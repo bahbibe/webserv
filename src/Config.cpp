@@ -67,6 +67,8 @@ void parseConfig(string const &buff)
             ss >> line;
             while (ss >> line)
             {
+                if (!isDirective(line))
+                    throw runtime_error(ERR "Unknown directive");
 
             }
         }
