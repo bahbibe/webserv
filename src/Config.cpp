@@ -1,53 +1,36 @@
 #include "../inc/webserv.hpp"
 
-bool isDirective(string const &line)
+void brackets(string const &file)
 {
-    vector<string> directives ;
-    directives.push_back("host");
-    directives.push_back("server_name");
-    directives.push_back("listen");
-    directives.push_back("error_page");
-    directives.push_back("client_max_body_size");
-    directives.push_back("root");
-    directives.push_back("index");
-    directives.push_back("autoindex");
-    for (size_t i = 0; i < directives.size(); i++)
-        if (line == directives[i])
-            return true;
-    return false;
-}
-
-void brackets(string const &buff)
-{
-    stringstream ss(buff);
-    string line;
+    stringstream ss(file);
+    string buff;
     int line_num = 0;
     stack<string> lim;
-    while (ss >> line)
-    {   
+    while (ss >> buff)
+    {
         line_num++;
-        if (line == "server" || line == "location")
+        if (buff == "server" || buff == "location")
         {
-            if (line == "location")
+            if (buff == "location")
             {
-                ss >> line;
-                if (line[0] != '/')
+                ss >> buff;
+                if (buff[0] != '/')
                     throw runtime_error(ERR "Expected '/'");
             }
-            ss >> line;
-            if (line == OPEN_BR)
-                lim.push(line);
+            ss >> buff;
+            if (buff == OPEN_BR)
+                lim.push(buff);
             else
                 throw runtime_error(ERR "Expected '{'");
         }
-        else if (line == CLOSE_BR)
+        else if (buff == CLOSE_BR)
         {
             if (lim.top() == OPEN_BR)
                 lim.pop();
             else
                 throw runtime_error(ERR "Expected '}'");
         }
-        else if (line_num == 1 && line != "server")
+        else if (line_num == 1 && buff != "server")
             throw runtime_error(ERR "Expected 'server'");
     }
     if (lim.size())
@@ -55,24 +38,10 @@ void brackets(string const &buff)
 }
 
 
-void parseConfig(string const &buff)
+void parseConfig(string const &file)
 {
-    brackets(buff);
-    stringstream ss(buff);
-    string line;
-    while (ss >> line)
-    {
-        if (line == "server")
-        {
-            ss >> line;
-            while (ss >> line)
-            {
-                if (!isDirective(line))
-                    throw runtime_error(ERR "Unknown directive");
-
-            }
-        }
-        else
-            throw runtime_error(ERR "Expected 'server'");
-    }
+    brackets(file);
+    Server *server = new Server();
+    server->parseServer(file);
+    delete server;
 }

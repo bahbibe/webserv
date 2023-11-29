@@ -5,11 +5,10 @@
 #include <vector>
 #include <stack>
 #include <map>
-// #include <string>
 // #include <stdexcept>
-// #include <algorithm>
+#include <algorithm>
 // #include <cctype>
-// #include <cstring>
+#include <cstring>
 #include <cstdlib>
 // #include <sys/stat.h>
 // #include <sys/types.h>
@@ -18,6 +17,34 @@
 // #include <sys/socket.h>
 // #include <netinet/in.h>
 // #include <arpa/inet.h>
+using namespace std;
+#include "Server.hpp"
+// #include "Location.hpp"
+
+
+
+/*CONFIG*/
+void brackets(string  const &);
+void parseConfig(string const &);
+// void parseServer(string const &);
+// void parseLocation(string const &);
+/*UTILS*/
+bool isWhitespace( string const&);
+bool isComment( string const&);
+bool isDirective(string const &);
+
+
+
+
+
+
+
+
+
+
+
+/*MACROS*/
+
 #define RED "\033[0;31m"
 #define GREEN "\033[0;32m"
 #define YELLOW "\033[0;33m"
@@ -26,7 +53,6 @@
 #define USAGE YELLOW "Usage: ./webserv [config_file] if no config file is provided, default.conf will be used" RESET
 #define OPEN_BR "{"
 #define CLOSE_BR "}"
+#define COLON ":"
+#define SEMICOLON ";"
 #define ERR RED "Error: " RESET
-using namespace std;
-void brackets(string  const &);
-void parseConfig(string const &);
