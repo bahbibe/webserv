@@ -11,7 +11,9 @@ int main(int argc, char const *argv[])
         {
             string buff;
             getline(conf, buff, '\0');
-            parseConfig(buff);
+            Server server;
+            server.parseConfig(buff);
+            server.print();
         }
         else
             throw runtime_error("Unable to open file");

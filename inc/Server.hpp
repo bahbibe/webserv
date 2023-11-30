@@ -48,6 +48,8 @@ class Server
     public:
         Server();
         ~Server();
+        void parseConfig(string const &);
         void parseServer(string const &);
+        Location *parseLocation(stringstream &ss);
         void print();
 };

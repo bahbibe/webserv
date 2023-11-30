@@ -21,6 +21,7 @@ bool isComment(const string &str)
 bool isDirective(string const &dir)
 {
     vector<string> directives;
+    directives.push_back("server");
     directives.push_back("server_name");
     directives.push_back("listen");
     directives.push_back("root");
@@ -29,6 +30,7 @@ bool isDirective(string const &dir)
     directives.push_back("index");
     directives.push_back("autoindex");
     directives.push_back("location");
+    directives.push_back("return");
     vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
     if (it != directives.end())
         return true;
