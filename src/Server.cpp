@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "../inc/Server.hpp"
 
 Server::Server()
 {
@@ -7,6 +7,12 @@ Server::Server()
 
 Server::~Server()
 {
+    map<string, Location *>::iterator it = _locations.begin();
+    for (; it != _locations.end(); it++)
+    {
+        delete it->second;
+    }
+    
 }
 
 void Server::parseConfig(string const &file)
@@ -96,22 +102,11 @@ Location *Server::parseLocation(stringstream &ss)
                 line >> buff;
                 location->setUploadPath(buff);
             }
-            else if (buff == "cgi_path")
-            {
-                string extention, path;
-                line >> extention;
-                if (extention != ".php" && extention != ".py")
-                    throw runtime_error(ERR "Invalid cgi extention");
-                line >> path;
-                location->setCgiPath(extention, path);
-            }
             else if (buff == "return")
             {
                 _dir.return_code++;
-                string code;
-                line >> code;
                 line >> buff;
-                location->setReturn(code, buff);
+                location->setReturn(buff);
             }
             else
                 throw runtime_error(ERR "Invalid directive");
@@ -122,7 +117,7 @@ Location *Server::parseLocation(stringstream &ss)
 
 bool duplicateDirective(t_dir dir)
 {
-    for (int i = 0; i < sizeof(t_dir) / sizeof(int); i++)
+    for (size_t i = 0; i < sizeof(t_dir) / sizeof(int); i++)
     {
         if (((int *)&dir)[i] > 1)
             return true;
@@ -234,5 +229,9 @@ void Server::print()
     cout << "client_max_body_size: " << _client_max_body_size << endl;
     cout << "autoindex: " << _autoindex << endl;
     cout << "locations: " << endl;
-    
+    for (map<string, Location *>::iterator it = _locations.begin(); it != _locations.end(); it++)
+    {
+        cout << "    " << it->first << endl;
+        it->second->print();
+    }
 }

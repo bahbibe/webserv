@@ -11,9 +11,8 @@ private:
     bool _cgi;
     bool _upload;
     string _upload_path;
-    map<string, string> _cgi_path;
-    pair<string, string> _return;
-    
+    string _return;
+
 public:
     Location();
     ~Location();
@@ -24,6 +23,6 @@ public:
     void setUpload(bool);
     void setCgi(bool);
     void setUploadPath(string const &);
-    void setCgiPath(string const &, string const &);
-    void setReturn(string const &, string const &);
+    void setReturn(string const &);
+    void print();
 };

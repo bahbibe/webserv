@@ -69,16 +69,15 @@ void brackets(string const &file)
 bool isServerDir(string const &dir)
 {
     vector<string> directives;
-    directives.push_back("server");
-    directives.push_back("server_name");
+    directives.push_back("host");
     directives.push_back("listen");
+    directives.push_back("server_name");
     directives.push_back("root");
     directives.push_back("error_page");
     directives.push_back("client_max_body_size");
     directives.push_back("index");
     directives.push_back("autoindex");
     directives.push_back("location");
-    directives.push_back("return");
     vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
     if (it != directives.end())
         return true;
@@ -89,11 +88,13 @@ bool isLocationDir(string const &dir)
 {
     vector<string> directives;
     directives.push_back("root");
+    directives.push_back("return");
+    directives.push_back("allow");
     directives.push_back("index");
     directives.push_back("autoindex");
-    directives.push_back("client_max_body_size");
     directives.push_back("cgi");
     directives.push_back("upload");
+    directives.push_back("upload_path");
     vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
     if (it != directives.end())
         return true;
@@ -117,7 +118,10 @@ bool isIpV4(string const &str)
     {
         if (!isNumber(*it))
             return false;
-        if (stoi(*it) < 0 || stoi(*it) > 255)
+        stringstream ss(*it);
+        int num;
+        ss >> num;
+        if (num < 0 || num > 255)
             return false;
     }
     return true;

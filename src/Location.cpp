@@ -1,6 +1,5 @@
 #include "../inc/webserv.hpp"
-#include "Location.hpp"
-
+#include "../inc/Location.hpp"
 
 Location::Location()
 {
@@ -43,22 +42,11 @@ void Location::setUploadPath(string const &buff)
     _upload_path = buff;
 }
 
-void Location::setCgiPath(string const &buff1, string const &buff2)
-{
-    _cgi_path[buff1] = buff2;
-}
 
-void Location::setReturn(string const &code, string const &buff)
+
+void Location::setReturn(string const &buff)
 {
-    string codes[6] = {"200", "201", "301", "400", "403", "404"};
-    for (int i = 0; i < 6; i++)
-        if (code == codes[i])
-        {
-            _return.first = code;
-            _return.second = buff;
-            return;
-        }
-    throw runtime_error(ERR "Invalid return code");
+    _return = buff;
 }
 
 void Location::setMethods(string const &buff)
@@ -71,4 +59,24 @@ void Location::setMethods(string const &buff)
             return;
         }
     throw runtime_error(ERR "Invalid method");
+}
+
+void Location::print()
+{
+    cout << "Location:" << endl;
+    cout << "    indexs: ";
+    for (size_t i = 0; i < _indexs.size(); i++)
+        cout << _indexs[i] << " ";
+    cout << endl;
+    cout << "    root: " << _root << endl;
+    cout << "    autoindex: " << _autoindex << endl;
+    cout << "    upload: " << _upload << endl;
+    cout << "    cgi: " << _cgi << endl;
+    cout << "    upload_path: " << _upload_path << endl;
+    cout << endl;
+    cout << "    return: " << _return << endl;
+    cout << "    methods: ";
+    for (size_t i = 0; i < _methods.size(); i++)
+        cout << _methods[i] << " ";
+    cout << endl;
 }

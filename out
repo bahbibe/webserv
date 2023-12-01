@@ -1,6 +1,7 @@
 host: 
 port: 8080
-server_root: ./www/html/server_1/php
+server_names: indexs: index.html index.php server_root: ./www/html
+error_pages: 
+client_max_body_size: 
 autoindex: 0
-client_max_body_size: 0
-server_names: 
+locations: 
