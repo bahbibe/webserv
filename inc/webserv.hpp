@@ -18,29 +18,13 @@
 // #include <netinet/in.h>
 // #include <arpa/inet.h>
 using namespace std;
-#include "Server.hpp"
-// #include "Location.hpp"
-
-
-
-/*CONFIG*/
-void brackets(string  const &);
-void parseConfig(string const &);
-// void parseServer(string const &);
-// void parseLocation(string const &);
-/*UTILS*/
 bool isWhitespace( string const&);
 bool isComment( string const&);
-bool isDirective(string const &);
-
-
-
-
-
-
-
-
-
+bool isServerDir(string const &);
+bool isLocationDir(string const &);
+bool isIpV4(string const &str);
+bool isNumber(string const &);
+void brackets(string const &file);
 
 
 /*MACROS*/

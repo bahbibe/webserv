@@ -11,9 +11,9 @@ all:$(NAME)
 run:all
 	@./$(NAME)
 	@make -s fclean
-test:all
-	@./$(NAME) test.conf
-	@make -s fclean
+# test:all
+# 	@./$(NAME) test.conf
+# 	@make -s fclean
 $(NAME):$(OBJ)
 	$(CC) $(CPPFLAGS) $(OBJ) -o $(NAME)
 clean:
