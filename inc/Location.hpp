@@ -14,6 +14,7 @@ private:
     string _return;
 
 public:
+    t_dir _dir;
     Location();
     ~Location();
     void setMethods(string const &);
@@ -24,5 +25,6 @@ public:
     void setCgi(bool);
     void setUploadPath(string const &);
     void setReturn(string const &);
+    t_dir getDir() const;
     void print();
 };

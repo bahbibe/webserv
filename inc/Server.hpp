@@ -1,26 +1,6 @@
 #pragma once
 #include "webserv.hpp"
 #include "Location.hpp"
-typedef struct s_direrctive
-{
-    int host;
-    int listen;
-    int server_name;
-    int index;
-    int loc_index;
-    int root;
-    int loc_root;
-    int autoindex;
-    int loc_autoindex;
-    int client_max_body_size;
-    int cgi;
-    int upload;
-    int upload_path;
-    int allow;
-    int return_code;
-
-} t_dir;
-
 
 class Server
 {

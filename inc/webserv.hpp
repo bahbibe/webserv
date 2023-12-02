@@ -18,14 +18,32 @@
 // #include <netinet/in.h>
 // #include <arpa/inet.h>
 using namespace std;
-bool isWhitespace( string const&);
-bool isComment( string const&);
+typedef struct s_direrctive
+{
+    int host;
+    int listen;
+    int server_name;
+    int index;
+    int root;
+    int autoindex;
+    int client_max_body_size;
+    int cgi;
+    int upload;
+    int upload_path;
+    int allow;
+    int return_code;
+} t_dir;
+
+bool isWhitespace(string const&);
+bool isComment(string const&);
+bool isBrackets(string const&);
 bool isServerDir(string const &);
 bool isLocationDir(string const &);
 bool isIpV4(string const &str);
 bool isNumber(string const &);
 void brackets(string const &file);
-
+bool duplicateDirective(t_dir dir);
+void printDirective(t_dir dir);
 
 /*MACROS*/
 

@@ -18,6 +18,14 @@ bool isComment(const string &str)
     return (it != str.end() && *it == '#');
 }
 
+bool isBrackets(const string &str)
+{
+    string::const_iterator it = str.begin();
+    while (it != str.end() && isspace(*it))
+        ++it;
+    return (it != str.end() && (*it == '{' || *it == '}'));
+}
+
 bool isNumber(const string &str)
 {
     for (string::const_iterator it = str.begin(); it != str.end(); ++it)
@@ -27,6 +35,8 @@ bool isNumber(const string &str)
     }
     return true;
 }
+
+
 
 void brackets(string const &file)
 {
@@ -125,4 +135,15 @@ bool isIpV4(string const &str)
             return false;
     }
     return true;
+}
+
+
+bool duplicateDirective(t_dir dir)
+{
+    for (size_t i = 0; i < sizeof(t_dir) / sizeof(int); i++)
+    {
+        if (((int *)&dir)[i] > 1)
+            return true;
+    }
+    return false;
 }
