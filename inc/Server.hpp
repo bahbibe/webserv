@@ -23,4 +23,5 @@ public:
     Location *parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void print();
+    void start();
 };
