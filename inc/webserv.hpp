@@ -43,7 +43,6 @@ bool isIpV4(string const &str);
 bool isNumber(string const &);
 void brackets(string const &file);
 bool duplicateDirective(t_dir dir);
-void printDirective(t_dir dir);
 
 /*MACROS*/
 

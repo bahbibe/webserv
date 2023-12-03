@@ -7,11 +7,11 @@ private:
     vector<string> _methods;
     vector<string> _indexs;
     string _root;
+    string _upload_path;
+    string _return;
     bool _autoindex;
     bool _cgi;
     bool _upload;
-    string _upload_path;
-    string _return;
 
 public:
     t_dir _dir;
@@ -25,6 +25,5 @@ public:
     void setCgi(bool);
     void setUploadPath(string const &);
     void setReturn(string const &);
-    t_dir getDir() const;
     void print();
 };

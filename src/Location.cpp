@@ -12,11 +12,6 @@ Location::~Location()
 {
 }
 
-t_dir Location::getDir() const
-{
-    return _dir;
-}
-
 void Location::setIndexs(string const &buff)
 {
     _indexs.push_back(buff);
@@ -37,17 +32,15 @@ void Location::setUpload(bool flag)
     _upload = flag;
 }
 
-void Location::setCgi(bool flag)
-{
-    _cgi = flag;
-}
-
 void Location::setUploadPath(string const &buff)
 {
     _upload_path = buff;
 }
 
-
+void Location::setCgi(bool flag)
+{
+    _cgi = flag;
+}
 
 void Location::setReturn(string const &buff)
 {
@@ -68,7 +61,6 @@ void Location::setMethods(string const &buff)
 
 void Location::print()
 {
-    cout << "Location:" << endl;
     cout << "    indexs: ";
     for (size_t i = 0; i < _indexs.size(); i++)
         cout << _indexs[i] << " ";

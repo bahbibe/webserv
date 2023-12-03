@@ -5,17 +5,16 @@
 class Server
 {
 private:
-    string _host;
-    string _port;
+    map<string, Location *> _locations;
+    map<string, string> _error_pages;
     vector<string> _server_names;
     vector<string> _indexs;
+    string _host;
+    string _port;
     string _server_root;
-    map<string, string> _error_pages;
     string _client_max_body_size;
     bool _autoindex;
-    map<string, Location *> _locations;
     t_dir _dir;
-
 public:
     Server();
     ~Server();

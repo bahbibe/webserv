@@ -1,6 +1,6 @@
 CC = c++
-CPPFLAGS = -Wall -Wextra -Werror -std=c++98 #-fsanitize=address -g3
-SRC = main.cpp src/Server.cpp src/Location.cpp  src/Utils.cpp 
+CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -fsanitize=address -g3
+SRC = main.cpp src/Server.cpp src/Location.cpp  src/Utils.cpp  src/Config.cpp
 OBJ = $(SRC:.cpp=.o)
 NAME = webserv
 
@@ -11,7 +11,7 @@ all:$(NAME)
 run:all
 	@./$(NAME)
 	@make -s fclean
-tst:all
+testing:all
 	@./$(NAME) test.conf
 	@make -s fclean
 $(NAME):$(OBJ)

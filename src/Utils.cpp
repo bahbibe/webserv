@@ -10,6 +10,31 @@ bool isWhitespace(const string &str)
     return true;
 }
 
+bool isIpV4(string const &str)
+{
+    vector<string> octets;
+    string::size_type pos = 0;
+    string::size_type prev = 0;
+    while ((pos = str.find('.', pos)) != string::npos)
+    {
+        octets.push_back(str.substr(prev, pos - prev));
+        prev = ++pos;
+    }
+    octets.push_back(str.substr(prev, pos - prev));
+    if (octets.size() != 4)
+        return false;
+    for (vector<string>::iterator it = octets.begin(); it != octets.end(); ++it)
+    {
+        if (!isNumber(*it))
+            return false;
+        stringstream ss(*it);
+        int num;
+        ss >> num;
+        if (num < 0 || num > 255)
+            return false;
+    }
+    return true;
+}
 bool isComment(const string &str)
 {
     string::const_iterator it = str.begin();
@@ -36,114 +61,3 @@ bool isNumber(const string &str)
     return true;
 }
 
-
-
-void brackets(string const &file)
-{
-    stringstream ss(file);
-    string buff;
-    stack<string> lim;
-    while (ss >> buff)
-    {
-        if (buff == "server")
-        {
-            ss >> buff;
-            if (buff == OPEN_BR)
-                lim.push(buff);
-            else
-                throw runtime_error(ERR "Expected '{'");
-        }
-        else if (buff == "location")
-        {
-            ss >> buff;
-            if (buff[0] != '/')
-                throw runtime_error(ERR "Expected '/'");
-            ss >> buff;
-            if (buff == OPEN_BR)
-                lim.push(buff);
-            else
-                throw runtime_error(ERR "Expected '{'");
-        }
-        else if (buff == CLOSE_BR)
-        {
-            if (!lim.empty() && lim.top() == OPEN_BR)
-                lim.pop();
-            else
-                throw runtime_error(ERR "Expected '}'");
-        }
-    }
-    if (!lim.empty())
-        throw runtime_error(ERR "Unclosed '{'");
-}
-
-bool isServerDir(string const &dir)
-{
-    vector<string> directives;
-    directives.push_back("host");
-    directives.push_back("listen");
-    directives.push_back("server_name");
-    directives.push_back("root");
-    directives.push_back("error_page");
-    directives.push_back("client_max_body_size");
-    directives.push_back("index");
-    directives.push_back("autoindex");
-    directives.push_back("location");
-    vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
-    if (it != directives.end())
-        return true;
-    return false;
-}
-
-bool isLocationDir(string const &dir)
-{
-    vector<string> directives;
-    directives.push_back("root");
-    directives.push_back("return");
-    directives.push_back("allow");
-    directives.push_back("index");
-    directives.push_back("autoindex");
-    directives.push_back("cgi");
-    directives.push_back("upload");
-    directives.push_back("upload_path");
-    vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
-    if (it != directives.end())
-        return true;
-    return false;
-}
-
-bool isIpV4(string const &str)
-{
-    vector<string> octets;
-    string::size_type pos = 0;
-    string::size_type prev = 0;
-    while ((pos = str.find('.', pos)) != string::npos)
-    {
-        octets.push_back(str.substr(prev, pos - prev));
-        prev = ++pos;
-    }
-    octets.push_back(str.substr(prev, pos - prev));
-    if (octets.size() != 4)
-        return false;
-    for (vector<string>::iterator it = octets.begin(); it != octets.end(); ++it)
-    {
-        if (!isNumber(*it))
-            return false;
-        stringstream ss(*it);
-        int num;
-        ss >> num;
-        if (num < 0 || num > 255)
-            return false;
-    }
-    return true;
-}
-
-
-bool duplicateDirective(t_dir dir)
-{
-    for (size_t i = 0; i < sizeof(t_dir) / sizeof(int); i++)
-    {
-        if (((int *)&dir)[i] > 1)
-            return true;
-    }
-    return false;
-}
