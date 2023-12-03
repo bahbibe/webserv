@@ -15,6 +15,7 @@ int main(int argc, char const *argv[])
             server.parseServer(buff);
             // server.print();
             server.start();
+            
         }
         else
             throw runtime_error("Unable to open file");

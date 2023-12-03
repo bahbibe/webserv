@@ -12,11 +12,13 @@
 #include <cstdlib>
 // #include <sys/stat.h>
 // #include <sys/types.h>
-// #include <unistd.h>
-// #include <fcntl.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/epoll.h>
+
 using namespace std;
 typedef struct s_direrctive
 {
@@ -34,12 +36,7 @@ typedef struct s_direrctive
     int return_code;
 } t_dir;
 
-// struct sockaddr_in {
-//     short            sin_family;   // e.g. AF_INET, AF_INET6
-//     unsigned short   sin_port;     // e.g. htons(3490)
-//     struct in_addr   sin_addr;     // see struct in_addr, below
-//     char             sin_zero[8];  // zero this if you want to
-// };
+
 
 bool isWhitespace(string const&);
 bool isComment(string const&);
