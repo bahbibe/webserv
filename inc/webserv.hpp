@@ -2,18 +2,16 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 #include <vector>
 #include <stack>
 #include <map>
-// #include <stdexcept>
-#include <algorithm>
-// #include <cctype>
 #include <cstring>
 #include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
 // #include <sys/stat.h>
 // #include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -35,8 +33,6 @@ typedef struct s_direrctive
     int allow;
     int return_code;
 } t_dir;
-
-
 
 bool isWhitespace(string const&);
 bool isComment(string const&);

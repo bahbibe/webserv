@@ -53,65 +53,65 @@ void Server::print()
 
 void Server::start()
 {
-    // int ep = epoll_create(1);
-    // epoll_event ev;
-    // epoll_event evs[1024];
+    int ep = epoll_create(1);
+    epoll_event ev;
+    epoll_event evs[1024];
 
-    // int sockfd;
-    // struct sockaddr_in serv_addr;
-    // int opt = 1;
+    int sockfd;
+    struct sockaddr_in serv_addr;
+    int opt = 1;
 
-    // if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
-    //     throw runtime_error(ERR "Socket failed");
-    // if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
-    //     throw runtime_error(ERR "Setsockopt failed");
-    // serv_addr.sin_family = AF_INET;
-    // serv_addr.sin_addr.s_addr = inet_addr(_host.c_str());
-    // serv_addr.sin_port = htons(atoi(_port.c_str()));
-    // if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    //     throw runtime_error(ERR "Bind failed");
-    // if (listen(sockfd, 3) < 0)
-    //     throw runtime_error(ERR "Listen failed");
-    // ev.data.fd = sockfd;
-    // ev.events = EPOLLIN;
-    // epoll_ctl(ep,EPOLL_CTL_ADD,sockfd,&ev);
-    // cout << GREEN "Server started on " RESET << _host << ":" << _port << "\n";
-    // while (1)
-    // {
-    //     int new_socket;
-    //     struct sockaddr_in address;
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+        throw runtime_error(ERR "Socket failed");
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+        throw runtime_error(ERR "Setsockopt failed");
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = inet_addr(_host.c_str());
+    serv_addr.sin_port = htons(atoi(_port.c_str()));
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        throw runtime_error(ERR "Bind failed");
+    if (listen(sockfd, 3) < 0)
+        throw runtime_error(ERR "Listen failed");
+    ev.data.fd = sockfd;
+    ev.events = EPOLLIN;
+    epoll_ctl(ep,EPOLL_CTL_ADD,sockfd,&ev);
+    cout << GREEN "Server started on " RESET << _host << ":" << _port << "\n";
+    while (1)
+    {
+        int new_socket;
+        struct sockaddr_in address;
            
 
-    //     int fd_ready = epoll_wait(ep,evs,1024,-1); 
-    //     int addrlen = sizeof(address);
-    //     for(int i = 0; i < fd_ready;i++)
-    //     {
-    //         if(evs[i].data.fd == sockfd)
-    //         {
-    //             if ((new_socket = accept(sockfd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
-    //                 throw runtime_error(ERR "Accept failed");
-    //             cout << "New connection\n";
-    //             cout << new_socket << endl;
-    //             ev.data.fd = new_socket;
-    //             ev.events = EPOLLIN | EPOLLOUT;
-    //             epoll_ctl(ep,EPOLL_CTL_ADD,new_socket,&ev);
-    //         }
-    //         if(evs[i].data.fd != sockfd  && evs[i].events & EPOLLIN)
-    //         {
-    //             cout << evs[i].data.fd << endl;
-    //         }
+        int fd_ready = epoll_wait(ep,evs,1024,-1); 
+        int addrlen = sizeof(address);
+        for(int i = 0; i < fd_ready;i++)
+        {
+            if(evs[i].data.fd == sockfd)
+            {
+                if ((new_socket = accept(sockfd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+                    throw runtime_error(ERR "Accept failed");
+                cout << "New connection\n";
+                cout << new_socket << endl;
+                ev.data.fd = new_socket;
+                ev.events = EPOLLIN | EPOLLOUT;
+                epoll_ctl(ep,EPOLL_CTL_ADD,new_socket,&ev);
+            }
+            if(evs[i].data.fd != sockfd  && evs[i].events & EPOLLIN)
+            {
+                cout << evs[i].data.fd << endl;
+            }
             
-    //     }
+        }
         
         
-    //     // Request *req = new Request(new_socket, _locations, _error_pages, _server_root, _autoindex, _client_max_body_size);
-    //     // req->parseRequest();
-    //     // req->print();
-    //     // Response *res = new Response(req);
-    //     // res->sendResponse();
-    //     // delete req;
-    //     // delete res;
-    // }
+        // Request *req = new Request(new_socket, _locations, _error_pages, _server_root, _autoindex, _client_max_body_size);
+        // req->parseRequest();
+        // req->print();
+        // Response *res = new Response(req);
+        // res->sendResponse();
+        // delete req;
+        // delete res;
+    }
 
-    
+
 }
