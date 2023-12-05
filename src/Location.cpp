@@ -19,6 +19,8 @@ void Location::setIndexs(string const &buff)
 
 void Location::setRoot(string const &buff)
 {
+    // if (access(buff.c_str(), F_OK) == -1)
+    //     throw runtime_error(ERR "Root doesn't exist");
     _root = buff;
 }
 
@@ -34,6 +36,10 @@ void Location::setUpload(bool flag)
 
 void Location::setUploadPath(string const &buff)
 {
+    // if (_upload == false)
+    //     throw runtime_error(ERR "Upload is off");
+    // if (access(buff.c_str(), F_OK) == -1)
+    //     throw runtime_error(ERR "Upload path doesn't exist");
     _upload_path = buff;
 }
 

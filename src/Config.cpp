@@ -226,6 +226,8 @@ void Server::parseServer(string const &file)
             {
                 _dir.root++;
                 line >> _server_root;
+                // if (access(_server_root.c_str(), F_OK) == -1)
+                //     throw runtime_error(ERR "Root doesn't exist");
             }
             else if (buff == "autoindex")
             {
@@ -248,6 +250,8 @@ void Server::parseServer(string const &file)
             else if (buff == "location")
             {
                 line >> buff;
+                // if (access(buff.c_str(), F_OK) == -1)
+                //     throw runtime_error(ERR "Location doesn't exist");
                 _locations[buff] = parseLocation(ss);
             }
         }

@@ -13,8 +13,8 @@ int main(int argc, char const *argv[])
             getline(conf, buff, '\0');
             Server server;
             server.parseServer(buff);
-            // server.print();
-            server.start();
+            server.print();
+            // server.start();
             
         }
         else

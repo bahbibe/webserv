@@ -16,6 +16,8 @@ Server::~Server()
 
 void Server::setErrorCodes(string const &code, string const &buff)
 {
+    // if (access(buff.c_str(), F_OK) == -1)
+    //     throw runtime_error(ERR "Error page doesn't exist");
     string codes[11] = {"400", "403", "404", "405", "411", "413", "414", "500", "501", "503", "505"};
     for (int i = 0; i < 11; i++)
         if (code == codes[i])
