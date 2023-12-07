@@ -15,13 +15,23 @@ private:
     string _client_max_body_size;
     bool _autoindex;
     t_dir _dir;
+    int _sockFd;
 public:
     Server();
     ~Server();
-    void parseConfig(string const &);
     void parseServer(string const &);
     Location *parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void print();
     void start();
+    void setupSocket();
+    class ServerException : public exception
+    {
+    private:
+        string _msg;
+    public:
+        ServerException(string const &msg) : _msg(msg) {}
+        virtual ~ServerException() throw() {}
+        virtual const char *what() const throw(){ return _msg.c_str();}
+    };
 };

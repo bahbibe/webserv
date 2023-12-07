@@ -6,7 +6,7 @@ int main(int argc, char const *argv[])
     {
         ifstream conf;
         (argc == 1) ? conf.open("default.conf") : (argc == 2) ? conf.open(argv[1])
-                                                                     : throw runtime_error(USAGE);
+                                                                     : throw Server::ServerException(USAGE);
         if (conf.is_open())
         {
             string buff;
@@ -15,13 +15,12 @@ int main(int argc, char const *argv[])
             server.parseServer(buff);
             server.print();
             // server.start();
-            
         }
         else
-            throw runtime_error("Unable to open file");
+            throw Server::ServerException("Unable to open file");
     }
-    catch (const std::exception &e)
+    catch (const exception &e)
     {
-        std::cerr << e.what() << '\n';
+        cerr << e.what() << '\n';
     }
 }

@@ -1,5 +1,6 @@
 #include "../inc/webserv.hpp"
 #include "../inc/Location.hpp"
+#include "../inc/Server.hpp"
 
 Location::Location()
 {
@@ -8,50 +9,14 @@ Location::Location()
     _cgi = false;
 }
 
-Location::~Location()
-{
-}
-
-void Location::setIndexs(string const &buff)
-{
-    _indexs.push_back(buff);
-}
-
-void Location::setRoot(string const &buff)
-{
-    // if (access(buff.c_str(), F_OK) == -1)
-    //     throw runtime_error(ERR "Root doesn't exist");
-    _root = buff;
-}
-
-void Location::setAutoindex(bool flag)
-{
-    _autoindex = flag;
-}
-
-void Location::setUpload(bool flag)
-{
-    _upload = flag;
-}
-
-void Location::setUploadPath(string const &buff)
-{
-    // if (_upload == false)
-    //     throw runtime_error(ERR "Upload is off");
-    // if (access(buff.c_str(), F_OK) == -1)
-    //     throw runtime_error(ERR "Upload path doesn't exist");
-    _upload_path = buff;
-}
-
-void Location::setCgi(bool flag)
-{
-    _cgi = flag;
-}
-
-void Location::setReturn(string const &buff)
-{
-    _return = buff;
-}
+Location::~Location(){}
+void Location::setIndexs(string const &buff){_indexs.push_back(buff);}
+void Location::setRoot(string const &buff) {_root = buff;}
+void Location::setAutoindex(bool flag) {_autoindex = flag;}
+void Location::setUpload(bool flag) {_upload = flag;}
+void Location::setUploadPath(string const &buff) {_upload_path = buff;}
+void Location::setCgi(bool flag) {_cgi = flag;}
+void Location::setReturn(string const &buff) {_return = buff;}
 
 void Location::setMethods(string const &buff)
 {
@@ -62,7 +27,7 @@ void Location::setMethods(string const &buff)
             _methods.push_back(buff);
             return;
         }
-    throw runtime_error(ERR "Invalid method");
+    throw Server::ServerException(ERR "Invalid method");
 }
 
 void Location::print()

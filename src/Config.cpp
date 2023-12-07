@@ -14,29 +14,29 @@ void brackets(string const &file)
             if (buff == OPEN_BR)
                 lim.push(buff);
             else
-                throw runtime_error(ERR "Expected '{'");
+                throw Server::ServerException(ERR "Expected '{'");
         }
         else if (buff == "location")
         {
             ss >> buff;
             if (buff[0] != '/')
-                throw runtime_error(ERR "Expected '/'");
+                throw Server::ServerException(ERR "Expected '/'");
             ss >> buff;
             if (buff == OPEN_BR)
                 lim.push(buff);
             else
-                throw runtime_error(ERR "Expected '{'");
+                throw Server::ServerException(ERR "Expected '{'");
         }
         else if (buff == CLOSE_BR)
         {
             if (!lim.empty() && lim.top() == OPEN_BR)
                 lim.pop();
             else
-                throw runtime_error(ERR "Expected '}'");
+                throw Server::ServerException(ERR "Expected '}'");
         }
     }
     if (!lim.empty())
-        throw runtime_error(ERR "Unclosed '{'");
+        throw Server::ServerException(ERR "Unclosed '{'");
 }
 
 bool isServerDir(string const &dir)
@@ -73,9 +73,6 @@ bool isLocationDir(string const &dir)
         return true;
     return false;
 }
-
-
-
 
 bool duplicateDirective(t_dir dir)
 {
@@ -127,7 +124,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setAutoindex(true);
                 else if (tmp != "off")
-                    throw runtime_error(ERR "Invalid autoindex");
+                    throw ServerException(ERR "Invalid autoindex");
             }
             else if (tmp == "cgi")
             {
@@ -136,7 +133,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setCgi(true);
                 else if (tmp != "off")
-                    throw runtime_error(ERR "Invalid cgi");
+                    throw ServerException(ERR "Invalid cgi");
             }
             else if (tmp == "upload")
             {
@@ -145,7 +142,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setUpload(true);
                 else if (tmp != "off")
-                    throw runtime_error(ERR "Invalid upload");
+                    throw ServerException(ERR "Invalid upload");
             }
             else if (tmp == "upload_path")
             {
@@ -161,10 +158,10 @@ Location *Server::parseLocation(stringstream &ss)
             }
         }
         else
-            throw runtime_error(ERR "Invalid directive");
+            throw ServerException(ERR "Invalid directive");
     }
     if (duplicateDirective(location->_dir))
-        throw runtime_error(ERR "Duplicate directive");
+        throw ServerException(ERR "Duplicate directive");
     return location;
 }
 
@@ -174,7 +171,6 @@ void Server::parseServer(string const &file)
     stringstream ss(file);
     string buff;
     ss >> buff >> buff;
-    memset(&_dir, 0, sizeof(t_dir));
     while (getline(ss, buff))
     {
         if (isBrackets(buff) && buff.find("}") != string::npos)
@@ -192,7 +188,7 @@ void Server::parseServer(string const &file)
                 if (_host == "localhost")
                     _host = "127.0.0.1";
                 else if (!isIpV4(_host))
-                    throw runtime_error(ERR "Invalid host");
+                    throw ServerException(ERR "Invalid host");
             }
             else if (buff == "listen")
             {
@@ -201,7 +197,7 @@ void Server::parseServer(string const &file)
                 if (_port.empty())
                     _port = "80";
                 if (!isNumber(_port))
-                    throw runtime_error(ERR "Invalid port");
+                    throw ServerException(ERR "Invalid port");
             }
             else if (buff == "server_name")
             {
@@ -226,8 +222,6 @@ void Server::parseServer(string const &file)
             {
                 _dir.root++;
                 line >> _server_root;
-                // if (access(_server_root.c_str(), F_OK) == -1)
-                //     throw runtime_error(ERR "Root doesn't exist");
             }
             else if (buff == "autoindex")
             {
@@ -238,26 +232,24 @@ void Server::parseServer(string const &file)
                 else if (buff == "off")
                     _autoindex = false;
                 else
-                    throw runtime_error(ERR "Invalid autoindex");
+                    throw ServerException(ERR "Invalid autoindex");
             }
             else if (buff == "client_max_body_size")
             {
                 _dir.client_max_body_size++;
                 line >> _client_max_body_size;
                 if (!isNumber(_client_max_body_size))
-                    throw runtime_error(ERR "Invalid client_max_body_size");
+                    throw ServerException(ERR "Invalid client_max_body_size");
             }
             else if (buff == "location")
             {
                 line >> buff;
-                // if (access(buff.c_str(), F_OK) == -1)
-                //     throw runtime_error(ERR "Location doesn't exist");
                 _locations[buff] = parseLocation(ss);
             }
         }
         else
-            throw runtime_error(ERR "Invalid directive" + buff);
+            throw ServerException(ERR "Invalid directive");
     }
     if (duplicateDirective(_dir))
-        throw runtime_error(ERR "Duplicate directive");
+        throw ServerException(ERR "Duplicate directive");
 }
