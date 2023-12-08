@@ -2,13 +2,7 @@
 #include "../inc/Location.hpp"
 #include "../inc/Server.hpp"
 
-Location::Location()
-{
-    _autoindex = false;
-    _upload = false;
-    _cgi = false;
-}
-
+Location::Location() : _autoindex(false), _cgi(false), _upload(false){}
 Location::~Location(){}
 void Location::setIndexs(string const &buff){_indexs.push_back(buff);}
 void Location::setRoot(string const &buff) {_root = buff;}
@@ -17,7 +11,6 @@ void Location::setUpload(bool flag) {_upload = flag;}
 void Location::setUploadPath(string const &buff) {_upload_path = buff;}
 void Location::setCgi(bool flag) {_cgi = flag;}
 void Location::setReturn(string const &buff) {_return = buff;}
-
 void Location::setMethods(string const &buff)
 {
     string method[3] = {"GET", "POST", "DELETE"};
@@ -29,7 +22,6 @@ void Location::setMethods(string const &buff)
         }
     throw Server::ServerException(ERR "Invalid method");
 }
-
 void Location::print()
 {
     cout << "    indexs: ";

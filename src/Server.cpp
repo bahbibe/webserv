@@ -14,12 +14,13 @@ Server::~Server()
         delete it->second;
     }
     close(_sockFd);
+    close(_epollFd);
 }
 
 void Server::setErrorCodes(string const &code, string const &buff)
 {
-    string codes[11] = {"400", "403", "404", "405", "411", "413", "414", "500", "501", "503", "505"};
-    for (int i = 0; i < 11; i++)
+    string codes[9] = {"400", "403", "404", "405", "409", "413", "414", "500", "501"};
+    for (int i = 0; i < 9; i++)
         if (code == codes[i])
         {
             _error_pages[code] = buff;
@@ -55,64 +56,54 @@ void Server::print()
 
 void Server::setupSocket()
 {
-    int opt = 1;
-    struct sockaddr_in serv_addr;
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(_host.c_str());
-    serv_addr.sin_port = htons(atoi(_port.c_str()));
+    int sockOpt = 1;
+    struct sockaddr_in serverAddr;
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(_host.c_str());
+    serverAddr.sin_port = htons(atoi(_port.c_str()));
+    if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        throw ServerException(ERR "Failed to create socket");
+    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR , &sockOpt, sizeof(sockOpt)))
+        throw ServerException(ERR "Failed to set socket options");
+    if (bind(_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)))
+        throw ServerException(ERR "Failed to bind socket");
+    if (listen(_socket, 1))
+        throw ServerException(ERR "Failed to listen on socket");    
+    cout << LISTENING << _host + ":" + _port + "\n";
+}
 
-    if ((_sockFd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        throw ServerException(ERR "Socket failed");
-    if (setsockopt(_sockFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
-        throw ServerException(ERR "Setsockopt failed");
-    if (bind(_sockFd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        throw ServerException(ERR "Bind failed");
-    if (listen(_sockFd, 3) < 0)
-        throw ServerException(ERR "Listen failed");
+void Server::setupEpoll()
+{
+    if((_epoll = epoll_create(1) ) == -1 )
+        throw ServerException(ERR "Failed to create epoll");
+    epoll_event event;
+    event.data.fd = _socket;
+    event.events = EPOLLIN;
+    if (epoll_ctl(_epoll,EPOLL_CTL_ADD,_socket,&event))
+        throw ServerException(ERR "Failed to add socket to epoll");
 }
 void Server::start()
 {
-    int ep = epoll_create(1);
-    epoll_event ev;
-    epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
-
-    int opt = 1;
-    struct sockaddr_in serv_addr;
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(_host.c_str());
-    serv_addr.sin_port = htons(atoi(_port.c_str()));
-
-    if ((_sockFd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        throw ServerException(ERR "Socket failed");
-    if (setsockopt(_sockFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
-        throw ServerException(ERR "Setsockopt failed");
-    if (bind(_sockFd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        throw ServerException(ERR "Bind failed");
-    if (listen(_sockFd, 3) < 0)
-        throw ServerException(ERR "Listen failed");
-    ev.data.fd = _sockFd;
-    ev.events = EPOLLIN;
-    epoll_ctl(ep,EPOLL_CTL_ADD,_sockFd,&ev);
-    cout << GREEN "Server started on " RESET << _host << ":" << _port << "\n";
+    // epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
+    setupSocket();
+    setupEpoll();
     while (1)
     {
-        int new_socket;
-        struct sockaddr_in address;
-           
-
-        int fd_ready = epoll_wait(ep,evs,1024,-1); 
-        int addrlen = sizeof(address);
-        for(int i = 0; i < fd_ready;i++)
+        // int clientSock;
+        // struct sockaddr_in clientAddr;
+        // socklen_t addrLen = sizeof(clientAddr);
+        int evCount = epoll_wait(_epoll,evs,MAX_EVENTS,-1); 
+        for(int i = 0; i < evCount;i++)
         {
             if(evs[i].data.fd == _sockFd)
             {
-                if ((new_socket = accept(_sockFd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+                if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
                     throw ServerException(ERR "Accept failed");
                 cout << "New connection\n";
-                cout << new_socket << '\n';
-                ev.data.fd = new_socket;
+                ev.data.fd = clientSock;
                 ev.events = EPOLLIN | EPOLLOUT;
-                epoll_ctl(ep,EPOLL_CTL_ADD,new_socket,&ev);
+                epoll_ctl(ep,EPOLL_CTL_ADD,clientSock,&ev);
             }
             if(evs[i].data.fd != _sockFd  && evs[i].events & EPOLLIN)
                 cout << evs[i].data.fd << '\n';

@@ -4,14 +4,14 @@
 class Location
 {
 private:
+    bool _autoindex;
+    bool _cgi;
+    bool _upload;
     vector<string> _methods;
     vector<string> _indexs;
     string _root;
     string _upload_path;
     string _return;
-    bool _autoindex;
-    bool _cgi;
-    bool _upload;
 
 public:
     t_dir _dir;

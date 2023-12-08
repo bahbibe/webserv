@@ -15,7 +15,8 @@ private:
     string _client_max_body_size;
     bool _autoindex;
     t_dir _dir;
-    int _sockFd;
+    int _socket;
+    int _epoll;
 public:
     Server();
     ~Server();
@@ -25,6 +26,7 @@ public:
     void print();
     void start();
     void setupSocket();
+    void setupEpoll();
     class ServerException : public exception
     {
     private:

@@ -57,3 +57,7 @@ bool duplicateDirective(t_dir dir);
 #define COLON ":"
 #define SEMICOLON ";"
 #define ERR RED "Error: " RESET
+#define DEFAULT_CONF "conf/default.conf"
+#define DEFAULT_PORT "80"
+#define MAX_EVENTS 1024
+#define LISTENING GREEN "Listening on " RESET

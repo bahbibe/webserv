@@ -12,7 +12,7 @@ run:all
 	@./$(NAME)
 	@make -s fclean
 testing:all
-	@./$(NAME) /config/test.conf
+	@./$(NAME) /conf/test.conf
 	@make -s fclean
 $(NAME):$(OBJ)
 	$(CC) $(CPPFLAGS) $(OBJ) -o $(NAME)

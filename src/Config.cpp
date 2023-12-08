@@ -195,7 +195,7 @@ void Server::parseServer(string const &file)
                 _dir.listen++;
                 line >> _port;
                 if (_port.empty())
-                    _port = "80";
+                    _port = DEFAULT_PORT;
                 if (!isNumber(_port))
                     throw ServerException(ERR "Invalid port");
             }
