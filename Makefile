@@ -1,5 +1,5 @@
 CC = c++
-CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -fsanitize=address -g3
+CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -g3 -fsanitize=address 
 SRC = main.cpp src/Server.cpp src/Location.cpp  src/Utils.cpp  src/Config.cpp \
 		src/Request/Request.cpp
 OBJ = $(SRC:.cpp=.o)
