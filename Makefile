@@ -1,6 +1,7 @@
 CC = c++
 CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -fsanitize=address -g3
-SRC = main.cpp src/Server.cpp src/Location.cpp  src/Utils.cpp  src/Config.cpp
+SRC = main.cpp src/Server.cpp src/Location.cpp  src/Utils.cpp  src/Config.cpp \
+		src/Request/Request.cpp
 OBJ = $(SRC:.cpp=.o)
 NAME = webserv
 

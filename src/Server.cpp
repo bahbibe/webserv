@@ -13,8 +13,8 @@ Server::~Server()
     {
         delete it->second;
     }
-    close(_sockFd);
-    close(_epollFd);
+    close(_socket);
+    close(_epoll);
 }
 
 void Server::setErrorCodes(string const &code, string const &buff)
@@ -85,28 +85,33 @@ void Server::setupEpoll()
 }
 void Server::start()
 {
-    // epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
+    epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
     setupSocket();
     setupEpoll();
+    epoll_event ev;
+    // Request::runTests();
     while (1)
     {
-        // int clientSock;
-        // struct sockaddr_in clientAddr;
-        // socklen_t addrLen = sizeof(clientAddr);
+        int clientSock;
+        struct sockaddr_in clientAddr;
+        socklen_t addrLen = sizeof(clientAddr);
         int evCount = epoll_wait(_epoll,evs,MAX_EVENTS,-1); 
         for(int i = 0; i < evCount;i++)
         {
-            if(evs[i].data.fd == _sockFd)
+            if(evs[i].data.fd == _socket)
             {
                 if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
                     throw ServerException(ERR "Accept failed");
                 cout << "New connection\n";
                 ev.data.fd = clientSock;
                 ev.events = EPOLLIN | EPOLLOUT;
-                epoll_ctl(ep,EPOLL_CTL_ADD,clientSock,&ev);
+                epoll_ctl(_epoll,EPOLL_CTL_ADD,clientSock,&ev);
             }
-            if(evs[i].data.fd != _sockFd  && evs[i].events & EPOLLIN)
-                cout << evs[i].data.fd << '\n';
+            if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
+            {
+                Request *req = new Request(evs[i].data.fd, evs[i]);
+                delete req;
+            }
             
         }
         
