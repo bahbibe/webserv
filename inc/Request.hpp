@@ -7,10 +7,12 @@
 
 class Request {
 private:
-    char _buffer[BUFFER_SIZE];
     int _socketFd;
-    std::string _request;
     epoll_event _event;
+    int _requestLine;
+    
+    char _buffer[BUFFER_SIZE];
+    std::string _request;
 
     // request stuff
     std::string _method;
@@ -20,7 +22,8 @@ private:
     std::map<std::string, std::string> _headers;
     
     void readRequest();
-    void parseRequest();
+    void parseRequest(std::string buffer);
+    void parseRequestLine(std::string requestLine);
     void validateRequest();
     std::vector<std::string> split(std::string str, std::string delimiter);
     std::string toLowerCase(const std::string &str);

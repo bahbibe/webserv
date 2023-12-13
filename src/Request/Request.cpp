@@ -4,19 +4,18 @@ Request::~Request()
 {
 }
 
-Request::Request(int socket, epoll_event event)
+Request::Request(int socket, epoll_event event) : _socketFd(socket), _event(event), _requestLine(0)
 {
-    _socketFd = socket;
-    _event = event;
     memset(_buffer, 0, BUFFER_SIZE);
     this->readRequest();
-    // std::cout << "------ Request Start -----" << std::endl;
-    // std::cout << _request << std::endl;
-    // std::cout << "------ Request END -----" << std::endl;
-    this->parseRequest();
+    std::cout << "------ Request Start -----" << std::endl;
+    std::cout << _request << std::endl;
+    std::cout << "------ Request END -----" << std::endl;
+    // this->parseRequest();
     std::cout << "Method: " << _method << std::endl;
     std::cout << "Request Target: " << _requestTarget << std::endl;
     std::cout << "HTTP Version: " << _httpVersion << std::endl;
+    std::cout << "Headers size: " << _headers.size() << std::endl;
     std::cout << "Headers: " << std::endl;
     std::map<std::string, std::string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
@@ -31,7 +30,9 @@ void Request::readRequest()
         throw Server::ServerException(ERR "Failed to read from socket");
     while (readBytes > 0)
     {
+        _buffer[readBytes] = '\0';
         _request.append(_buffer, readBytes);
+        this->parseRequest(_buffer);
         if (_request.find("\r\n\r\n") != std::string::npos)
             break;
         readBytes = recv(_socketFd, _buffer, BUFFER_SIZE, 0);
@@ -62,43 +63,50 @@ std::string Request::toLowerCase(const std::string& str)
     return lowerCaseStr;
 }
 
-void Request::parseRequest()
+typedef std::pair<std::map<std::string, std::string>::iterator, bool> ret_type;
+
+void Request::parseRequest(std::string buffer)
 {
-    size_t pos = this->_request.find("\r\n");
-    if (pos == std::string::npos)
-        throw Server::ServerException(ERR "Invalid request");
-    std::string requestLine = this->_request.substr(0, pos);
-    this->_request.erase(0, pos + 2);
-    std::vector<std::string> requestLineTokens = split(requestLine, " ");
-    if (requestLineTokens.size() != 3)
-        throw Server::ServerException(ERR "Invalid request");
-    this->_method = requestLineTokens[0];
-    this->_requestTarget = requestLineTokens[1];
-    this->_httpVersion = requestLineTokens[2];
-    pos = this->_request.find("\r\n");
-    while (pos != std::string::npos)
+    if (this->_requestLine == 0)
+        this->parseRequestLine(buffer);
+    else
     {
-        std::string headerLine = this->_request.substr(0, pos);
-        this->_request.erase(0, pos + 2);
-        if (this->_request.empty())
-            break;
-        std::vector<std::string> headerLineTokens = split(headerLine, ": ");
-        if (headerLineTokens.size() != 2)
-            throw Server::ServerException(ERR "Invalid request");
-        this->_headers.insert(std::pair<std::string, std::string>(this->toLowerCase(headerLineTokens[0]), headerLineTokens[1]));
-        pos = this->_request.find("\r\n");
+        if (buffer == "\r\n")
+            return;
+        if (buffer.find("\r\n") == std::string::npos)
+            throw Server::ServerException(ERR "Invalid request (no \\r\\n)");
+        buffer = buffer.substr(0, buffer.length() - 2);
+        std::vector<std::string> headerTokens = this->split(buffer, ": ");
+        std::string headerName = toLowerCase(headerTokens[0]);
+        std::string headerValue = headerTokens[1];
+        ret_type ret = this->_headers.insert(std::pair<std::string, std::string>(headerName, headerValue));
+        if (headerName == "host" && ret.second == false)
+            throw Server::ServerException(ERR "Invalid request (duplicate host header)");
     }
-    std::map<std::string, std::string>::iterator it = this->_headers.find("host");
-    if (it == this->_headers.end())
-        throw Server::ServerException(ERR "Invalid request");
-    this->validateRequest();
+}
+
+
+void Request::parseRequestLine(std::string requestLine)
+{
+    if (requestLine.find("\r\n") == std::string::npos)
+        throw Server::ServerException(ERR "Invalid request (no \\r\\n)");
+    requestLine = requestLine.substr(0, requestLine.length() - 2);
+    std::vector<std::string> tokens = this->split(requestLine, " ");
+    if (tokens.size() != 3)
+        throw Server::ServerException(ERR "Invalid request (size not 3)");
+    this->_method = tokens[0];
+    this->_requestTarget = tokens[1];
+    this->_httpVersion = tokens[2];
+    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
+        throw Server::ServerException(ERR "Invalid request (invalid method)");
+    // TODO: validate the request target
+    if (this->_httpVersion != "HTTP/1.1")
+        throw Server::ServerException(ERR "Invalid request (invalid http version)");
+    this->_requestLine++;
 }
 
 void Request::validateRequest()
 {
-    // validate the method
-    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
-        throw Server::ServerException(ERR "Invalid request");
 }
 
 void Request::runTests()
