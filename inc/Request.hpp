@@ -9,7 +9,7 @@ class Request {
 private:
     int _socketFd;
     epoll_event _event;
-    int _requestLine;
+    int _lineCount;
     
     char _buffer[BUFFER_SIZE];
     std::string _request;
@@ -23,7 +23,7 @@ private:
     
     void readRequest();
     void parseRequest(std::string buffer);
-    void parseRequestLine(std::string requestLine);
+    void parseRequestLine(std::string& requestLine);
     void validateRequest();
     std::vector<std::string> split(std::string str, std::string delimiter);
     std::string toLowerCase(const std::string &str);
