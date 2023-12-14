@@ -18,8 +18,9 @@ private:
     std::string _method;
     std::string _requestTarget;
     std::string _httpVersion;
-    std::string _host;
     std::map<std::string, std::string> _headers;
+
+    int _statusCode;
     
     void readRequest();
     void parseRequest(std::string buffer);
@@ -27,10 +28,10 @@ private:
     void validateRequest();
     std::vector<std::string> split(std::string str, std::string delimiter);
     std::string toLowerCase(const std::string &str);
+    void throwException(const std::string& msg, int statusCode);
 public:
     Request(int socket, epoll_event event);
     ~Request();
-
 
     static void runTests();
 

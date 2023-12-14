@@ -4,13 +4,13 @@ Request::~Request()
 {
 }
 
-Request::Request(int socket, epoll_event event) : _socketFd(socket), _event(event), _lineCount(0)
+Request::Request(int socket, epoll_event event) : _socketFd(socket), _event(event), _lineCount(0), _statusCode(0)
 {
     memset(_buffer, 0, BUFFER_SIZE);
     this->readRequest();
     std::map<std::string, std::string>::iterator it = _headers.find("host");
     if (it == _headers.end())
-        throw Server::ServerException(ERR "Invalid request (no host header)");
+        throwException(ERR "Invalid request (no host header)", 400);
     std::cout << "Method: " << _method << std::endl;
     std::cout << "Request Target: " << _requestTarget << std::endl;
     std::cout << "HTTP Version: " << _httpVersion << std::endl;
@@ -83,13 +83,11 @@ void Request::parseRequest(std::string buffer)
                 std::string headerValue = headerTokens[1];
                 ret_type ret = this->_headers.insert(std::pair<std::string, std::string>(headerName, headerValue));
                 if (headerName == "host" && ret.second == false)
-                    throw Server::ServerException(ERR "Invalid request (duplicate host header)");
+                    throwException(ERR "Invalid request (duplicate host header)", 400);
             }
         }
     }
-    
 }
-
 
 void Request::parseRequestLine(std::string& buffer)
 {
@@ -105,15 +103,21 @@ void Request::parseRequestLine(std::string& buffer)
     this->_requestTarget = tokens[1];
     this->_httpVersion = tokens[2];
     if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
-        throw Server::ServerException(ERR "Invalid request (invalid method)");
+        throwException(ERR "Invalid request (invalid method)", 400);
     // TODO: validate the request target
+    
+    // TODO: need to check if http version is not supported (505 if not supported)
     if (this->_httpVersion != "HTTP/1.1")
-        throw Server::ServerException(ERR "Invalid request (invalid http version)");
+        throwException(ERR "Invalid request (invalid http version)", 400);
     this->_lineCount++;
 }
 
-void Request::validateRequest()
+
+void Request::throwException(const std::string& msg, int statusCode)
 {
+    this->_statusCode = statusCode;
+    std::cout << "Status Code: " << _statusCode << std::endl;
+    throw Server::ServerException(msg);
 }
 
 void Request::runTests()
