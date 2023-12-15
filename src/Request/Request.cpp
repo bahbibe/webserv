@@ -4,22 +4,9 @@ Request::~Request()
 {
 }
 
-Request::Request(int socket, epoll_event event) : _socketFd(socket), _event(event), _lineCount(0), _statusCode(0)
+Request::Request(int socket, epoll_event event) : _socketFd(socket), _event(event), _lineCount(0), _statusCode(200), isRequestFinished(false)
 {
     memset(_buffer, 0, BUFFER_SIZE);
-    this->readRequest();
-    std::map<std::string, std::string>::iterator it = _headers.find("host");
-    if (it == _headers.end())
-        throwException(ERR "Invalid request (no host header)", 400);
-    std::cout << "Method: " << _method << std::endl;
-    std::cout << "Request Target: " << _requestTarget << std::endl;
-    std::cout << "HTTP Version: " << _httpVersion << std::endl;
-    std::cout << "Headers size: " << _headers.size() << std::endl;
-    std::cout << "Headers: " << std::endl;
-    it = _headers.begin();
-    for (; it != _headers.end(); it++)
-        std::cout << it->first << ": " << it->second << std::endl;
-    std::cout << "Body: " << _body << std::endl;
 }
 
 void Request::readRequest()
@@ -41,6 +28,18 @@ void Request::readRequest()
         // readBytes = recv(_socketFd, _buffer, BUFFER_SIZE, 0);
         // readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
     // }
+    std::map<std::string, std::string>::iterator it = _headers.find("host");
+    if (it == _headers.end())
+        throwException(ERR "Invalid request (no host header)", 400);
+    std::cout << "Method: " << _method << std::endl;
+    std::cout << "Request Target: " << _requestTarget << std::endl;
+    std::cout << "HTTP Version: " << _httpVersion << std::endl;
+    std::cout << "Headers size: " << _headers.size() << std::endl;
+    std::cout << "Headers: " << std::endl;
+    it = _headers.begin();
+    for (; it != _headers.end(); it++)
+        std::cout << it->first << ": " << it->second << std::endl;
+    std::cout << "Body: " << _body << std::endl;
 }
 
 std::vector<std::string> Request::split(std::string str, std::string delimiter)
@@ -128,6 +127,7 @@ void Request::throwException(const std::string& msg, int statusCode)
     (void) msg;
     this->_statusCode = statusCode;
     std::cout << "Status Code: " << _statusCode << std::endl;
+    this->isRequestFinished = true;
     // throw Server::ServerException(msg);
 }
 

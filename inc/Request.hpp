@@ -10,6 +10,7 @@ private:
     int _socketFd;
     epoll_event _event;
     int _lineCount;
+    bool isRequestFinished;
     
     char _buffer[BUFFER_SIZE];
     std::string _request;
@@ -23,10 +24,8 @@ private:
 
     int _statusCode;
     
-    void readRequest();
     void parseRequest(std::string buffer);
     void parseRequestLine(std::string& requestLine);
-    void validateRequest();
     std::vector<std::string> split(std::string str, std::string delimiter);
     std::string toLowerCase(const std::string &str);
     void throwException(const std::string& msg, int statusCode);
@@ -34,6 +33,7 @@ public:
     Request(int socket, epoll_event event);
     ~Request();
 
+    void readRequest();
     static void runTests();
 
 };

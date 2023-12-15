@@ -97,6 +97,7 @@ void Server::start()
         int evCount = epoll_wait(_epoll,evs,MAX_EVENTS,-1); 
         for(int i = 0; i < evCount;i++)
         {
+            Request req = Request(evs[i].data.fd, evs[i]);
             if(evs[i].data.fd == _socket)
             {
                 if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
@@ -107,11 +108,7 @@ void Server::start()
                 epoll_ctl(_epoll,EPOLL_CTL_ADD,clientSock,&ev);
             }
             if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
-            {
-                Request *req = new Request(evs[i].data.fd, evs[i]);
-                delete req;
-            }
-            
+                req.readRequest();
         }
         
         
