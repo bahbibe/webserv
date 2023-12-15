@@ -19,6 +19,7 @@ private:
     std::string _requestTarget;
     std::string _httpVersion;
     std::map<std::string, std::string> _headers;
+    std::string _body;
 
     int _statusCode;
     
@@ -36,3 +37,13 @@ public:
     static void runTests();
 
 };
+
+/*
+POST /post.php HTTP/1.1
+Host: localhost:8080
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 23
+
+name=JohnWick&age=30
+
+*/

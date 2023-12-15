@@ -89,7 +89,6 @@ void Server::start()
     setupSocket();
     setupEpoll();
     epoll_event ev;
-    // Request::runTests();
     while (1)
     {
         int clientSock;

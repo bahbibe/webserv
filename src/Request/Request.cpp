@@ -19,24 +19,28 @@ Request::Request(int socket, epoll_event event) : _socketFd(socket), _event(even
     it = _headers.begin();
     for (; it != _headers.end(); it++)
         std::cout << it->first << ": " << it->second << std::endl;
+    std::cout << "Body: " << _body << std::endl;
 }
 
 void Request::readRequest()
 {
-    int readBytes = recv(_socketFd, _buffer, BUFFER_SIZE, 0);
-    // int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
+    // int readBytes = recv(_socketFd, _buffer, BUFFER_SIZE, 0);
+    int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
     if (readBytes == -1)
         throw Server::ServerException(ERR "Failed to read from socket");
-    while (readBytes > 0)
-    {
+    // while (readBytes > 0)
+    // {
         _buffer[readBytes] = '\0';
         _request.append(_buffer, readBytes);
         this->parseRequest(_buffer);
-        if (_request.find("\r\n\r\n") != std::string::npos)
-            break;
-        readBytes = recv(_socketFd, _buffer, BUFFER_SIZE, 0);
+        // if (_request.find("\r\n\r\n") != std::string::npos)
+        // {
+        //     std::cout << "Found end of request" << std::endl;
+        //     break;
+        // }
+        // readBytes = recv(_socketFd, _buffer, BUFFER_SIZE, 0);
         // readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
-    }
+    // }
 }
 
 std::vector<std::string> Request::split(std::string str, std::string delimiter)
@@ -76,11 +80,17 @@ void Request::parseRequest(std::string buffer)
                 break;
             std::string header = buffer.substr(0, pos);
             buffer.erase(0, pos + 2);
+            if (header.length() == 0 && buffer.length() != 0)
+            {
+                std::cout << "Found body" << std::endl;
+                this->_body = buffer;
+                break;
+            }
             if (header.length() != 0)
             {
                 std::vector<std::string> headerTokens = this->split(header, ": ");
                 std::string headerName = toLowerCase(headerTokens[0]);
-                std::string headerValue = headerTokens[1];
+                std::string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
                 ret_type ret = this->_headers.insert(std::pair<std::string, std::string>(headerName, headerValue));
                 if (headerName == "host" && ret.second == false)
                     throwException(ERR "Invalid request (duplicate host header)", 400);
@@ -115,9 +125,10 @@ void Request::parseRequestLine(std::string& buffer)
 
 void Request::throwException(const std::string& msg, int statusCode)
 {
+    (void) msg;
     this->_statusCode = statusCode;
     std::cout << "Status Code: " << _statusCode << std::endl;
-    throw Server::ServerException(msg);
+    // throw Server::ServerException(msg);
 }
 
 void Request::runTests()
