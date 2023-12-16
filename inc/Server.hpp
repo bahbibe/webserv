@@ -1,6 +1,7 @@
 #pragma once
 #include "webserv.hpp"
 #include "Location.hpp"
+#include "Request.hpp"
 
 class Server
 {

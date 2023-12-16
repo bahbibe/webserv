@@ -1,0 +1,57 @@
+#pragma once
+
+#include "webserv.hpp"
+#include "Server.hpp"
+
+#define BUFFER_SIZE 1024
+
+class Request {
+private:
+    int _socketFd;
+    int _lineCount;
+    int _statusCode;
+    string _statusMessage;
+    bool isRequestFinished;
+    
+    char _buffer[BUFFER_SIZE];
+    string _request;
+
+    string _method;
+    string _requestTarget;
+    string _httpVersion;
+    map<string, string> _headers;
+    string _body;
+    
+    void parseRequest(string buffer);
+    void parseRequestLine(string& requestLine);
+    vector<string> split(string str, string delimiter);
+    string toLowerCase(const string &str);
+    void setStatusCode(int statusCode, string statusMessage);
+public:
+    Request(int socket);
+    Request();
+    ~Request();
+
+    void readRequest(int socket);
+    
+    void printRequest();
+
+    bool getIsRequestFinished() const;
+    string getStatusMessage() const;
+    string getMethod() const;
+    string getRequestTarget() const;
+    string getHttpVersion() const;
+    map<string, string> getHeaders() const;
+    string getBody() const;
+};
+
+/*
+POST /post.php HTTP/1.1
+Host: localhost:8080
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 23
+Content-Length: 23
+
+name=JohnWick&age=30
+
+*/
