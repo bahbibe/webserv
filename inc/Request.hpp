@@ -8,40 +8,48 @@
 class Request {
 private:
     int _socketFd;
-    epoll_event _event;
     int _lineCount;
+    int _statusCode;
+    string _statusMessage;
     bool isRequestFinished;
     
     char _buffer[BUFFER_SIZE];
-    std::string _request;
+    string _request;
 
-    // request stuff
-    std::string _method;
-    std::string _requestTarget;
-    std::string _httpVersion;
-    std::map<std::string, std::string> _headers;
-    std::string _body;
-
-    int _statusCode;
+    string _method;
+    string _requestTarget;
+    string _httpVersion;
+    map<string, string> _headers;
+    string _body;
     
-    void parseRequest(std::string buffer);
-    void parseRequestLine(std::string& requestLine);
-    std::vector<std::string> split(std::string str, std::string delimiter);
-    std::string toLowerCase(const std::string &str);
-    void throwException(const std::string& msg, int statusCode);
+    void parseRequest(string buffer);
+    void parseRequestLine(string& requestLine);
+    vector<string> split(string str, string delimiter);
+    string toLowerCase(const string &str);
+    void setStatusCode(int statusCode, string statusMessage);
 public:
-    Request(int socket, epoll_event event);
+    Request(int socket);
+    Request();
     ~Request();
 
-    void readRequest();
-    static void runTests();
+    void readRequest(int socket);
+    
+    void printRequest();
 
+    bool getIsRequestFinished() const;
+    string getStatusMessage() const;
+    string getMethod() const;
+    string getRequestTarget() const;
+    string getHttpVersion() const;
+    map<string, string> getHeaders() const;
+    string getBody() const;
 };
 
 /*
 POST /post.php HTTP/1.1
 Host: localhost:8080
 Content-Type: application/x-www-form-urlencoded
+Content-Length: 23
 Content-Length: 23
 
 name=JohnWick&age=30
