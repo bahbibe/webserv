@@ -12,6 +12,7 @@ private:
     int _statusCode;
     string _statusMessage;
     bool isRequestFinished;
+    bool _isFoundCRLF;
     
     char _buffer[BUFFER_SIZE];
     string _request;
@@ -28,12 +29,11 @@ private:
     string toLowerCase(const string &str);
     void setStatusCode(int statusCode, string statusMessage);
 public:
-    Request(int socket);
     Request();
     ~Request();
 
     void readRequest(int socket);
-    
+
     void printRequest();
 
     bool getIsRequestFinished() const;

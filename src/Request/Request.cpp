@@ -4,12 +4,7 @@ Request::~Request()
 {
 }
 
-Request::Request(int socket) : _socketFd(socket), _lineCount(0), _statusCode(200), isRequestFinished(false)
-{
-    memset(_buffer, 0, BUFFER_SIZE);
-}
-
-Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false)
+Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), _isFoundCRLF(false)
 {
     memset(_buffer, 0, BUFFER_SIZE);
 }
@@ -26,6 +21,12 @@ void Request::readRequest(int socket)
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
+    if (_method != "POST")
+        setStatusCode(200, "OK");
+    if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
+        setStatusCode(501, "Unsupported Transfer-Encoding");
+    if (_headers.find("content-length") != _headers.end() && _headers.find("transfer-encoding") != _headers.end())
+        setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
     this->setStatusCode(200, "OK");
 }
 
@@ -46,7 +47,7 @@ void Request::parseRequest(string buffer)
             buffer.erase(0, pos + 2);
             if (header.length() == 0 && buffer.length() != 0)
             {
-                cout << "Found body" << endl;
+                cout << "Found body: do not read it here" << endl;
                 this->_body = buffer;
                 break;
             }
@@ -84,6 +85,7 @@ void Request::parseRequestLine(string& buffer)
     this->_method = tokens[0];
     this->_requestTarget = tokens[1];
     this->_httpVersion = tokens[2];
+    // TODO: 405 Method Not Allowed
     if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
         setStatusCode(400, "Invalid Method");
     // TODO: validate the request target
