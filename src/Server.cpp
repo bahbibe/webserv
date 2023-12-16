@@ -111,6 +111,7 @@ void Server::start()
             {
                 try
                 {
+                    // TODO: support telnet for reading request
                     req.readRequest(evs[i].data.fd);
                 }
                 catch(int statusCode)
