@@ -45,24 +45,16 @@ void Request::parseRequest(string buffer)
                 break;
             string header = buffer.substr(0, pos);
             buffer.erase(0, pos + 2);
+                // cout << "Found body: do not read it here" << endl;
+                // this->_body = buffer;
             if (header.length() == 0 && buffer.length() != 0)
-            {
-                cout << "Found body: do not read it here" << endl;
-                this->_body = buffer;
-                break;
-            }
+                return this->parseBody(buffer);
             if (header.length() != 0)
             {
                 vector<string> headerTokens = this->split(header, ": ");
                 string headerName = toLowerCase(headerTokens[0]);
                 string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
-                for (size_t i = 0; i < headerValue.length(); i++)
-                {
-                    if (headerValue[i] == ' ')
-                        headerValue.erase(i, 1);
-                    else
-                        break;
-                }
+                trim(headerValue);
                 ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
                 //! NOTE: random headers can be duplicated
                 if (ret.second == false)
@@ -97,11 +89,34 @@ void Request::parseRequestLine(string& buffer)
     this->_lineCount++;
 }
 
+void Request::parseBody(string buffer)
+{
+    if (_headers.find("content-length") != _headers.end())
+    {
+        string contentLengthStr = _headers["content-length"];
+        for (size_t i = 0; i < contentLengthStr.length(); i++)
+            if (!isdigit(contentLengthStr[i]))
+                setStatusCode(400, "Invalid Content-Length");
+        int contentLength = atoi(_headers["content-length"].c_str());
+        if (contentLength == 0)
+            setStatusCode(200, "OK");
+        if (contentLength < 0)
+            setStatusCode(400, "Invalid Content-Length");
+        if (buffer.length() < (size_t)contentLength)
+        {
+            // TODO: read more from socket
+            cout << "Not enough data in buffer: Should read more" << endl;
+            this->_body = buffer;
+            return;
+        }
+        this->_body = buffer.substr(0, contentLength);
+        buffer.erase(0, contentLength);
+    }
+}
 
 void Request::setStatusCode(int statusCode, string statusMessage)
 {
     this->_statusCode = statusCode;
-    cout << "Status Code: " << _statusCode << endl;
     this->isRequestFinished = true;
     stringstream ss;
     ss << statusCode;
@@ -177,4 +192,12 @@ string Request::toLowerCase(const string &str)
     for (size_t i = 0; i < str.length(); i++)
         lowerCaseStr += tolower(str[i]);
     return lowerCaseStr;
+}
+
+void Request::trim(string& str)
+{
+    while (str.length() > 0 && str[0] == ' ')
+        str.erase(0, 1);
+    while (str.length() > 0 && str[str.length() - 1] == ' ')
+        str.erase(str.length() - 1, 1);
 }

@@ -25,9 +25,12 @@ private:
     
     void parseRequest(string buffer);
     void parseRequestLine(string& requestLine);
+    void parseBody(string buffer);
     vector<string> split(string str, string delimiter);
     string toLowerCase(const string &str);
     void setStatusCode(int statusCode, string statusMessage);
+
+    void trim(string& str);
 public:
     Request();
     ~Request();
@@ -49,8 +52,7 @@ public:
 POST /post.php HTTP/1.1
 Host: localhost:8080
 Content-Type: application/x-www-form-urlencoded
-Content-Length: 23
-Content-Length: 23
+Content-Length: 25
 
 name=JohnWick&age=30
 
