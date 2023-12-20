@@ -21,7 +21,10 @@ private:
     string _requestTarget;
     string _httpVersion;
     map<string, string> _headers;
-    string _body;
+    string _uploadFilePath;
+    string _filePath;
+    fstream *_outfile;
+    bool _outfileIsCreated;
     
     void parseRequest(string buffer);
     void parseRequestLine(string& requestLine);
@@ -29,6 +32,7 @@ private:
     vector<string> split(string str, string delimiter);
     string toLowerCase(const string &str);
     void setStatusCode(int statusCode, string statusMessage);
+    void createOutfile();
 
     void trim(string& str);
 public:
@@ -45,7 +49,7 @@ public:
     string getRequestTarget() const;
     string getHttpVersion() const;
     map<string, string> getHeaders() const;
-    string getBody() const;
+    fstream* getOutFile() const;
 };
 
 /*

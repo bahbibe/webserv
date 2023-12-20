@@ -2,11 +2,17 @@
 
 Request::~Request()
 {
+    if (this->_outfileIsCreated)
+    {
+        this->_outfile->close();
+        delete this->_outfile;
+    }
 }
 
-Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), _isFoundCRLF(false)
+Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false)
 {
     memset(_buffer, 0, BUFFER_SIZE);
+    this->_uploadFilePath = "upload/";
 }
 
 void Request::readRequest(int socket)
@@ -17,7 +23,8 @@ void Request::readRequest(int socket)
         throw Server::ServerException(ERR "Failed to read from socket");
     _buffer[readBytes] = '\0';
     this->parseRequest(_buffer);
-    this->printRequest();
+    if (!this->isRequestFinished)
+        return;
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
@@ -45,8 +52,6 @@ void Request::parseRequest(string buffer)
                 break;
             string header = buffer.substr(0, pos);
             buffer.erase(0, pos + 2);
-                // cout << "Found body: do not read it here" << endl;
-                // this->_body = buffer;
             if (header.length() == 0 && buffer.length() != 0)
                 return this->parseBody(buffer);
             if (header.length() != 0)
@@ -89,33 +94,51 @@ void Request::parseRequestLine(string& buffer)
     this->_lineCount++;
 }
 
+void Request::createOutfile()
+{
+    // TODO: upload the file in the upload folder
+    this->_filePath = this->_uploadFilePath + "file.txt";
+    this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
+    if (!this->_outfile->is_open())
+        setStatusCode(500, "Failed to create file");
+    this->_outfileIsCreated = true;
+}
+
 void Request::parseBody(string buffer)
 {
+    if (this->_method != "POST")
+        return;
+    if (!this->_outfileIsCreated)
+        this->createOutfile();
     if (_headers.find("content-length") != _headers.end())
     {
         string contentLengthStr = _headers["content-length"];
         for (size_t i = 0; i < contentLengthStr.length(); i++)
             if (!isdigit(contentLengthStr[i]))
                 setStatusCode(400, "Invalid Content-Length");
-        int contentLength = atoi(_headers["content-length"].c_str());
+        size_t contentLength = atoi(_headers["content-length"].c_str());
         if (contentLength == 0)
             setStatusCode(200, "OK");
-        if (contentLength < 0)
-            setStatusCode(400, "Invalid Content-Length");
-        if (buffer.length() < (size_t)contentLength)
+        if (buffer.length() < contentLength)
         {
             // TODO: read more from socket
             cout << "Not enough data in buffer: Should read more" << endl;
-            this->_body = buffer;
+            // this->_body = buffer;
             return;
         }
-        this->_body = buffer.substr(0, contentLength);
+        if (buffer.length() > contentLength)
+            buffer.erase(contentLength, buffer.length() - contentLength);
+        this->_outfile->write(buffer.c_str(), contentLength);
+        this->_outfile->flush();
         buffer.erase(0, contentLength);
+        if (buffer.length() == 0)
+            setStatusCode(201, "Created");
     }
 }
 
 void Request::setStatusCode(int statusCode, string statusMessage)
 {
+    this->printRequest();
     this->_statusCode = statusCode;
     this->isRequestFinished = true;
     stringstream ss;
@@ -134,7 +157,6 @@ void Request::printRequest()
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
         cout << it->first << ": " << it->second << endl;
-    cout << "Body: " << _body << endl;
 }
 
 bool Request::getIsRequestFinished() const
@@ -167,9 +189,9 @@ map<string, string> Request::getHeaders() const
     return this->_headers;
 }
 
-string Request::getBody() const
+fstream *Request::getOutFile() const
 {
-    return this->_body;
+    return this->_outfile;
 }
 
 vector<string> Request::split(string str, string delimiter)
