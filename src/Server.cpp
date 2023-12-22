@@ -89,6 +89,7 @@ void Server::start()
     setupSocket();
     setupEpoll();
     epoll_event ev;
+    Request *req;
     while (1)
     {
         int clientSock;
@@ -97,7 +98,7 @@ void Server::start()
         int evCount = epoll_wait(_epoll,evs,MAX_EVENTS,-1); 
         for(int i = 0; i < evCount;i++)
         {
-            Request req;
+            // Request req;
             if(evs[i].data.fd == _socket)
             {
                 if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
@@ -105,21 +106,31 @@ void Server::start()
                 cout << "New connection\n";
                 ev.data.fd = clientSock;
                 ev.events = EPOLLIN | EPOLLOUT;
+                req = new Request();
                 epoll_ctl(_epoll,EPOLL_CTL_ADD,clientSock,&ev);
             }
             if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
             {
-                try
-                {
-                    // TODO: support telnet for reading request
-                    req.readRequest(evs[i].data.fd);
-                }
-                catch(int statusCode)
-                {
-                    std::cerr << req.getStatusMessage() << '\n';
-                    // exit(0);
-                    close(evs[i].data.fd);
-                }
+                req->readRequest(evs[i].data.fd);
+                if (req->getIsRequestFinished())
+                    cout << GREEN "Request finished\n" RESET;
+                // try
+                // {
+                //     // TODO: support telnet for reading request
+                //     req.readRequest(evs[i].data.fd);
+                //     // req.validateRequest();
+                // }
+                // catch(int statusCode)
+                // {
+                //     std::cerr << req.getStatusMessage() << '\n';
+                //     // exit(0);
+                //     close(evs[i].data.fd);
+                // }
+            }
+            if (req && req->getIsRequestFinished())
+            {
+                delete req;
+                close(evs[i].data.fd);
             }
         }
         

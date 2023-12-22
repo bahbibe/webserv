@@ -17,24 +17,31 @@ Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), 
 
 void Request::readRequest(int socket)
 {
-    this->_socketFd = socket;
-    int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
-    if (readBytes == -1)
-        throw Server::ServerException(ERR "Failed to read from socket");
-    _buffer[readBytes] = '\0';
-    this->parseRequest(_buffer);
-    if (!this->isRequestFinished)
+    try {
+        this->_socketFd = socket;
+        int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
+        if (readBytes == -1)
+            throw Server::ServerException(ERR "Failed to read from socket");
+        _buffer[readBytes] = '\0';
+        this->parseRequest(_buffer);
+        if (!this->isRequestFinished)
+            return;
+    } catch (int statusCode)
+    {
+        std::cerr << this->getStatusMessage() << '\n';
         return;
+    }
+}
+
+void Request::validateRequest()
+{
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
-    if (_method != "POST")
-        setStatusCode(200, "OK");
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
         setStatusCode(501, "Unsupported Transfer-Encoding");
     if (_headers.find("content-length") != _headers.end() && _headers.find("transfer-encoding") != _headers.end())
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
-    this->setStatusCode(200, "OK");
 }
 
 typedef pair<map<string, string>::iterator, bool> ret_type;
@@ -52,8 +59,10 @@ void Request::parseRequest(string buffer)
                 break;
             string header = buffer.substr(0, pos);
             buffer.erase(0, pos + 2);
+            if (header.length() == 0 && buffer.length() == 0)
+                this->parseBody(buffer);
             if (header.length() == 0 && buffer.length() != 0)
-                return this->parseBody(buffer);
+                this->parseBody(buffer);
             if (header.length() != 0)
             {
                 vector<string> headerTokens = this->split(header, ": ");
@@ -106,33 +115,69 @@ void Request::createOutfile()
 
 void Request::parseBody(string buffer)
 {
+    this->validateRequest();
+    if (buffer.length() == 0)
+        setStatusCode(200, "OK");
     if (this->_method != "POST")
-        return;
+        setStatusCode(200, "OK");
     if (!this->_outfileIsCreated)
         this->createOutfile();
-    if (_headers.find("content-length") != _headers.end())
+    if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
+        parseBodyWithChunked(buffer);
+    else if (_headers.find("content-length") != _headers.end())
+        parseBodyWithContentLength(buffer);
+}
+
+void Request::parseBodyWithContentLength(string buffer)
+{
+    string contentLengthStr = _headers["content-length"];
+    for (size_t i = 0; i < contentLengthStr.length(); i++)
+        if (!isdigit(contentLengthStr[i]))
+            setStatusCode(400, "Invalid Content-Length");
+    size_t contentLength = atoi(_headers["content-length"].c_str());
+    if (contentLength == 0)
+        setStatusCode(200, "OK");
+    if (buffer.length() < contentLength)
     {
-        string contentLengthStr = _headers["content-length"];
-        for (size_t i = 0; i < contentLengthStr.length(); i++)
-            if (!isdigit(contentLengthStr[i]))
-                setStatusCode(400, "Invalid Content-Length");
-        size_t contentLength = atoi(_headers["content-length"].c_str());
-        if (contentLength == 0)
-            setStatusCode(200, "OK");
-        if (buffer.length() < contentLength)
-        {
-            // TODO: read more from socket
-            cout << "Not enough data in buffer: Should read more" << endl;
-            // this->_body = buffer;
-            return;
-        }
-        if (buffer.length() > contentLength)
-            buffer.erase(contentLength, buffer.length() - contentLength);
-        this->_outfile->write(buffer.c_str(), contentLength);
+        // TODO: read more from socket
+        cout << "Not enough data in buffer: Should read more" << endl;
+        return;
+    }
+    if (buffer.length() > contentLength)
+        buffer.erase(contentLength, buffer.length() - contentLength);
+    this->_outfile->write(buffer.c_str(), contentLength);
+    this->_outfile->flush();
+    buffer.erase(0, contentLength);
+    if (buffer.length() == 0)
+        setStatusCode(201, "Created");
+}
+
+void Request::parseBodyWithChunked(string buffer)
+{
+    //* get size of chunk
+    size_t pos = buffer.find("\r\n");
+    if (pos == string::npos)
+        return;
+    string chunkSizeStr = buffer.substr(0, pos);
+    buffer.erase(0, pos + 2);
+    for (size_t i = 0; i < chunkSizeStr.length(); i++)
+        if (!isxdigit(chunkSizeStr[i]))
+            setStatusCode(400, "Invalid Chunk Size");
+    size_t chunkSize = strtol(chunkSizeStr.c_str(), NULL, 16);
+    if (chunkSize == 0)
+        setStatusCode(201, "OK");
+    //* get chunk
+    if (buffer.length() < chunkSize)
+    {
+        this->_outfile->write(buffer.c_str(), buffer.length());
         this->_outfile->flush();
-        buffer.erase(0, contentLength);
-        if (buffer.length() == 0)
-            setStatusCode(201, "Created");
+        buffer.erase(0, buffer.length());
+    }
+    else
+    {
+        this->_outfile->write(buffer.c_str(), chunkSize);
+        this->_outfile->flush();
+        buffer.erase(0, chunkSize);
     }
 }
 

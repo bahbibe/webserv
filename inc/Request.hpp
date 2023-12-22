@@ -29,6 +29,8 @@ private:
     void parseRequest(string buffer);
     void parseRequestLine(string& requestLine);
     void parseBody(string buffer);
+    void parseBodyWithContentLength(string buffer);
+    void parseBodyWithChunked(string buffer);
     vector<string> split(string str, string delimiter);
     string toLowerCase(const string &str);
     void setStatusCode(int statusCode, string statusMessage);
@@ -40,6 +42,7 @@ public:
     ~Request();
 
     void readRequest(int socket);
+    void validateRequest();
 
     void printRequest();
 
