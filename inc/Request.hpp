@@ -38,6 +38,7 @@ private:
 
     void trim(string& str);
 public:
+    bool isErrorCode;
     Request();
     ~Request();
 

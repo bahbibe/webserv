@@ -9,7 +9,7 @@ Request::~Request()
     }
 }
 
-Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false)
+Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), isErrorCode(false)
 {
     memset(_buffer, 0, BUFFER_SIZE);
     this->_uploadFilePath = "upload/";
@@ -188,6 +188,8 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     this->isRequestFinished = true;
     stringstream ss;
     ss << statusCode;
+    if (statusCode >= 400)
+        this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
     throw  statusCode;
 }
