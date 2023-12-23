@@ -230,7 +230,10 @@ string Request::getHttpVersion() const
 {
     return this->_httpVersion;
 }
-
+int Request::getStatusCode() const
+{
+    return this->_statusCode;
+}
 map<string, string> Request::getHeaders() const
 {
     return this->_headers;

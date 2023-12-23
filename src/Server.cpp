@@ -1,4 +1,5 @@
 #include "../inc/Server.hpp"
+#include "../inc/Response.hpp"
 
 Server::Server()
 {
@@ -112,8 +113,8 @@ void Server::start()
             if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
             {
                 req->readRequest(evs[i].data.fd);
-                if (req->getIsRequestFinished())
-                    cout << GREEN "Request finished\n" RESET;
+                // if (req->getIsRequestFinished())
+                //     cout << GREEN "Request finished\n" RESET;
                 // try
                 // {
                 //     // TODO: support telnet for reading request
@@ -126,6 +127,14 @@ void Server::start()
                 //     // exit(0);
                 //     close(evs[i].data.fd);
                 // }
+            }
+            if(evs[i].data.fd != _socket  && evs[i].events & EPOLLOUT && req->getIsRequestFinished())
+            {
+                Response r(*req, evs[i].data.fd);
+                // cout << "Request finished\n";
+                // Response res(req);
+                // res.sendResponse(evs[i].data.fd);
+                close(evs[i].data.fd);
             }
             if (req && req->getIsRequestFinished())
             {

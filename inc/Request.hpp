@@ -52,6 +52,7 @@ public:
     string getMethod() const;
     string getRequestTarget() const;
     string getHttpVersion() const;
+    int getStatusCode() const;
     map<string, string> getHeaders() const;
     fstream* getOutFile() const;
 };
