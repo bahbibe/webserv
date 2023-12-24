@@ -25,6 +25,8 @@ private:
     string _filePath;
     fstream *_outfile;
     bool _outfileIsCreated;
+    size_t _bodyLength;
+    bool _isReadingBody;
     
     void parseRequest(string buffer);
     void parseRequestLine(string& requestLine);
