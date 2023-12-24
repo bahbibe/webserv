@@ -9,7 +9,9 @@ Request::~Request()
     }
 }
 
-Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false), _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), isErrorCode(false)
+Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false),
+    _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
+    _isReadingBody(false), isErrorCode(false)
 {
     memset(_buffer, 0, BUFFER_SIZE);
     this->_uploadFilePath = "upload/";
@@ -48,6 +50,8 @@ typedef pair<map<string, string>::iterator, bool> ret_type;
 
 void Request::parseRequest(string buffer)
 {
+    if (this->_isReadingBody)
+        return this->parseBody(buffer);
     while (buffer.length() > 0)
     {
         if (this->_lineCount == 0)
@@ -59,9 +63,11 @@ void Request::parseRequest(string buffer)
                 break;
             string header = buffer.substr(0, pos);
             buffer.erase(0, pos + 2);
-            if (header.length() == 0 && buffer.length() == 0)
-                this->parseBody(buffer);
-            if (header.length() == 0 && buffer.length() != 0)
+            // if (header.length() == 0 && buffer.length() == 0)
+            //     this->parseBody(buffer);
+            // if (header.length() == 0 && buffer.length() != 0)
+            //     this->parseBody(buffer);
+            if (header.length() == 0)
                 this->parseBody(buffer);
             if (header.length() != 0)
             {
@@ -115,9 +121,11 @@ void Request::createOutfile()
 
 void Request::parseBody(string buffer)
 {
+    this->_isReadingBody = true;
     this->validateRequest();
-    if (buffer.length() == 0)
-        setStatusCode(200, "OK");
+    //! NOTE: if the request has no body, the body length is 0 maybe should wait for the body 
+    // if (buffer.length() == 0)
+    //     setStatusCode(200, "OK");
     if (this->_method != "POST")
         setStatusCode(200, "OK");
     if (!this->_outfileIsCreated)
@@ -135,12 +143,16 @@ void Request::parseBodyWithContentLength(string buffer)
         if (!isdigit(contentLengthStr[i]))
             setStatusCode(400, "Invalid Content-Length");
     size_t contentLength = atoi(_headers["content-length"].c_str());
+    size_t headerContentLength = contentLength;
     if (contentLength == 0)
         setStatusCode(200, "OK");
+    contentLength -= _bodyLength;
     if (buffer.length() < contentLength)
     {
-        // TODO: read more from socket
-        cout << "Not enough data in buffer: Should read more" << endl;
+        this->_outfile->write(buffer.c_str(), buffer.length());
+        this->_outfile->flush();
+        _bodyLength += buffer.length();
+        buffer.erase(0, buffer.length());
         return;
     }
     if (buffer.length() > contentLength)
@@ -148,7 +160,8 @@ void Request::parseBodyWithContentLength(string buffer)
     this->_outfile->write(buffer.c_str(), contentLength);
     this->_outfile->flush();
     buffer.erase(0, contentLength);
-    if (buffer.length() == 0)
+    _bodyLength += contentLength;
+    if (buffer.length() == 0 && _bodyLength == headerContentLength)
         setStatusCode(201, "Created");
 }
 
