@@ -1,4 +1,5 @@
 #include "../inc/Server.hpp"
+#include "../inc/Response.hpp"
 
 Server::Server()
 {
@@ -13,8 +14,8 @@ Server::~Server()
     {
         delete it->second;
     }
-    close(_sockFd);
-    close(_epollFd);
+    close(_socket);
+    close(_epoll);
 }
 
 void Server::setErrorCodes(string const &code, string const &buff)
@@ -85,29 +86,61 @@ void Server::setupEpoll()
 }
 void Server::start()
 {
-    // epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
+    epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
     setupSocket();
     setupEpoll();
+    epoll_event ev;
+    Request *req;
     while (1)
     {
-        // int clientSock;
-        // struct sockaddr_in clientAddr;
-        // socklen_t addrLen = sizeof(clientAddr);
+        int clientSock;
+        struct sockaddr_in clientAddr;
+        socklen_t addrLen = sizeof(clientAddr);
         int evCount = epoll_wait(_epoll,evs,MAX_EVENTS,-1); 
         for(int i = 0; i < evCount;i++)
         {
-            if(evs[i].data.fd == _sockFd)
+            // Request req;
+            if(evs[i].data.fd == _socket)
             {
                 if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
                     throw ServerException(ERR "Accept failed");
                 cout << "New connection\n";
                 ev.data.fd = clientSock;
                 ev.events = EPOLLIN | EPOLLOUT;
-                epoll_ctl(ep,EPOLL_CTL_ADD,clientSock,&ev);
+                req = new Request();
+                epoll_ctl(_epoll,EPOLL_CTL_ADD,clientSock,&ev);
             }
-            if(evs[i].data.fd != _sockFd  && evs[i].events & EPOLLIN)
-                cout << evs[i].data.fd << '\n';
-            
+            if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
+            {
+                req->readRequest(evs[i].data.fd);
+                // if (req->getIsRequestFinished())
+                //     cout << GREEN "Request finished\n" RESET;
+                // try
+                // {
+                //     // TODO: support telnet for reading request
+                //     req.readRequest(evs[i].data.fd);
+                //     // req.validateRequest();
+                // }
+                // catch(int statusCode)
+                // {
+                //     std::cerr << req.getStatusMessage() << '\n';
+                //     // exit(0);
+                //     close(evs[i].data.fd);
+                // }
+            }
+            if(evs[i].data.fd != _socket  && evs[i].events & EPOLLOUT && req->getIsRequestFinished())
+            {
+                Response r(*req, evs[i].data.fd);
+                // cout << "Request finished\n";
+                // Response res(req);
+                // res.sendResponse(evs[i].data.fd);
+                close(evs[i].data.fd);
+            }
+            if (req && req->getIsRequestFinished())
+            {
+                delete req;
+                close(evs[i].data.fd);
+            }
         }
         
         
