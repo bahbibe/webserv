@@ -2,11 +2,13 @@
 
 #include "webserv.hpp"
 #include "Server.hpp"
+#include "Helpers.hpp"
 
 #define BUFFER_SIZE 1024
 
 class Request {
 private:
+    Server *_server;
     int _socketFd;
     int _lineCount;
     int _statusCode;
@@ -27,6 +29,9 @@ private:
     bool _outfileIsCreated;
     size_t _bodyLength;
     bool _isReadingBody;
+    size_t _contentLength;
+
+    Location *_location;
     
     void parseRequest(string buffer);
     void parseRequestLine(string& requestLine);
@@ -41,7 +46,7 @@ private:
     void trim(string& str);
 public:
     bool isErrorCode;
-    Request();
+    Request(Server* server);
     ~Request();
 
     void readRequest(int socket);
@@ -57,6 +62,9 @@ public:
     int getStatusCode() const;
     map<string, string> getHeaders() const;
     fstream* getOutFile() const;
+
+    void setContentLength(string contentLength);
+    Location* getLocation() const;
 };
 
 /*

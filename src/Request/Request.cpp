@@ -9,10 +9,12 @@ Request::~Request()
     }
 }
 
-Request::Request() : _lineCount(0), _statusCode(200), isRequestFinished(false),
+Request::Request(Server *server) : _lineCount(0), _statusCode(200), isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), isErrorCode(false)
+    _isReadingBody(false), _contentLength(0), isErrorCode(false)
 {
+    this->_server = server;
+    this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->_uploadFilePath = "upload/";
 }
@@ -35,6 +37,14 @@ void Request::readRequest(int socket)
     }
 }
 
+void Request::setContentLength(string contentLength)
+{
+    for (size_t i = 0; i < contentLength.length(); i++)
+        if (!isdigit(contentLength[i]))
+            setStatusCode(400, "Invalid Content-Length");
+    this->_contentLength = atoi(contentLength.c_str());
+}
+
 void Request::validateRequest()
 {
     map<string, string>::iterator it = _headers.find("host");
@@ -44,6 +54,43 @@ void Request::validateRequest()
         setStatusCode(501, "Unsupported Transfer-Encoding");
     if (_headers.find("content-length") != _headers.end() && _headers.find("transfer-encoding") != _headers.end())
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
+    if (_method == "POST")
+    {
+        if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
+            setStatusCode(400, "Length Required");
+        setContentLength(_headers["content-length"]);
+        if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
+            setStatusCode(413, "Request Entity Too Large");
+    }
+    Location *_location = this->getLocation();
+    if (_location == NULL)
+        setStatusCode(404, "Not Found");
+    if (!_location->getReturn().empty())
+        setStatusCode(301, "Moved Permanently");
+    vector<string> locationMethods = _location->getMethods();
+    if (locationMethods.size() > 0)
+    {
+        vector<string>::iterator itb = locationMethods.begin();
+        vector<string>::iterator ite = locationMethods.end();
+        if (find(itb, ite, _method) == ite)
+            setStatusCode(405, "Method Not Allowed");
+    }
+    cout << GREEN "Location: " RESET << endl;
+    _location->print();
+    cout << GREEN "END location" RESET << endl;
+}
+
+Location* Request::getLocation() const
+{
+    map<string, Location *> locations = this->_server->getLocations();
+    map<string, Location *>::iterator itb = locations.begin();
+    map<string, Location *>::iterator ite = locations.end();
+    for (; itb != ite; itb++)
+    {
+        if (this->_requestTarget == itb->first)
+            return itb->second;
+    }
+    return NULL;
 }
 
 typedef pair<map<string, string>::iterator, bool> ret_type;
@@ -63,10 +110,6 @@ void Request::parseRequest(string buffer)
                 break;
             string header = buffer.substr(0, pos);
             buffer.erase(0, pos + 2);
-            // if (header.length() == 0 && buffer.length() == 0)
-            //     this->parseBody(buffer);
-            // if (header.length() == 0 && buffer.length() != 0)
-            //     this->parseBody(buffer);
             if (header.length() == 0)
                 this->parseBody(buffer);
             if (header.length() != 0)
@@ -100,8 +143,14 @@ void Request::parseRequestLine(string& buffer)
     // TODO: 405 Method Not Allowed
     if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
         setStatusCode(400, "Invalid Method");
-    // TODO: validate the request target
-    
+    /*
+        /// TODO: validate the request target
+        /// - request target too long (2048)
+    */
+    if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
+        setStatusCode(400, "Invalid Request Target");
+    if (this->_requestTarget.length() > 1024)
+        setStatusCode(414, "Request-URI Too Long");
     if (this->_httpVersion.length() != 8 || this->_httpVersion.substr(0, 5) != "HTTP/")
         setStatusCode(400, "Invalid HTTP Version");
     else if (this->_httpVersion.substr(5, 3) != "1.1")
@@ -138,16 +187,11 @@ void Request::parseBody(string buffer)
 
 void Request::parseBodyWithContentLength(string buffer)
 {
-    string contentLengthStr = _headers["content-length"];
-    for (size_t i = 0; i < contentLengthStr.length(); i++)
-        if (!isdigit(contentLengthStr[i]))
-            setStatusCode(400, "Invalid Content-Length");
-    size_t contentLength = atoi(_headers["content-length"].c_str());
-    size_t headerContentLength = contentLength;
-    if (contentLength == 0)
+    size_t headerContentLength = _contentLength;
+    if (_contentLength == 0)
         setStatusCode(200, "OK");
-    contentLength -= _bodyLength;
-    if (buffer.length() < contentLength)
+    _contentLength -= _bodyLength;
+    if (buffer.length() < _contentLength)
     {
         this->_outfile->write(buffer.c_str(), buffer.length());
         this->_outfile->flush();
@@ -155,12 +199,12 @@ void Request::parseBodyWithContentLength(string buffer)
         buffer.erase(0, buffer.length());
         return;
     }
-    if (buffer.length() > contentLength)
-        buffer.erase(contentLength, buffer.length() - contentLength);
-    this->_outfile->write(buffer.c_str(), contentLength);
+    if (buffer.length() > _contentLength)
+        buffer.erase(_contentLength, buffer.length() - _contentLength);
+    this->_outfile->write(buffer.c_str(), _contentLength);
     this->_outfile->flush();
-    buffer.erase(0, contentLength);
-    _bodyLength += contentLength;
+    buffer.erase(0, _contentLength);
+    _bodyLength += _contentLength;
     if (buffer.length() == 0 && _bodyLength == headerContentLength)
         setStatusCode(201, "Created");
 }

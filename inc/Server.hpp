@@ -1,7 +1,7 @@
 #pragma once
 #include "webserv.hpp"
 #include "Location.hpp"
-#include "Request.hpp"
+// #include "Request.hpp"
 // #include "Response.hpp"
 
 class Server
@@ -38,4 +38,7 @@ public:
         virtual ~ServerException() throw() {}
         virtual const char *what() const throw(){ return _msg.c_str();}
     };
+
+    size_t getClientMaxBodySize() const;
+    map<string, Location *> getLocations() const;
 };
