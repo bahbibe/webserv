@@ -29,4 +29,5 @@ public:
 
     string getReturn() const;
     vector<string> getMethods() const;
+    string getRoot() const;
 };

@@ -62,7 +62,7 @@ void Request::validateRequest()
         if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
             setStatusCode(413, "Request Entity Too Large");
     }
-    Location *_location = this->getLocation();
+    Location *_location = this->findLocation();
     if (_location == NULL)
         setStatusCode(404, "Not Found");
     if (!_location->getReturn().empty())
@@ -75,12 +75,13 @@ void Request::validateRequest()
         if (find(itb, ite, _method) == ite)
             setStatusCode(405, "Method Not Allowed");
     }
+    this->_fileFullPath = _location->getRoot() + _requestTarget;
     cout << GREEN "Location: " RESET << endl;
     _location->print();
     cout << GREEN "END location" RESET << endl;
 }
 
-Location* Request::getLocation() const
+Location* Request::findLocation() const
 {
     map<string, Location *> locations = this->_server->getLocations();
     map<string, Location *>::iterator itb = locations.begin();
@@ -140,11 +141,11 @@ void Request::parseRequestLine(string& buffer)
     this->_method = tokens[0];
     this->_requestTarget = tokens[1];
     this->_httpVersion = tokens[2];
-    // TODO: 405 Method Not Allowed
     if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
         setStatusCode(400, "Invalid Method");
     /*
         /// TODO: validate the request target
+        /// TODO: parse the query string if exists && decode the uri
         /// - request target too long (2048)
     */
     if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
@@ -253,6 +254,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
 
 void Request::printRequest()
 {
+    cout << GREEN "=====================Request=================" RESET << endl;
     cout << "Method: " << _method << endl;
     cout << "Request Target: " << _requestTarget << endl;
     cout << "HTTP Version: " << _httpVersion << endl;
@@ -261,6 +263,8 @@ void Request::printRequest()
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
         cout << it->first << ": " << it->second << endl;
+    cout << "Full Path: " << _fileFullPath << endl;
+    cout << GREEN "=====================Request=================" RESET << endl;
 }
 
 bool Request::getIsRequestFinished() const
@@ -299,6 +303,11 @@ map<string, string> Request::getHeaders() const
 fstream *Request::getOutFile() const
 {
     return this->_outfile;
+}
+
+string Request::getFileFullPath() const
+{
+    return this->_fileFullPath;
 }
 
 vector<string> Request::split(string str, string delimiter)
