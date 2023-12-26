@@ -91,6 +91,7 @@ void Server::start()
     setupEpoll();
     epoll_event ev;
     Request *req;
+    Response resp;
     while (1)
     {
         int clientSock;
@@ -130,17 +131,17 @@ void Server::start()
             }
             if(evs[i].data.fd != _socket  && evs[i].events & EPOLLOUT && req->getIsRequestFinished())
             {
-                Response r(*req, evs[i].data.fd);
+                resp.sendResponse(*req, evs[i].data.fd);
                 // cout << "Request finished\n";
                 // Response res(req);
                 // res.sendResponse(evs[i].data.fd);
-                close(evs[i].data.fd);
+                // close(evs[i].data.fd);
             }
-            if (req && req->getIsRequestFinished())
-            {
-                delete req;
-                close(evs[i].data.fd);
-            }
+            // if (req && req->getIsRequestFinished())
+            // {
+            //     delete req;
+            //     close(evs[i].data.fd);
+            // }
         }
         
         

@@ -1,11 +1,32 @@
 #include "../../inc/Response.hpp"
 
-Response::Response(Request &request, int fdSocket):_fdSocket(fdSocket)
+Response::Response():_fdSocket(0), flag(false)
 {
-    this->_path = request.getRequestTarget();
+    // this->_path = request.getRequestTarget();
+    // std::cout << request.getRequestTarget() << "\n";
+    // if (this->_path == "/")
+    //     this->_path = "./WWW/test.txt";
+    // findeContentType();
+    // if (request.isErrorCode)
+    // {
+    //     std::cout << "Error\n";
+    //     GET(request);
+    //     // SendHeader(request._socketFd);
+    // }
+    // else if (request.getMethod() == "GET")
+    // {
+    //     GET(request);
+    //     std::cout << "GET\n";
+    // }
+}
+
+void Response::sendResponse(Request &request, int fdSocket)
+{
+    this->_fdSocket = fdSocket;
+      this->_path = request.getRequestTarget();
     std::cout << request.getRequestTarget() << "\n";
     if (this->_path == "/")
-        this->_path = "./WWW/index.html";
+        this->_path = "./WWW/test.txt";
     findeContentType();
     if (request.isErrorCode)
     {
@@ -15,22 +36,22 @@ Response::Response(Request &request, int fdSocket):_fdSocket(fdSocket)
     }
     else if (request.getMethod() == "GET")
     {
-        std::cout << "GET\n";
+        GET(request);
+        // std::cout << "GET\n";
     }
 }
-
 void Response::SendHeader(int contentLength) {
     (void)contentLength;
-    this->statusString << contentLength;
-    std::string len  = statusString.str();
+    // this->statusString << contentLength;
+    // std::string len  = statusString.str();
 
     this->_header = "HTTP/1.1 200 OK\r\n";
-    this->_header += "Content-Type: text/html\r\n";
-    // this->_header += "Transfer-Encoding:chunked\r\n";
-    this->_header += "Content-Length: " + len + "\r\n";
+    this->_header += "Content-Type: " + this->_contentType + "\r\n";
+    // this->_header += "Content-Type: text/html\r\n";
+    this->_header += "Transfer-Encoding: chunked\r\n";
+    // this->_header += "Content-Length: " + len + "\r\n";
     this->_header += "connection: close\r\n\r\n";
-    // this->_header += "Hello World\r\n";
-    // write(this->_fdSocket, this->_header.c_str(), this->_header.length());
+    write(this->_fdSocket, this->_header.c_str(), this->_header.length());
 
 }
 
@@ -53,18 +74,62 @@ void Response::GET(Request &request)
             this->_body = buffer.str();
             SendHeader(this->_body.length());
             // file.read(this->_body, 1024);
-            this->_header += this->_body;
+            // this->_header += this->_body;
             // std::cout << _header << "\n";
-            write(this->_fdSocket, this->_header.c_str(),  this->_header.length());
+            // write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
             // write(request._socketFd, this->_body ,  1024);
         }
         else
             std::cout << "File not found!!!.\n";
-        
+    }
+    else
+    {
+        char _body1[BUFFERSIZE] = {0};
+         if (!this->flag)
+        {
+            // this->file(this->_path.c_str(), std::ios::binary);
+            std::cout << "opne file \n";
+             this->file.open(_path.c_str(), std::ios::binary);
+             SendHeader(_body.length());
+             this->flag = true;
 
+        }
+            file.read(_body1, 5);
+            // std::cout << this->_body1;
+            // file.read(this->_body1, 5);
+            // std::cout << this->_body1;
+            if (file.gcount() > 0)
+            {
+                
+                std::cout << "cout: " << file.gcount() << "\n";
+                this->_body = "5\r\n";
+                this->_body += _body1;
+                this->_body += "\r\n";
+                // std::cout << "body1:"<< this->_body1 << "\n";
+                // std::cout << "body: " << this->_body << "\n";
+                write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+                // std::cout << "====>1\n";
+
+
+            }
+            else if (file.gcount() == 0)
+            {
+                std::cout << "======>2\n";
+                this->_body = "0\r\n\r\n";
+                this->flag = false;
+                write(this->_fdSocket, this->_body.c_str(),   this->_body.length());
+                close(this->_fdSocket);
+            }
+            // this->_body += "0\r\n";
+            // std::cout << "this is test file: \n"<< this->_body << "\n";
+
+        // }
+        // else
+        //     std::cout << "File not found!!!.\n";
     }
 
 }
+
 void Response::findeContentType()
 {
     std::ifstream file("./conf/mime.conf");

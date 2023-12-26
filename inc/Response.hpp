@@ -18,10 +18,13 @@ class Response
         std::string _header;
         int _contentLength;
         std::string _body;
+        std::ifstream file;
+        bool flag;
         std::stringstream statusString;
         std::map<std::string, std::string> mime;
     public:
-        Response(Request &request, int fdSocket);
+        Response();
+        void sendResponse(Request &request, int fdSocket);
         void SendHeader(int contentLength);
         void findeContentType();
         void GET(Request &request);
