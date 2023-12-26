@@ -107,27 +107,11 @@ void Server::start()
                 cout << "New connection\n";
                 ev.data.fd = clientSock;
                 ev.events = EPOLLIN | EPOLLOUT;
-                req = new Request();
+                req = new Request(this);
                 epoll_ctl(_epoll,EPOLL_CTL_ADD,clientSock,&ev);
             }
             if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
-            {
                 req->readRequest(evs[i].data.fd);
-                // if (req->getIsRequestFinished())
-                //     cout << GREEN "Request finished\n" RESET;
-                // try
-                // {
-                //     // TODO: support telnet for reading request
-                //     req.readRequest(evs[i].data.fd);
-                //     // req.validateRequest();
-                // }
-                // catch(int statusCode)
-                // {
-                //     std::cerr << req.getStatusMessage() << '\n';
-                //     // exit(0);
-                //     close(evs[i].data.fd);
-                // }
-            }
             if(evs[i].data.fd != _socket  && evs[i].events & EPOLLOUT && req->getIsRequestFinished())
             {
                 Response r(*req, evs[i].data.fd);
@@ -139,19 +123,24 @@ void Server::start()
             if (req && req->getIsRequestFinished())
             {
                 delete req;
+                req = NULL;
                 close(evs[i].data.fd);
             }
         }
-        
-        
-        // Request *req = new Request(new_socket, _locations, _error_pages, _server_root, _autoindex, _client_max_body_size);
-        // req->parseRequest();
-        // req->print();
-        // Response *res = new Response(req);
-        // res->sendResponse();
-        // delete req;
-        // delete res;
     }
+}
 
+size_t Server::getClientMaxBodySize() const
+{
+    if (_client_max_body_size == "")
+        return 0;
+    size_t size = 0;
+    stringstream ss(_client_max_body_size);
+    ss >> size;
+    return size;
+}
 
+map<string, Location *> Server::getLocations() const
+{
+    return _locations;
 }

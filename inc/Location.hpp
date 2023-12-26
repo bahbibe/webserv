@@ -26,4 +26,8 @@ public:
     void setUploadPath(string const &);
     void setReturn(string const &);
     void print();
+
+    string getReturn() const;
+    vector<string> getMethods() const;
+    string getRoot() const;
 };

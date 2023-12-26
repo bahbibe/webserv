@@ -2,11 +2,13 @@
 
 #include "webserv.hpp"
 #include "Server.hpp"
+#include "Helpers.hpp"
 
 #define BUFFER_SIZE 1024
 
 class Request {
 private:
+    Server *_server;
     int _socketFd;
     int _lineCount;
     int _statusCode;
@@ -27,21 +29,31 @@ private:
     bool _outfileIsCreated;
     size_t _bodyLength;
     bool _isReadingBody;
+    size_t _contentLength;
+
+    Location *_location;
+
+    string _fileFullPath;
     
+    //? Parsing
     void parseRequest(string buffer);
     void parseRequestLine(string& requestLine);
     void parseBody(string buffer);
     void parseBodyWithContentLength(string buffer);
     void parseBodyWithChunked(string buffer);
-    vector<string> split(string str, string delimiter);
-    string toLowerCase(const string &str);
+
+    //? 
     void setStatusCode(int statusCode, string statusMessage);
     void createOutfile();
 
+    //? Helpers
+    vector<string> split(string str, string delimiter);
     void trim(string& str);
+    string toLowerCase(const string &str);
+    Location* findLocation() const;
 public:
     bool isErrorCode;
-    Request();
+    Request(Server* server);
     ~Request();
 
     void readRequest(int socket);
@@ -49,6 +61,7 @@ public:
 
     void printRequest();
 
+    //? Getters
     bool getIsRequestFinished() const;
     string getStatusMessage() const;
     string getMethod() const;
@@ -57,14 +70,8 @@ public:
     int getStatusCode() const;
     map<string, string> getHeaders() const;
     fstream* getOutFile() const;
+    string getFileFullPath() const;
+
+    //? Setters
+    void setContentLength(string contentLength);
 };
-
-/*
-POST /post.php HTTP/1.1
-Host: localhost:8080
-Content-Type: application/x-www-form-urlencoded
-Content-Length: 25
-
-name=JohnWick&age=30
-
-*/
