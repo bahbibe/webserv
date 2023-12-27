@@ -25,7 +25,7 @@ class Response
     public:
         Response();
         void sendResponse(Request &request, int fdSocket);
-        void SendHeader(int contentLength);
+        void SendHeader();
         void findeContentType();
         void GET(Request &request);
         // void Delete(Request &request, Location &locations);
