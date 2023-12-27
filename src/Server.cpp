@@ -118,17 +118,9 @@ void Server::start(t_events *events)
                 req->readRequest(events->events[i].data.fd);
             else if(events->events[i].events & EPOLLOUT && req->getIsRequestFinished())
             {
-                resp.sendResponse(*req, evs[i].data.fd);
-                // cout << "Request finished\n";
-                // Response res(req);
-                // res.sendResponse(evs[i].data.fd);
-                // close(evs[i].data.fd);
+                Response resp;
+                resp.sendResponse(*req, events->events[i].data.fd);
             }
-            // if (req && req->getIsRequestFinished())
-            // {
-            //     delete req;
-            //     close(evs[i].data.fd);
-            // }
         }
     }
 }

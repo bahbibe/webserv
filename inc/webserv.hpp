@@ -47,6 +47,7 @@ typedef struct s_direrctive
     int upload_path;
     int allow;
     int return_code;
+    int server;
 } t_dir;
 
 typedef struct s_events

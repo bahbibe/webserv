@@ -11,6 +11,7 @@ int main(int argc, char const *argv[])
         {
             string buff;
             getline(conf, buff, '\0');
+            brackets(buff);
             Server server;
             t_events events;
             server.parseServer(buff);

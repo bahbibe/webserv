@@ -10,6 +10,7 @@ void brackets(string const &file)
     {
         if (buff == "server")
         {
+            
             ss >> buff;
             if (buff == OPEN_BR)
                 lim.push(buff);
@@ -170,7 +171,9 @@ void Server::parseServer(string const &file)
     brackets(file);
     stringstream ss(file);
     string buff;
-    ss >> buff >> buff;
+    ss >> buff ;
+    // cout << ">>" << buff << endl;
+    // exit(0);
     while (getline(ss, buff))
     {
         if (isBrackets(buff) && buff.find("}") != string::npos)
