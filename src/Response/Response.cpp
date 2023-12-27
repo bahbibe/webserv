@@ -109,4 +109,5 @@ void Response::findeContentType()
 Response::~Response()
 {
     std::cout << "Response destructor\n";
+    // close(this->_fdSocket);
 }

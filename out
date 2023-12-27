@@ -1,0 +1,47 @@
+==================SERVER==================
+host: 127.0.0.1
+port: 5500
+server_names: 
+	example.com
+	fghdhd.com
+indexs: 
+	index.html
+	index.php
+server_root: ./www/html
+error_pages: 
+	400 ./err/400.html 
+	403 ./err/403.html 
+	404 ./err/404.html 
+	405 ./err/405.html 
+	500 ./err/500.html 
+	501 ./err/501.html 
+client_max_body_size: 255
+autoindex: 1
+==================LOCATIONS==================
+Location: /
+    indexs: index.html index.php 
+    root: ./www/html/server_1
+    autoindex: 1
+    upload: 0
+    cgi: 1
+    upload_path: ./www/html/server_1/uploads
+    return: 
+    methods: GET 
+Location: /imgs
+    indexs: index.html index.php 
+    root: ./www/html/server_1/uploads
+    autoindex: 1
+    upload: 0
+    cgi: 0
+    upload_path: 
+    return: 
+    methods: GET DELETE 
+Location: /php_upload_
+    indexs: /index.php 
+    root: ./www/html/server_1/php
+    autoindex: 1
+    upload: 1
+    cgi: 0
+    upload_path: ./www/html/server_1/uploads/
+    return: https://google.com
+    methods: GET DELETE POST 

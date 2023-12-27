@@ -12,9 +12,10 @@ int main(int argc, char const *argv[])
             string buff;
             getline(conf, buff, '\0');
             Server server;
+            t_events events;
             server.parseServer(buff);
             // server.print();
-            server.start();
+            server.start(&events);
         }
         else
             throw Server::ServerException(ERR "Unable to open file");

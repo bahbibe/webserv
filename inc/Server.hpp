@@ -18,7 +18,6 @@ private:
     bool _autoindex;
     t_dir _dir;
     int _socket;
-    int _epoll;
 public:
     Server();
     ~Server();
@@ -26,9 +25,10 @@ public:
     Location *parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void print();
-    void start();
+    void start(t_events *events);
     void setupSocket();
-    void setupEpoll();
+    void setupEpoll(t_events *events);
+    void newConnection(t_events *events);
     class ServerException : public exception
     {
     private:
