@@ -15,7 +15,6 @@ Server::~Server()
         delete it->second;
     }
     close(_socket);
-    close(_epoll);
 }
 
 void Server::setErrorCodes(string const &code, string const &buff)
@@ -63,7 +62,7 @@ void Server::setupSocket()
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = inet_addr(_host.c_str());
     serverAddr.sin_port = htons(atoi(_port.c_str()));
-    if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    if ((_socket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
         throw ServerException(ERR "Failed to create socket");
     if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR , &sockOpt, sizeof(sockOpt)))
         throw ServerException(ERR "Failed to set socket options");
@@ -74,62 +73,50 @@ void Server::setupSocket()
     cout << LISTENING << _host + ":" + _port + "\n";
 }
 
-void Server::setupEpoll()
+void Server::setupEpoll(t_events *events)
 {
-    if((_epoll = epoll_create(1) ) == -1 )
+    if((events->epollFd = epoll_create(1) ) == -1 )
         throw ServerException(ERR "Failed to create epoll");
     epoll_event event;
     event.data.fd = _socket;
     event.events = EPOLLIN;
-    if (epoll_ctl(_epoll,EPOLL_CTL_ADD,_socket,&event))
+    if (epoll_ctl(events->epollFd,EPOLL_CTL_ADD,_socket,&event))
         throw ServerException(ERR "Failed to add socket to epoll");
 }
-void Server::start()
+
+void Server::newConnection(t_events *events)
 {
-    epoll_event evs[1024]; //!TODO reset evs after each epoll_wait
+    int clientSock;
+    struct sockaddr_in clientAddr;
+    socklen_t addrLen = sizeof(clientAddr);
+    if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
+        throw ServerException(ERR "Accept failed");
+    cout << "New connection\n";
+    struct epoll_event ev;
+    ev.data.fd = clientSock;
+    ev.events = EPOLLIN | EPOLLOUT;
+    if (epoll_ctl(events->epollFd,EPOLL_CTL_ADD,clientSock,&ev))
+        throw ServerException(ERR "Failed to add client to epoll");
+}
+
+void Server::start(t_events *events)
+{
     setupSocket();
-    setupEpoll();
-    epoll_event ev;
-    Request *req;
-    Response resp;
+    setupEpoll(events);
+    Request *req; //!WTF
     while (1)
     {
-        int clientSock;
-        struct sockaddr_in clientAddr;
-        socklen_t addrLen = sizeof(clientAddr);
-        int evCount = epoll_wait(_epoll,evs,MAX_EVENTS,-1); 
+        int evCount = epoll_wait(events->epollFd, events->events, MAX_EVENTS, -1);
         for(int i = 0; i < evCount;i++)
         {
-            // Request req;
-            if(evs[i].data.fd == _socket)
+            if(events->events[i].data.fd == _socket)
             {
-                if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
-                    throw ServerException(ERR "Accept failed");
-                cout << "New connection\n";
-                ev.data.fd = clientSock;
-                ev.events = EPOLLIN | EPOLLOUT;
-                req = new Request();
-                epoll_ctl(_epoll,EPOLL_CTL_ADD,clientSock,&ev);
+                newConnection(events);
+                req = new Request(this);//!WTF
             }
-            if(evs[i].data.fd != _socket  && evs[i].events & EPOLLIN)
-            {
-                req->readRequest(evs[i].data.fd);
-                // if (req->getIsRequestFinished())
-                //     cout << GREEN "Request finished\n" RESET;
-                // try
-                // {
-                //     // TODO: support telnet for reading request
-                //     req.readRequest(evs[i].data.fd);
-                //     // req.validateRequest();
-                // }
-                // catch(int statusCode)
-                // {
-                //     std::cerr << req.getStatusMessage() << '\n';
-                //     // exit(0);
-                //     close(evs[i].data.fd);
-                // }
-            }
-            if(evs[i].data.fd != _socket  && evs[i].events & EPOLLOUT && req->getIsRequestFinished())
+            else if(events->events[i].events & EPOLLIN)
+                req->readRequest(events->events[i].data.fd);
+            else if(events->events[i].events & EPOLLOUT && req->getIsRequestFinished())
             {
                 resp.sendResponse(*req, evs[i].data.fd);
                 // cout << "Request finished\n";
@@ -143,16 +130,20 @@ void Server::start()
             //     close(evs[i].data.fd);
             // }
         }
-        
-        
-        // Request *req = new Request(new_socket, _locations, _error_pages, _server_root, _autoindex, _client_max_body_size);
-        // req->parseRequest();
-        // req->print();
-        // Response *res = new Response(req);
-        // res->sendResponse();
-        // delete req;
-        // delete res;
     }
+}
 
+size_t Server::getClientMaxBodySize() const
+{
+    if (_client_max_body_size == "")
+        return 0;
+    size_t size = 0;
+    stringstream ss(_client_max_body_size);
+    ss >> size;
+    return size;
+}
 
+map<string, Location *> Server::getLocations() const
+{
+    return _locations;
 }

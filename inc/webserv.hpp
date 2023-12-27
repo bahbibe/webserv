@@ -1,4 +1,19 @@
 #pragma once 
+#define RED "\033[0;31m"
+#define GREEN "\033[0;32m"
+#define YELLOW "\033[0;33m"
+#define BLUE "\033[0;34m"
+#define RESET "\033[0m"
+#define USAGE YELLOW "Usage: ./webserv [config_file] if no config file is provided, default.conf will be used" RESET
+#define OPEN_BR "{"
+#define CLOSE_BR "}"
+#define COLON ":"
+#define SEMICOLON ";"
+#define ERR RED "Error: " RESET
+#define DEFAULT_CONF "conf/default.conf"
+#define DEFAULT_PORT "80"
+#define MAX_EVENTS 1024
+#define LISTENING GREEN "Listening on " RESET
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -34,6 +49,14 @@ typedef struct s_direrctive
     int return_code;
 } t_dir;
 
+typedef struct s_events
+{
+    int epollFd;
+    struct epoll_event events[MAX_EVENTS];
+    struct epoll_event event;
+} t_events;
+
+
 bool isWhitespace(string const&);
 bool isComment(string const&);
 bool isBrackets(string const&);
@@ -43,21 +66,3 @@ bool isIpV4(string const &str);
 bool isNumber(string const &);
 void brackets(string const &file);
 bool duplicateDirective(t_dir dir);
-
-/*MACROS*/
-
-#define RED "\033[0;31m"
-#define GREEN "\033[0;32m"
-#define YELLOW "\033[0;33m"
-#define BLUE "\033[0;34m"
-#define RESET "\033[0m"
-#define USAGE YELLOW "Usage: ./webserv [config_file] if no config file is provided, default.conf will be used" RESET
-#define OPEN_BR "{"
-#define CLOSE_BR "}"
-#define COLON ":"
-#define SEMICOLON ";"
-#define ERR RED "Error: " RESET
-#define DEFAULT_CONF "conf/default.conf"
-#define DEFAULT_PORT "80"
-#define MAX_EVENTS 1024
-#define LISTENING GREEN "Listening on " RESET

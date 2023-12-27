@@ -39,3 +39,9 @@ void Location::print()
         cout << _methods[i] << " ";
     cout << endl;
 }
+
+string Location::getReturn() const { return _return; }
+
+vector<string> Location::getMethods() const { return _methods; }
+
+string Location::getRoot() const { return _root; }
