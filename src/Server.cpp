@@ -118,20 +118,17 @@ void Server::start(t_events *events)
                 req->readRequest(events->events[i].data.fd);
             else if(events->events[i].events & EPOLLOUT && req->getIsRequestFinished())
             {
-                Response r(*req, events->events[i].data.fd);//!WTF 
+                resp.sendResponse(*req, evs[i].data.fd);
                 // cout << "Request finished\n";
                 // Response res(req);
-                // res.sendResponse(events[i].data.fd);
-                // if (epoll_ctl(events->epollFd,EPOLL_CTL_DEL,events->events[i].data.fd,0))
-                //     throw ServerException(ERR "Failed to delete client from epoll");
-                // close(events[i].data.fd);
+                // res.sendResponse(evs[i].data.fd);
+                // close(evs[i].data.fd);
             }
-            if (req && req->getIsRequestFinished())
-            {
-                delete req;
-                req = NULL;
-                close(events->events[i].data.fd);
-            }
+            // if (req && req->getIsRequestFinished())
+            // {
+            //     delete req;
+            //     close(evs[i].data.fd);
+            // }
         }
     }
 }
