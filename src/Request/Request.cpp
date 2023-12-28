@@ -8,8 +8,39 @@ Request::~Request()
         delete this->_outfile;
     }
 }
+Request::Request(const Request &other)
+{
+    *this = other;
+}
 
-Request::Request(Server *server) : _lineCount(0), _statusCode(200), isRequestFinished(false),
+
+Request &Request::operator=(const Request &other)
+{
+    if (this != &other)
+    {
+        this->_method = other._method;
+        this->_requestTarget = other._requestTarget;
+        this->_httpVersion = other._httpVersion;
+        this->_headers = other._headers;
+        this->_fileFullPath = other._fileFullPath;
+        this->_filePath = other._filePath;
+        this->_socketFd = other._socketFd;
+        this->_server = other._server;
+        this->_location = other._location;
+        this->_lineCount = other._lineCount;
+        this->_statusCode = other._statusCode;
+        this->isRequestFinished = other.isRequestFinished;
+        this->_isFoundCRLF = other._isFoundCRLF;
+        this->_outfile = other._outfile;
+        this->_outfileIsCreated = other._outfileIsCreated;
+        this->_bodyLength = other._bodyLength;
+        this->_isReadingBody = other._isReadingBody;
+        this->_contentLength = other._contentLength;
+        this->isErrorCode = other.isErrorCode;
+    }
+    return *this;
+}
+Request::Request(Server &server) : _lineCount(0), _statusCode(200), isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), isErrorCode(false)
 {
@@ -59,7 +90,7 @@ void Request::validateRequest()
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
-        if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
+        if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server.getClientMaxBodySize())
             setStatusCode(413, "Request Entity Too Large");
     }
     Location *_location = this->findLocation();
@@ -83,7 +114,7 @@ void Request::validateRequest()
 
 Location* Request::findLocation() const
 {
-    map<string, Location *> locations = this->_server->getLocations();
+    map<string, Location *> locations = this->_server.getLocations();
     map<string, Location *>::iterator itb = locations.begin();
     map<string, Location *>::iterator ite = locations.end();
     for (; itb != ite; itb++)

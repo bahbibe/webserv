@@ -1,6 +1,7 @@
 #pragma once
 
 #include "webserv.hpp"
+using namespace std;
 
 class Helpers {
     public:

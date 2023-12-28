@@ -1,5 +1,4 @@
 #pragma once
-
 #include "webserv.hpp"
 #include "Server.hpp"
 #include "Helpers.hpp"
@@ -8,7 +7,7 @@
 
 class Request {
 private:
-    Server *_server;
+    Server _server;
     int _socketFd;
     int _lineCount;
     int _statusCode;
@@ -53,9 +52,11 @@ private:
     Location* findLocation() const;
 public:
     bool isErrorCode;
-    Request(Server* server);
+    Request(Server &server);
     ~Request();
-
+    Request() {}
+    Request(Request const &other);
+    Request &operator=(Request const &other);
     void readRequest(int socket);
     void validateRequest();
 

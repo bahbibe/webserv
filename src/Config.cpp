@@ -1,44 +1,7 @@
 #include "../inc/webserv.hpp"
 #include "../inc/Server.hpp"
+// #include "../inc/Multiplexer.hpp"
 
-void brackets(string const &file)
-{
-    stringstream ss(file);
-    string buff;
-    stack<string> lim;
-    while (ss >> buff)
-    {
-        if (buff == "server")
-        {
-            
-            ss >> buff;
-            if (buff == OPEN_BR)
-                lim.push(buff);
-            else
-                throw Server::ServerException(ERR "Expected '{'");
-        }
-        else if (buff == "location")
-        {
-            ss >> buff;
-            if (buff[0] != '/')
-                throw Server::ServerException(ERR "Expected '/'");
-            ss >> buff;
-            if (buff == OPEN_BR)
-                lim.push(buff);
-            else
-                throw Server::ServerException(ERR "Expected '{'");
-        }
-        else if (buff == CLOSE_BR)
-        {
-            if (!lim.empty() && lim.top() == OPEN_BR)
-                lim.pop();
-            else
-                throw Server::ServerException(ERR "Expected '}'");
-        }
-    }
-    if (!lim.empty())
-        throw Server::ServerException(ERR "Unclosed '{'");
-}
 
 bool isServerDir(string const &dir)
 {
@@ -168,7 +131,6 @@ Location *Server::parseLocation(stringstream &ss)
 
 void Server::parseServer(string const &file)
 {
-    brackets(file);
     stringstream ss(file);
     string buff;
     ss >> buff ;

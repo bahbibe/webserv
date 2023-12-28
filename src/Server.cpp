@@ -12,9 +12,15 @@ Server::~Server()
     map<string, Location *>::iterator it = _locations.begin();
     for (; it != _locations.end(); it++)
     {
-        delete it->second;
+        // if(it->second)
+        //     delete it->second;
     }
     close(_socket);
+}
+
+int Server::getSocket() const
+{
+    return _socket;
 }
 
 void Server::setErrorCodes(string const &code, string const &buff)
@@ -71,59 +77,56 @@ void Server::setupSocket()
     if (listen(_socket, 1))
         throw ServerException(ERR "Failed to listen on socket");    
     cout << LISTENING << _host + ":" + _port + "\n";
-}
-
-void Server::setupEpoll(t_events *events)
-{
-    if((events->epollFd = epoll_create(1) ) == -1 )
-        throw ServerException(ERR "Failed to create epoll");
-    epoll_event event;
-    event.data.fd = _socket;
-    event.events = EPOLLIN;
-    if (epoll_ctl(events->epollFd,EPOLL_CTL_ADD,_socket,&event))
+    ep.event.data.fd = _socket;
+    ep.event.events = EPOLLIN;
+    if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,_socket,&ep.event))
         throw ServerException(ERR "Failed to add socket to epoll");
 }
 
-void Server::newConnection(t_events *events)
+
+void Webserver::newConnection(map<int, Request> &req ,Server &server)
 {
     int clientSock;
     struct sockaddr_in clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
-    if ((clientSock = accept(_socket, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
+    if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     cout << "New connection\n";
     struct epoll_event ev;
     ev.data.fd = clientSock;
     ev.events = EPOLLIN | EPOLLOUT;
-    if (epoll_ctl(events->epollFd,EPOLL_CTL_ADD,clientSock,&ev))
+    if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ev))
         throw ServerException(ERR "Failed to add client to epoll");
+ cout << clientSock << "\n";
+
+    req.insert(pair<int, Request>(clientSock, Request(server)));
 }
 
-void Server::start(t_events *events)
+void Webserver::start()
 {
-    setupSocket();
-    setupEpoll(events);
-    Request *req; //!WTF
+    map<int, Request> req;
     Response resp;
     while (1)
     {
-        int evCount = epoll_wait(events->epollFd, events->events, MAX_EVENTS, -1);
+        int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
         for(int i = 0; i < evCount;i++)
         {
-            if(events->events[i].data.fd == _socket)
+            for (size_t j = 0; j < _servers.size(); j++)
             {
-                newConnection(events);
-                req = new Request(this);//!WTF
-                
+                if(ep.events[i].data.fd == _servers[j].getSocket())
+                {
+                    newConnection(req, _servers[j]);
+                    continue;
+                }
             }
-            else if(events->events[i].events & EPOLLIN)
+            if(ep.events[i].events & EPOLLIN)
             {
-                req->readRequest(events->events[i].data.fd);
+                req[ep.events[i].data.fd].readRequest(ep.events[i].data.fd);
             }
-            if(events->events[i].events & EPOLLOUT && req->getIsRequestFinished())
-            {
-                resp.sendResponse(*req, events->events[i].data.fd);
-            }
+            // if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
+            // {
+            //     // resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
+            // }
         }
     }
 }

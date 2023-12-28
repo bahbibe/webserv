@@ -1,5 +1,5 @@
 #include "inc/Server.hpp"
-
+t_events ep;
 int main(int argc, char const *argv[])
 {
     try
@@ -11,12 +11,15 @@ int main(int argc, char const *argv[])
         {
             string buff;
             getline(conf, buff, '\0');
-            brackets(buff);
-            Server server;
-            t_events events;
-            server.parseServer(buff);
-            // server.print();
-            server.start(&events);
+            Webserver server;
+            server.brackets(buff);
+            for (size_t i = 0; i < server.serverCount(); i++)
+            {
+                server[i].parseServer(buff);
+                // server[i].print();
+                server[i].setupSocket();
+            }
+            server.start();
         }
         else
             throw Server::ServerException(ERR "Unable to open file");

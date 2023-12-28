@@ -31,8 +31,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
-
+// #include "Request.hpp"
+// #include "Server.hpp"
 using namespace std;
+
+class Request;
+class Server;
 typedef struct s_direrctive
 {
     int host;
@@ -57,6 +61,30 @@ typedef struct s_events
     struct epoll_event event;
 } t_events;
 
+extern t_events ep;
+
+class Webserver
+{
+private:
+    vector<Server> _servers;
+public:
+    Webserver();
+    ~Webserver();
+    void brackets(string const &file);
+    size_t serverCount();
+    Server &operator[](size_t index);
+    void start();
+    void newConnection(map<int, Request> &req ,Server &server);
+    class ServerException : public exception
+    {
+    private:
+        string _msg;
+    public:
+        ServerException(string const &msg) : _msg(msg) {}
+        virtual ~ServerException() throw() {}
+        virtual const char *what() const throw(){ return _msg.c_str();}
+    };
+};
 
 bool isWhitespace(string const&);
 bool isComment(string const&);
@@ -65,5 +93,4 @@ bool isServerDir(string const &);
 bool isLocationDir(string const &);
 bool isIpV4(string const &str);
 bool isNumber(string const &);
-void brackets(string const &file);
 bool duplicateDirective(t_dir dir);

@@ -25,10 +25,8 @@ public:
     Location *parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void print();
-    void start(t_events *events);
     void setupSocket();
-    void setupEpoll(t_events *events);
-    void newConnection(t_events *events);
+    int getSocket() const;
     class ServerException : public exception
     {
     private:
