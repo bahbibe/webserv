@@ -1,0 +1,15 @@
+200 OK
+201 Created
+204 No Content
+
+301 Moved Permanently
+
+400 Bad Request
+404 Not Found
+403 Forbidden
+405 Method Not Allowed
+408 Request Timeout
+409 Conflict
+
+500 Internal Server Error
+501 Not Implemented

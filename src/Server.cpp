@@ -104,6 +104,7 @@ void Server::start(t_events *events)
     setupSocket();
     setupEpoll(events);
     Request *req; //!WTF
+    Response resp;
     while (1)
     {
         int evCount = epoll_wait(events->epollFd, events->events, MAX_EVENTS, -1);
@@ -113,12 +114,14 @@ void Server::start(t_events *events)
             {
                 newConnection(events);
                 req = new Request(this);//!WTF
+                
             }
             else if(events->events[i].events & EPOLLIN)
-                req->readRequest(events->events[i].data.fd);
-            else if(events->events[i].events & EPOLLOUT && req->getIsRequestFinished())
             {
-                Response resp;
+                req->readRequest(events->events[i].data.fd);
+            }
+            if(events->events[i].events & EPOLLOUT && req->getIsRequestFinished())
+            {
                 resp.sendResponse(*req, events->events[i].data.fd);
             }
         }
