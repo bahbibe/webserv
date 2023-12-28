@@ -18,6 +18,7 @@ private:
     bool _autoindex;
     t_dir _dir;
     int _socket;
+    static streampos _pos;
 public:
     Server();
     ~Server();

@@ -132,10 +132,9 @@ Location *Server::parseLocation(stringstream &ss)
 void Server::parseServer(string const &file)
 {
     stringstream ss(file);
+    ss.seekg(Server::_pos);
     string buff;
     ss >> buff ;
-    // cout << ">>" << buff << endl;
-    // exit(0);
     while (getline(ss, buff))
     {
         if (isBrackets(buff) && buff.find("}") != string::npos)
@@ -217,4 +216,5 @@ void Server::parseServer(string const &file)
     }
     if (duplicateDirective(_dir))
         throw ServerException(ERR "Duplicate directive");
+    Server::_pos = ss.tellg();
 }

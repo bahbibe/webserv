@@ -1,6 +1,7 @@
 #include "../inc/Server.hpp"
 #include "../inc/Response.hpp"
 
+streampos Server::_pos = 0;
 Server::Server()
 {
     _autoindex = false;
@@ -97,8 +98,6 @@ void Webserver::newConnection(map<int, Request> &req ,Server &server)
     ev.events = EPOLLIN | EPOLLOUT;
     if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ev))
         throw ServerException(ERR "Failed to add client to epoll");
- cout << clientSock << "\n";
-
     req.insert(pair<int, Request>(clientSock, Request(server)));
 }
 
