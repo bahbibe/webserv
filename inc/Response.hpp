@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>  
 #include <fstream>
+#include <signal.h>
 #define BUFFERSIZE 1024
 class Response
 {
