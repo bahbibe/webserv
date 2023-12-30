@@ -98,7 +98,7 @@ void Webserver::newConnection(map<int, Request> &req ,Server &server)
     ev.events = EPOLLIN | EPOLLOUT;
     if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ev))
         throw ServerException(ERR "Failed to add client to epoll");
-    req.insert(pair<int, Request>(clientSock, Request(server)));
+    req.insert(pair<int, Request>(clientSock, Request(&server)));
 }
 
 void Webserver::start()
@@ -117,15 +117,15 @@ void Webserver::start()
                     newConnection(req, _servers[j]);
                     continue;
                 }
+                if(ep.events[i].events & EPOLLIN)
+                {
+                    req[ep.events[i].data.fd].readRequest(ep.events[i].data.fd);
+                }
+                if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
+                {
+                    resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
+                }
             }
-            if(ep.events[i].events & EPOLLIN)
-            {
-                req[ep.events[i].data.fd].readRequest(ep.events[i].data.fd);
-            }
-            // if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
-            // {
-            //     // resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
-            // }
         }
     }
 }

@@ -40,7 +40,7 @@ Request &Request::operator=(const Request &other)
     }
     return *this;
 }
-Request::Request(Server &server) : _lineCount(0), _statusCode(200), isRequestFinished(false),
+Request::Request(Server* server) : _lineCount(0), _statusCode(200), isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), isErrorCode(false)
 {
@@ -90,7 +90,7 @@ void Request::validateRequest()
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
-        if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server.getClientMaxBodySize())
+        if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
             setStatusCode(413, "Request Entity Too Large");
     }
     Location *_location = this->findLocation();
@@ -114,7 +114,7 @@ void Request::validateRequest()
 
 Location* Request::findLocation() const
 {
-    map<string, Location *> locations = this->_server.getLocations();
+    map<string, Location *> locations = this->_server->getLocations();
     map<string, Location *>::iterator itb = locations.begin();
     map<string, Location *>::iterator ite = locations.end();
     for (; itb != ite; itb++)
