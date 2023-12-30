@@ -7,7 +7,7 @@
 
 class Request {
 private:
-    Server _server;
+    Server* _server;
     int _socketFd;
     int _lineCount;
     int _statusCode;
@@ -52,7 +52,7 @@ private:
     Location* findLocation() const;
 public:
     bool isErrorCode;
-    Request(Server &server);
+    Request(Server* server);
     ~Request();
     Request() {}
     Request(Request const &other);
