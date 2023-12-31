@@ -98,7 +98,7 @@ void Webserver::newConnection(map<int, Request> &req ,Server &server)
     ev.events = EPOLLIN | EPOLLOUT;
     if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ev))
         throw ServerException(ERR "Failed to add client to epoll");
-    req.insert(pair<int, Request>(clientSock, Request(&server)));
+    req.insert(pair<int, Request>(clientSock, Request(&server, clientSock)));
 }
 
 void Webserver::start()
@@ -119,11 +119,13 @@ void Webserver::start()
                 }
                 if(ep.events[i].events & EPOLLIN)
                 {
-                    req[ep.events[i].data.fd].readRequest(ep.events[i].data.fd);
+                    req[ep.events[i].data.fd].readRequest();
                 }
                 if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
                 {
                     resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
+                    req.erase(ep.events[i].data.fd);
+                    // close(ep.events[i].data.fd);
                 }
             }
         }
@@ -143,4 +145,39 @@ size_t Server::getClientMaxBodySize() const
 map<string, Location *> Server::getLocations() const
 {
     return _locations;
+}
+
+string Server::getHost() const
+{
+    return _host;
+}
+
+string Server::getPort() const
+{
+    return _port;
+}
+
+string Server::getRoot() const
+{
+    return _server_root;
+}
+
+bool Server::getAutoindex() const
+{
+    return _autoindex;
+}
+
+map<string, string> Server::getErrorPages() const
+{
+    return _error_pages;
+}
+
+vector<string> Server::getIndexs() const
+{
+    return _indexs;
+}
+
+vector<string> Server::getServerNames() const
+{
+    return _server_names;
 }

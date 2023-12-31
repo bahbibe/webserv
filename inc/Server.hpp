@@ -40,4 +40,11 @@ public:
 
     size_t getClientMaxBodySize() const;
     map<string, Location *> getLocations() const;
+    string getHost() const;
+    string getPort() const;
+    string getRoot() const;
+    bool getAutoindex() const;
+    map<string, string> getErrorPages() const;
+    vector<string> getIndexs() const;
+    vector<string> getServerNames() const;
 };

@@ -30,4 +30,9 @@ public:
     string getReturn() const;
     vector<string> getMethods() const;
     string getRoot() const;
+    bool getUpload() const;
+    bool getAutoindex() const;
+    bool getCgi() const;
+    string getUploadPath() const;
+    vector<string> getIndexs() const;
 };
