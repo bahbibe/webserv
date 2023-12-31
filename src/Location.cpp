@@ -45,3 +45,13 @@ string Location::getReturn() const { return _return; }
 vector<string> Location::getMethods() const { return _methods; }
 
 string Location::getRoot() const { return _root; }
+
+bool Location::getUpload() const { return _upload; }
+
+bool Location::getAutoindex() const { return _autoindex; }
+
+bool Location::getCgi() const { return _cgi; }
+
+string Location::getUploadPath() const { return _upload_path; }
+
+vector<string> Location::getIndexs() const { return _indexs; }

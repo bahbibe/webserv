@@ -12,7 +12,7 @@ private:
     int _lineCount;
     int _statusCode;
     string _statusMessage;
-    bool isRequestFinished;
+    bool _isRequestFinished;
     bool _isFoundCRLF;
     
     char _buffer[BUFFER_SIZE];
@@ -22,7 +22,7 @@ private:
     string _requestTarget;
     string _httpVersion;
     map<string, string> _headers;
-    string _uploadFilePath;
+    // string _uploadFilePath;
     string _filePath;
     fstream *_outfile;
     bool _outfileIsCreated;
@@ -31,8 +31,21 @@ private:
     size_t _contentLength;
 
     Location *_location;
-
     string _fileFullPath;
+
+    //? Server directives
+    string _host;
+    string _port;
+    string _serverRoot;
+    size_t _clientMaxBodySize;
+    bool _autoindex;
+    map<string, string> _errorPages;
+    vector<string> _indexs;
+    vector<string> _serverNames;
+    bool _isUploadAllowed;
+    string _uploadPath;
+    bool _isCgiAllowed;
+    string returnRedirect;
     
     //? Parsing
     void parseRequest(string buffer);
@@ -41,9 +54,11 @@ private:
     void parseBodyWithContentLength(string buffer);
     void parseBodyWithChunked(string buffer);
 
-    //? 
+    //? Request Helpers
     void setStatusCode(int statusCode, string statusMessage);
+    void setContentLength(string contentLength);
     void createOutfile();
+    void setServer();
 
     //? Helpers
     vector<string> split(string str, string delimiter);
@@ -52,12 +67,12 @@ private:
     Location* findLocation() const;
 public:
     bool isErrorCode;
-    Request(Server* server);
+    Request(Server* server, int socketFd);
     ~Request();
     Request() {}
     Request(Request const &other);
     Request &operator=(Request const &other);
-    void readRequest(int socket);
+    void readRequest();
     void validateRequest();
 
     void printRequest();
@@ -71,8 +86,6 @@ public:
     int getStatusCode() const;
     map<string, string> getHeaders() const;
     fstream* getOutFile() const;
+    Location* getLocation() const;
     string getFileFullPath() const;
-
-    //? Setters
-    void setContentLength(string contentLength);
 };

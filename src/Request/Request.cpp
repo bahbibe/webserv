@@ -29,7 +29,7 @@ Request &Request::operator=(const Request &other)
         this->_location = other._location;
         this->_lineCount = other._lineCount;
         this->_statusCode = other._statusCode;
-        this->isRequestFinished = other.isRequestFinished;
+        this->_isRequestFinished = other._isRequestFinished;
         this->_isFoundCRLF = other._isFoundCRLF;
         this->_outfile = other._outfile;
         this->_outfileIsCreated = other._outfileIsCreated;
@@ -40,26 +40,26 @@ Request &Request::operator=(const Request &other)
     }
     return *this;
 }
-Request::Request(Server* server) : _lineCount(0), _statusCode(200), isRequestFinished(false),
+Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), isErrorCode(false)
 {
     this->_server = server;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
-    this->_uploadFilePath = "upload/";
+    // this->_uploadFilePath = "upload/";
 }
 
-void Request::readRequest(int socket)
+void Request::readRequest()
 {
     try {
-        this->_socketFd = socket;
+        // this->_socketFd = socket;
         int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
         if (readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
         _buffer[readBytes] = '\0';
         this->parseRequest(_buffer);
-        if (!this->isRequestFinished)
+        if (!this->_isRequestFinished)
             return;
     } catch (int statusCode)
     {
@@ -76,8 +76,61 @@ void Request::setContentLength(string contentLength)
     this->_contentLength = atoi(contentLength.c_str());
 }
 
+Location* Request::findLocation() const
+{
+    map<string, Location *> locations = this->_server->getLocations();
+    map<string, Location *>::iterator itb = locations.begin();
+    map<string, Location *>::iterator ite = locations.end();
+    ite--;
+    for (; ite != itb; ite--)
+    {
+        if (!this->_requestTarget.compare(0, ite->first.length(), ite->first))
+            return ite->second;
+    }
+    return NULL;
+}
+
+void Request::setServer()
+{
+    //! TODO: first find the server according to the host header
+    this->_host = _server->getHost();
+    this->_port = _server->getPort();
+    this->_serverRoot = _server->getRoot();
+    this->_clientMaxBodySize = _server->getClientMaxBodySize();
+    this->_autoindex = _server->getAutoindex();
+    this->_errorPages = _server->getErrorPages();
+    this->_indexs = _server->getIndexs();
+    this->_serverNames = _server->getServerNames();
+    _location = this->findLocation();
+    if (_location == NULL)
+        setStatusCode(404, "Not Found");
+    if (!_location->getReturn().empty())
+        setStatusCode(301, "Moved Permanently");
+    cout << GREEN "Location: " RESET << endl;
+    _location->print();
+    cout << GREEN "END location" RESET << endl;
+    vector<string> locationMethods = _location->getMethods();
+    if (locationMethods.size() > 0)
+    {
+        vector<string>::iterator itb = locationMethods.begin();
+        vector<string>::iterator ite = locationMethods.end();
+        if (find(itb, ite, _method) == ite)
+            setStatusCode(405, "Method Not Allowed");
+    }
+    // TODO: override the server directives with the location directives
+    this->_isUploadAllowed = _location->getUpload();
+    this->_uploadPath = _location->getUploadPath();
+    this->_isCgiAllowed = _location->getCgi();
+    this->returnRedirect = _location->getReturn();
+    if (_location->getIndexs().size() > 0)
+        this->_indexs = _location->getIndexs();
+    this->_fileFullPath = _location->getRoot() + _requestTarget;
+}
+
 void Request::validateRequest()
 {
+    this->setServer();
+
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
@@ -93,36 +146,6 @@ void Request::validateRequest()
         if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
             setStatusCode(413, "Request Entity Too Large");
     }
-    Location *_location = this->findLocation();
-    if (_location == NULL)
-        setStatusCode(404, "Not Found");
-    if (!_location->getReturn().empty())
-        setStatusCode(301, "Moved Permanently");
-    vector<string> locationMethods = _location->getMethods();
-    if (locationMethods.size() > 0)
-    {
-        vector<string>::iterator itb = locationMethods.begin();
-        vector<string>::iterator ite = locationMethods.end();
-        if (find(itb, ite, _method) == ite)
-            setStatusCode(405, "Method Not Allowed");
-    }
-    this->_fileFullPath = _location->getRoot() + _requestTarget;
-    cout << GREEN "Location: " RESET << endl;
-    _location->print();
-    cout << GREEN "END location" RESET << endl;
-}
-
-Location* Request::findLocation() const
-{
-    map<string, Location *> locations = this->_server->getLocations();
-    map<string, Location *>::iterator itb = locations.begin();
-    map<string, Location *>::iterator ite = locations.end();
-    for (; itb != ite; itb++)
-    {
-        if (this->_requestTarget == itb->first)
-            return itb->second;
-    }
-    return NULL;
 }
 
 typedef pair<map<string, string>::iterator, bool> ret_type;
@@ -193,7 +216,7 @@ void Request::parseRequestLine(string& buffer)
 void Request::createOutfile()
 {
     // TODO: upload the file in the upload folder
-    this->_filePath = this->_uploadFilePath + "file.txt";
+    this->_filePath = this->_uploadPath + "/file.txt";
     this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");
@@ -209,6 +232,8 @@ void Request::parseBody(string buffer)
     //     setStatusCode(200, "OK");
     if (this->_method != "POST")
         setStatusCode(200, "OK");
+    if (!this->_isUploadAllowed)
+        setStatusCode(200, "OK But upload is not allowed so work of the cgi");
     if (!this->_outfileIsCreated)
         this->createOutfile();
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
@@ -274,7 +299,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
 {
     this->printRequest();
     this->_statusCode = statusCode;
-    this->isRequestFinished = true;
+    this->_isRequestFinished = true;
     stringstream ss;
     ss << statusCode;
     if (statusCode >= 400)
@@ -300,7 +325,7 @@ void Request::printRequest()
 
 bool Request::getIsRequestFinished() const
 {
-    return this->isRequestFinished;
+    return this->_isRequestFinished;
 }
 
 string Request::getStatusMessage() const
@@ -339,6 +364,11 @@ fstream *Request::getOutFile() const
 string Request::getFileFullPath() const
 {
     return this->_fileFullPath;
+}
+
+Location *Request::getLocation() const
+{
+    return this->_location;
 }
 
 vector<string> Request::split(string str, string delimiter)
