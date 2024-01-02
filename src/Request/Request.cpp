@@ -47,22 +47,6 @@ Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCoun
     this->_server = server;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
-    // TODO: this should be in the server constructor
-    fstream mimeStream("./conf/mime.types", ios::in);
-    if (!mimeStream.is_open())
-        throw Server::ServerException(ERR "Failed to open mime.types");
-    string line;
-    while (getline(mimeStream, line))
-    {
-        if (line[0] == '#')
-            continue;
-        vector<string> tokens = this->split(line, " ");
-        if (tokens.size() < 2)
-            continue;
-        for (size_t i = 1; i < tokens.size(); i++)
-            this->_mimeTypes[tokens[0]].push_back(tokens[i]);
-    }
-    mimeStream.close();
 }
 
 void Request::readRequest()
@@ -228,9 +212,12 @@ void Request::parseRequestLine(string& buffer)
 
 string Request::getMimeType(string contentType)
 {
+    // TODO: wait for the mime types
+    if (contentType.find(";") != string::npos)
+        contentType = contentType.substr(0, contentType.find(";"));
     map<string, vector<string> >::iterator it = this->_mimeTypes.find(contentType);
     if (it == this->_mimeTypes.end())
-        return "text/plain";
+        return "txt";
     return it->second[0];
 }
 
