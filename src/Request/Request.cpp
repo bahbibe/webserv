@@ -47,13 +47,11 @@ Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCoun
     this->_server = server;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
-    // this->_uploadFilePath = "upload/";
 }
 
 void Request::readRequest()
 {
     try {
-        // this->_socketFd = socket;
         int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
         if (readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
@@ -81,8 +79,7 @@ Location* Request::findLocation() const
     map<string, Location *> locations = this->_server->getLocations();
     map<string, Location *>::iterator itb = locations.begin();
     map<string, Location *>::iterator ite = locations.end();
-    ite--;
-    for (; ite != itb; ite--)
+    while (ite-- != itb)
     {
         if (!this->_requestTarget.compare(0, ite->first.length(), ite->first))
             return ite->second;
@@ -213,10 +210,24 @@ void Request::parseRequestLine(string& buffer)
     this->_lineCount++;
 }
 
+string Request::getMimeType(string contentType)
+{
+    // TODO: wait for the mime types
+    if (contentType.find(";") != string::npos)
+        contentType = contentType.substr(0, contentType.find(";"));
+    map<string, vector<string> >::iterator it = this->_mimeTypes.find(contentType);
+    if (it == this->_mimeTypes.end())
+        return "txt";
+    return it->second[0];
+}
+
 void Request::createOutfile()
 {
     // TODO: upload the file in the upload folder
-    this->_filePath = this->_uploadPath + "/file.txt";
+    // TODO: apply the extension to the file from the content type header
+    string contentType = this->_headers["content-type"];
+    string extension = this->getMimeType(contentType);
+    this->_filePath = this->_uploadPath + "/file." + extension;
     this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");

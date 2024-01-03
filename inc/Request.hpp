@@ -22,7 +22,6 @@ private:
     string _requestTarget;
     string _httpVersion;
     map<string, string> _headers;
-    // string _uploadFilePath;
     string _filePath;
     fstream *_outfile;
     bool _outfileIsCreated;
@@ -46,6 +45,8 @@ private:
     string _uploadPath;
     bool _isCgiAllowed;
     string returnRedirect;
+
+    map<string, vector<string> > _mimeTypes;
     
     //? Parsing
     void parseRequest(string buffer);
@@ -59,6 +60,7 @@ private:
     void setContentLength(string contentLength);
     void createOutfile();
     void setServer();
+    string getMimeType(string contentType);
 
     //? Helpers
     vector<string> split(string str, string delimiter);

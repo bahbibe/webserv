@@ -125,7 +125,7 @@ void Webserver::start()
                 {
                     resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
                     req.erase(ep.events[i].data.fd);
-                    // close(ep.events[i].data.fd);
+                    close(ep.events[i].data.fd);
                 }
             }
         }
