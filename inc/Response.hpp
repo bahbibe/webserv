@@ -19,7 +19,7 @@ class Response
         int _fdSocket;
         int _statusCode;
         int _contentLength;
-        int _isfinished;
+        bool _isfinished;
         std::string _path;
         std::string _contentType;
         std::string _header;
@@ -32,12 +32,13 @@ class Response
     public:
         Response();
         ~Response();
-        void GET(Request &request);
         void sendResponse(Request &request, int fdSocket);
         Response(const Response &other);
         Response &operator=(const Response &other);
-        int getIsFinished() const;
+        
+        bool getIsFinished() const;
     private:
+        void GET(Request &request);
         void SendHeader();
         void findeContentType();
         void saveStatus();
