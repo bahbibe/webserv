@@ -382,6 +382,11 @@ Location *Request::getLocation() const
     return this->_location;
 }
 
+bool Request::getAutoIndex() const
+{
+    return this->_autoindex;
+}
+
 vector<string> Request::split(string str, string delimiter)
 {
     vector<string> tokens;
