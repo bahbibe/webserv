@@ -66,7 +66,7 @@ private:
     vector<string> split(string str, string delimiter);
     void trim(string& str);
     string toLowerCase(const string &str);
-    Location* findLocation() const;
+    Location* findLocation();
 public:
     bool isErrorCode;
     Request(Server* server, int socketFd);

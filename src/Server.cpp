@@ -124,8 +124,11 @@ void Webserver::start()
                 if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
                 {
                     resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
-                    req.erase(ep.events[i].data.fd);
-                    close(ep.events[i].data.fd);
+                    // if (req[ep.events[i].data.fd].getIsResponseFinished())
+                    // {
+                        close(ep.events[i].data.fd);
+                        req.erase(ep.events[i].data.fd);
+                    // }
                 }
             }
         }

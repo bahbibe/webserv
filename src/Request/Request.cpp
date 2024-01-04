@@ -74,7 +74,7 @@ void Request::setContentLength(string contentLength)
     this->_contentLength = atoi(contentLength.c_str());
 }
 
-Location* Request::findLocation() const
+Location* Request::findLocation()
 {
     map<string, Location *> locations = this->_server->getLocations();
     map<string, Location *>::iterator itb = locations.begin();
@@ -82,7 +82,10 @@ Location* Request::findLocation() const
     while (ite-- != itb)
     {
         if (!this->_requestTarget.compare(0, ite->first.length(), ite->first))
+        {
+            this->_requestTarget.erase(0, ite->first.length());
             return ite->second;
+        }
     }
     return NULL;
 }
@@ -121,7 +124,9 @@ void Request::setServer()
     this->returnRedirect = _location->getReturn();
     if (_location->getIndexs().size() > 0)
         this->_indexs = _location->getIndexs();
-    this->_fileFullPath = _location->getRoot() + _requestTarget;
+    if (!_location->getRoot().empty())
+        this->_serverRoot = _location->getRoot();
+    this->_fileFullPath = this->_serverRoot + this->_requestTarget;
 }
 
 void Request::validateRequest()
@@ -236,8 +241,9 @@ void Request::createOutfile()
 
 void Request::parseBody(string buffer)
 {
+    if (!this->_isReadingBody)
+        this->validateRequest();
     this->_isReadingBody = true;
-    this->validateRequest();
     //! NOTE: if the request has no body, the body length is 0 maybe should wait for the body 
     // if (buffer.length() == 0)
     //     setStatusCode(200, "OK");
@@ -255,25 +261,26 @@ void Request::parseBody(string buffer)
 
 void Request::parseBodyWithContentLength(string buffer)
 {
-    size_t headerContentLength = _contentLength;
     if (_contentLength == 0)
         setStatusCode(200, "OK");
-    _contentLength -= _bodyLength;
+    if (buffer.length() > _contentLength)
+        buffer.erase(_contentLength, buffer.length() - _contentLength);
     if (buffer.length() < _contentLength)
     {
         this->_outfile->write(buffer.c_str(), buffer.length());
         this->_outfile->flush();
         _bodyLength += buffer.length();
         buffer.erase(0, buffer.length());
-        return;
     }
-    if (buffer.length() > _contentLength)
-        buffer.erase(_contentLength, buffer.length() - _contentLength);
-    this->_outfile->write(buffer.c_str(), _contentLength);
-    this->_outfile->flush();
-    buffer.erase(0, _contentLength);
-    _bodyLength += _contentLength;
-    if (buffer.length() == 0 && _bodyLength == headerContentLength)
+    else
+    {
+        this->_outfile->write(buffer.c_str(), _contentLength);
+        this->_outfile->flush();
+        buffer.erase(0, _contentLength);
+        _bodyLength += _contentLength;
+    }
+    // TODO: handle when the content length is bigger than the body length
+    if (buffer.length() == 0 && _bodyLength == _contentLength)
         setStatusCode(201, "Created");
 }
 
@@ -330,7 +337,14 @@ void Request::printRequest()
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
         cout << it->first << ": " << it->second << endl;
-    cout << "Full Path: " << _fileFullPath << endl;
+    cout << "Requested File Path: " << _fileFullPath << endl;
+    cout << "Root: " << _serverRoot << endl;
+    cout << "Client Max Body Size: " << _clientMaxBodySize << endl;
+    cout << "Autoindex: " << _autoindex << endl;
+    cout << "Is Upload Allowed: " << _isUploadAllowed << endl;
+    cout << "Upload Path: " << _uploadPath << endl;
+    cout << "Is Cgi Allowed: " << _isCgiAllowed << endl;
+    cout << "Return Redirect: " << returnRedirect << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }
 
