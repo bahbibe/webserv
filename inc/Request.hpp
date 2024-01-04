@@ -29,7 +29,6 @@ private:
     bool _isReadingBody;
     size_t _contentLength;
 
-    Location *_location;
     string _fileFullPath;
 
     //? Server directives
@@ -68,6 +67,7 @@ private:
     string toLowerCase(const string &str);
     Location* findLocation();
 public:
+    Location *_location;
     bool isErrorCode;
     Request(Server* server, int socketFd);
     ~Request();
@@ -90,4 +90,5 @@ public:
     fstream* getOutFile() const;
     Location* getLocation() const;
     string getFileFullPath() const;
+    bool getAutoIndex() const;
 };

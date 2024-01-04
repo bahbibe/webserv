@@ -103,8 +103,9 @@ void Webserver::newConnection(map<int, Request> &req ,Server &server)
 
 void Webserver::start()
 {
+    signal(SIGPIPE, SIG_IGN);
     map<int, Request> req;
-    Response resp;
+    map<int, Response> resp;
     while (1)
     {
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
@@ -120,15 +121,23 @@ void Webserver::start()
                 if(ep.events[i].events & EPOLLIN)
                 {
                     req[ep.events[i].data.fd].readRequest();
+                    if(req[ep.events[i].data.fd].getIsRequestFinished())
+                    {
+                        resp.insert(pair<int, Response>(ep.events[i].data.fd, Response()));
+                    }
                 }
                 if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
                 {
-                    resp.sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
-                    // if (req[ep.events[i].data.fd].getIsResponseFinished())
-                    // {
-                        close(ep.events[i].data.fd);
+                    resp[ep.events[i].data.fd].sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
+                    if (resp[ep.events[i].data.fd].getIsFinished() == true)
+                    {
+                        cout << resp[ep.events[i].data.fd].getIsFinished() << "  ,eased client...!\n";
                         req.erase(ep.events[i].data.fd);
-                    // }
+                        resp.erase(ep.events[i].data.fd);
+                        close(ep.events[i].data.fd);
+                    }
+                    // req.erase(ep.events[i].data.fd);
+                    // close(ep.events[i].data.fd);
                 }
             }
         }
