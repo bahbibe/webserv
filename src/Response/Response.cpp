@@ -1,7 +1,8 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_fdSocket(0), _statusCode(0),_isfinished(0),_flag(false)
+Response::Response():_fdSocket(0), _statusCode(0),_isfinished(false),_flag(false)
 {
+    cout << GREEN "=====>Is finished: " << this->getIsFinished() << "<====\n" RESET;
 }
 
 
@@ -88,7 +89,7 @@ void Response::checkAutoInedx(Request &request)
 
 void Response::checkErrors(Request &request)
 {
-    cout << RED "ERRORS HSNDLER\n" RESET;
+    cout << RED "ERRORS HANDLER\n" RESET;
     file.open(this->_path.c_str(), ios::in | ios::binary);
     if (!file.good())
     {
@@ -160,11 +161,11 @@ void Response::GET(Request &request)
     else if (file.gcount() == 0)
     {
         this->_body = "0\r\n\r\n";
-        this->_flag = false;
-        this->_isfinished = 1;
         write(this->_fdSocket, this->_body.c_str(),   this->_body.length());
         file.close();
-        close(this->_fdSocket);
+        this->_flag = false;
+        this->_isfinished = true;
+        cout << GREEN "=====>Is finished: " << this->getIsFinished() << "<====\n" RESET;
         cout << GREEN "=====>end<====\n" RESET;
     }
 }
@@ -194,7 +195,6 @@ void Response::findeContentType()
         if (it != this->mime.end())
             this->_contentType = it->second;
     }
-
 }
 Response::Response(const Response &other)
 {
@@ -219,7 +219,7 @@ Response &Response::operator=(const Response &other)
     }
     return *this;
 }
-int Response::getIsFinished() const
+bool Response::getIsFinished() const
 {
     return this->_isfinished;
 }
