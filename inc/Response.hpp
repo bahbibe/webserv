@@ -11,16 +11,18 @@
 #include <sys/stat.h>
 
 #define BUFFERSIZE 1024
+using namespace std;
 class Response
 {
     private:
         // char _body1[BUFFERSIZE];
         int _fdSocket;
         int _statusCode;
+        int _contentLength;
+        int _isfinished;
         std::string _path;
         std::string _contentType;
         std::string _header;
-        int _contentLength;
         std::string _body;
         std::ifstream file;
         bool _flag;
@@ -32,11 +34,16 @@ class Response
         ~Response();
         void GET(Request &request);
         void sendResponse(Request &request, int fdSocket);
+        Response(const Response &other);
+        Response &operator=(const Response &other);
+        int getIsFinished() const;
     private:
         void SendHeader();
         void findeContentType();
         void saveStatus();
         int is_adir(std::string path);
+        void checkAutoInedx(Request &request);
+        void checkErrors(Request &request);
 
         // void Delete(Request &request, Location &locations);
 };
