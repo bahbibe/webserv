@@ -95,9 +95,7 @@ void Request::setServer()
     //! TODO: first find the server according to the host header
     directives.host = _server->getHost();
     directives.port = _server->getPort();
-    directives.serverRoot = _server->getRoot();
     directives.clientMaxBodySize = _server->getClientMaxBodySize();
-    directives.autoindex = _server->getAutoindex();
     directives.errorPages = _server->getErrorPages();
     directives.indexs = _server->getIndexs();
     directives.serverNames = _server->getServerNames();
@@ -121,14 +119,10 @@ void Request::setServer()
     directives.uploadPath = _location->getUploadPath();
     directives.isCgiAllowed = _location->getCgi();
     directives.returnRedirect = _location->getReturn();
-    cout << YELLOW "auto: " << _location->getAutoindex() << RESET << endl;
-    // if (!_location->getAutoindex())
     directives.autoindex = _location->getAutoindex();
-    // directives.autoindex = directives.autoindex || _location->getAutoindex();
+    directives.serverRoot = _location->getRoot();
     if (_location->getIndexs().size() > 0)
         directives.indexs = _location->getIndexs();
-    if (!_location->getRoot().empty())
-        directives.serverRoot = _location->getRoot();
     if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
