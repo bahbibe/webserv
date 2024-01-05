@@ -1,46 +1,43 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_fdSocket(0), _statusCode(0),_isfinished(false),_flag(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false), _fdSocket(0), _statusCode(0)
 {
-    cout << GREEN "=====>Is finished: " << this->getIsFinished() << "<====\n" RESET;
+    saveStatus();
 }
-
 
 void Response::sendResponse(Request &request, int fdSocket)
 {
     cout << BLUE"======================RESPONSE===========================\n" RESET;
-    this->_fdSocket = fdSocket;
-    this->_path = request.getRequestTarget();
-    this->_statusCode = request.getStatusCode();
-    this->_path = request.getFileFullPath();
-    cout << "Path: " << this->_path << endl;
-
-    cout << "Flag: " << this->_flag << endl;
-    cout << "Method: " << request.getMethod() << endl;
-    if (is_adir(this->_path)&& !this->_flag)
-        checkAutoInedx(request);
+    if (!this->_flag)
+    {
+        this->_fdSocket = fdSocket;
+        this->_path = request.getRequestTarget();
+        this->_statusCode = request.getStatusCode();
+        this->_path = request.directives.requestedFile;
+        cout << "Method: " << request.getMethod() << endl;
+        cout << "Is error: " << request.isErrorCode << endl;
+    }
+        cout << "Path: " << this->_path << endl;
     if (request.isErrorCode && !this->_flag)
         checkErrors(request);
+    else if (is_adir(this->_path) && !this->_flag)
+        checkAutoInedx(request);
     else if (!this->_flag)
     {
-        //!openig file and check exist.
-        cout << "request.getAutoIndex(): " << request.directives.autoindex << endl;
-
         this->file.open(_path.c_str(), ios::in | ios::binary);
         if (!file.good())
         {
             request.isErrorCode = 1;
-            this->_path = "./WWW/err/404.html";
+            this->_path = getErrorPage(request, 404);
             this->_statusCode = 404;
             this->file.open(_path.c_str(), ios::in | ios::binary);
         }
-        saveStatus();
         findeContentType();
         SendHeader();
         this->_flag = true;
     }
 
-    if (request.getMethod() == "GET")
+    if (request.getMethod() == "GET" && !this->_defaultError)
     {
         GET(request);
     }
@@ -50,16 +47,14 @@ void Response::sendResponse(Request &request, int fdSocket)
         cout << "DELETE\n";
     }
     cout << BLUE"======================RESPONSE===========================\n" RESET;
-
 }
-
 
 void Response::checkAutoInedx(Request &request)
 {
     cout << "checkAutoInedx: " << request.directives.autoindex << endl;
     if (request.directives.autoindex)
     {
-        for (size_t i = 0; i < request._location->getIndexs().size(); i++)
+        for (size_t i = 0; i < request.directives.indexs.size(); i++)
         {
             string index = this->_path + request._location->getIndexs()[i];
             cout << "index: " << index << endl;
@@ -81,27 +76,55 @@ void Response::checkAutoInedx(Request &request)
     else
     {
         request.isErrorCode = 1;
-        this->_path = "./WWW/err/403.html";
         this->_statusCode = 403;
+        checkErrors(request);
     }
 
+}
+
+
+string Response::getErrorPage(Request &request, int statusCode)
+{
+    cout << "getErrorPage\n";
+    map<string, string>::iterator it;
+    it = request.directives.errorPages.find(toSting(statusCode));
+    if (it != request.directives.errorPages.end())
+        return it->second;
+    return "default";
 }
 
 void Response::checkErrors(Request &request)
 {
     cout << RED "ERRORS HANDLER\n" RESET;
-    file.open(this->_path.c_str(), ios::in | ios::binary);
-    if (!file.good())
+    this->_path = getErrorPage(request, this->_statusCode);
+    cout << "path: " << this->_path << endl;
+    if (this->_path == "default")
     {
-        request.isErrorCode = 1;
-        this->_path = "./WWW/err/404.html";
-        this->_statusCode = 404;
-        this->file.open(_path.c_str(), ios::in | ios::binary);
+        stringstream ss;
+        map<int, string>::iterator it;
+        this->_contentType = "text/plain";
+        SendHeader();
+
+        it = this->status.find(this->_statusCode);
+        ss << hex << it->second.length();
+        this->_body = ss.str() + "\r\n";
+        this->_body += it->second + "\r\n";
+        this->_body += "0\r\n\r\n";
+        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+        this->_defaultError = true;
+        this->_isfinished = true;
+        this->_flag = false;
+        cout << "end default...!!!!\n";
     }
+    else
+    {
+        file.open(this->_path.c_str(), ios::in | ios::binary);
+        findeContentType();
+        SendHeader();
+    }
+
     this->_flag = true;
-    saveStatus();
-    findeContentType();
-    SendHeader();
+    // saveStatus();
 }
 
 int Response::is_adir(string path)
@@ -109,6 +132,7 @@ int Response::is_adir(string path)
     struct stat metaData;
     return (stat(path.c_str(), &metaData) == 0 && (metaData.st_mode & S_IFDIR) ? 1 : 0);
 }
+
 void Response::saveStatus()
 {
     this->status[200] = "200 OK";
@@ -165,7 +189,6 @@ void Response::GET(Request &request)
         file.close();
         this->_flag = false;
         this->_isfinished = true;
-        cout << GREEN "=====>Is finished: " << this->getIsFinished() << "<====\n" RESET;
         cout << GREEN "=====>end<====\n" RESET;
     }
 }
@@ -196,10 +219,19 @@ void Response::findeContentType()
             this->_contentType = it->second;
     }
 }
+
+string Response::toSting(int mun)
+{
+    stringstream ss;
+    ss << mun;
+    return ss.str();
+}
+
 Response::Response(const Response &other)
 {
     *this = other;
 }
+
 Response &Response::operator=(const Response &other)
 {
     if (this != &other)
@@ -219,10 +251,12 @@ Response &Response::operator=(const Response &other)
     }
     return *this;
 }
+
 bool Response::getIsFinished() const
 {
     return this->_isfinished;
 }
+
 Response::~Response()
 {
     cout << "Response destructor\n";

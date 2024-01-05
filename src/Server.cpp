@@ -130,13 +130,11 @@ void Webserver::start()
                     resp[ep.events[i].data.fd].sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
                     if (resp[ep.events[i].data.fd].getIsFinished() == true)
                     {
-                        cout << resp[ep.events[i].data.fd].getIsFinished() << "  ,eased client...!\n";
                         req.erase(ep.events[i].data.fd);
                         resp.erase(ep.events[i].data.fd);
                         close(ep.events[i].data.fd);
                     }
-                    // req.erase(ep.events[i].data.fd);
-                    // close(ep.events[i].data.fd);
+
                 }
             }
         }
