@@ -24,7 +24,7 @@ void Response::sendResponse(Request &request, int fdSocket)
     else if (!this->_flag)
     {
         //!openig file and check exist.
-        cout << "request.getAutoIndex(): " << request.getAutoIndex() << endl;
+        cout << "request.getAutoIndex(): " << request.directives.autoindex << endl;
 
         this->file.open(_path.c_str(), ios::in | ios::binary);
         if (!file.good())
@@ -56,8 +56,8 @@ void Response::sendResponse(Request &request, int fdSocket)
 
 void Response::checkAutoInedx(Request &request)
 {
-    cout << "checkAutoInedx: " << request.getAutoIndex() << endl;
-    if (request.getAutoIndex())
+    cout << "checkAutoInedx: " << request.directives.autoindex << endl;
+    if (request.directives.autoindex)
     {
         for (size_t i = 0; i < request._location->getIndexs().size(); i++)
         {
