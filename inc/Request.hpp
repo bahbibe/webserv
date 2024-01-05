@@ -5,6 +5,22 @@
 
 #define BUFFER_SIZE 1024
 
+struct Directives {
+    string host;
+    string port;
+    string serverRoot;
+    size_t clientMaxBodySize;
+    bool autoindex;
+    map<string, string> errorPages;
+    vector<string> indexs;
+    vector<string> serverNames;
+    bool isUploadAllowed;
+    string uploadPath;
+    bool isCgiAllowed;
+    string returnRedirect;
+    string requestedFile;
+};
+
 class Request {
 private:
     Server* _server;
@@ -31,20 +47,6 @@ private:
 
     string _fileFullPath;
 
-    //? Server directives
-    string _host;
-    string _port;
-    string _serverRoot;
-    size_t _clientMaxBodySize;
-    bool _autoindex;
-    map<string, string> _errorPages;
-    vector<string> _indexs;
-    vector<string> _serverNames;
-    bool _isUploadAllowed;
-    string _uploadPath;
-    bool _isCgiAllowed;
-    string returnRedirect;
-
     map<string, vector<string> > _mimeTypes;
     
     //? Parsing
@@ -67,6 +69,9 @@ private:
     string toLowerCase(const string &str);
     Location* findLocation();
 public:
+    //? Server directives
+    Directives directives;
+
     Location *_location;
     bool isErrorCode;
     Request(Server* server, int socketFd);
@@ -90,5 +95,4 @@ public:
     fstream* getOutFile() const;
     Location* getLocation() const;
     string getFileFullPath() const;
-    bool getAutoIndex() const;
 };

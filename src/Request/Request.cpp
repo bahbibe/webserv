@@ -93,14 +93,14 @@ Location* Request::findLocation()
 void Request::setServer()
 {
     //! TODO: first find the server according to the host header
-    this->_host = _server->getHost();
-    this->_port = _server->getPort();
-    this->_serverRoot = _server->getRoot();
-    this->_clientMaxBodySize = _server->getClientMaxBodySize();
-    this->_autoindex = _server->getAutoindex();
-    this->_errorPages = _server->getErrorPages();
-    this->_indexs = _server->getIndexs();
-    this->_serverNames = _server->getServerNames();
+    directives.host = _server->getHost();
+    directives.port = _server->getPort();
+    directives.serverRoot = _server->getRoot();
+    directives.clientMaxBodySize = _server->getClientMaxBodySize();
+    directives.autoindex = _server->getAutoindex();
+    directives.errorPages = _server->getErrorPages();
+    directives.indexs = _server->getIndexs();
+    directives.serverNames = _server->getServerNames();
     _location = this->findLocation();
     if (_location == NULL)
         setStatusCode(404, "Not Found");
@@ -117,16 +117,21 @@ void Request::setServer()
         if (find(itb, ite, _method) == ite)
             setStatusCode(405, "Method Not Allowed");
     }
-    // TODO: override the server directives with the location directives
-    this->_isUploadAllowed = _location->getUpload();
-    this->_uploadPath = _location->getUploadPath();
-    this->_isCgiAllowed = _location->getCgi();
-    this->returnRedirect = _location->getReturn();
+    directives.isUploadAllowed = _location->getUpload();
+    directives.uploadPath = _location->getUploadPath();
+    directives.isCgiAllowed = _location->getCgi();
+    directives.returnRedirect = _location->getReturn();
+    cout << YELLOW "auto: " << _location->getAutoindex() << RESET << endl;
+    // if (!_location->getAutoindex())
+    directives.autoindex = _location->getAutoindex();
+    // directives.autoindex = directives.autoindex || _location->getAutoindex();
     if (_location->getIndexs().size() > 0)
-        this->_indexs = _location->getIndexs();
+        directives.indexs = _location->getIndexs();
     if (!_location->getRoot().empty())
-        this->_serverRoot = _location->getRoot();
-    this->_fileFullPath = this->_serverRoot + this->_requestTarget;
+        directives.serverRoot = _location->getRoot();
+    if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
+        directives.serverRoot += "/";
+    directives.requestedFile = directives.serverRoot + this->_requestTarget;
 }
 
 void Request::validateRequest()
@@ -145,8 +150,8 @@ void Request::validateRequest()
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
-        if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
-            setStatusCode(413, "Request Entity Too Large");
+        // if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
+        //     setStatusCode(413, "Request Entity Too Large");
     }
 }
 
@@ -232,7 +237,7 @@ void Request::createOutfile()
     // TODO: apply the extension to the file from the content type header
     string contentType = this->_headers["content-type"];
     string extension = this->getMimeType(contentType);
-    this->_filePath = this->_uploadPath + "/file." + extension;
+    this->_filePath = directives.uploadPath + "/file." + extension;
     this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");
@@ -243,13 +248,13 @@ void Request::parseBody(string buffer)
 {
     if (!this->_isReadingBody)
         this->validateRequest();
-    this->_isReadingBody = true;
     //! NOTE: if the request has no body, the body length is 0 maybe should wait for the body 
     // if (buffer.length() == 0)
     //     setStatusCode(200, "OK");
     if (this->_method != "POST")
         setStatusCode(200, "OK");
-    if (!this->_isUploadAllowed)
+    this->_isReadingBody = true;
+    if (!directives.isUploadAllowed)
         setStatusCode(200, "OK But upload is not allowed so work of the cgi");
     if (!this->_outfileIsCreated)
         this->createOutfile();
@@ -337,14 +342,16 @@ void Request::printRequest()
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
         cout << it->first << ": " << it->second << endl;
-    cout << "Requested File Path: " << _fileFullPath << endl;
-    cout << "Root: " << _serverRoot << endl;
-    cout << "Client Max Body Size: " << _clientMaxBodySize << endl;
-    cout << "Autoindex: " << _autoindex << endl;
-    cout << "Is Upload Allowed: " << _isUploadAllowed << endl;
-    cout << "Upload Path: " << _uploadPath << endl;
-    cout << "Is Cgi Allowed: " << _isCgiAllowed << endl;
-    cout << "Return Redirect: " << returnRedirect << endl;
+    cout << BLUE "=====================Directives=================" RESET << endl;
+    cout << "Requested File Path: " << directives.requestedFile << endl;
+    cout << "Root: " << directives.serverRoot << endl;
+    cout << "Client Max Body Size: " << directives.clientMaxBodySize << endl;
+    cout << "Autoindex: " << directives.autoindex << endl;
+    cout << "Is Upload Allowed: " << directives.isUploadAllowed << endl;
+    cout << "Upload Path: " << directives.uploadPath << endl;
+    cout << "Is Cgi Allowed: " << directives.isCgiAllowed << endl;
+    cout << "Return Redirect: " << directives.returnRedirect << endl;
+    cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }
 
@@ -394,11 +401,6 @@ string Request::getFileFullPath() const
 Location *Request::getLocation() const
 {
     return this->_location;
-}
-
-bool Request::getAutoIndex() const
-{
-    return this->_autoindex;
 }
 
 vector<string> Request::split(string str, string delimiter)
