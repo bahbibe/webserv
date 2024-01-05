@@ -126,6 +126,10 @@ Location *Server::parseLocation(stringstream &ss)
     }
     if (duplicateDirective(location->_dir))
         throw ServerException(ERR "Duplicate directive");
+    if (location->getRoot().empty())
+        location->setRoot(_server_root);
+    if (location->_dir.autoindex == 0)
+        location->setAutoindex(_autoindex);
     return location;
 }
 

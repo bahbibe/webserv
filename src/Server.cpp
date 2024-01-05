@@ -2,9 +2,8 @@
 #include "../inc/Response.hpp"
 
 streampos Server::_pos = 0;
-Server::Server()
+Server::Server() : _autoindex(false)
 {
-    _autoindex = false;
     memset(&_dir, 0, sizeof(_dir));
 }
 

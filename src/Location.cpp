@@ -2,7 +2,10 @@
 #include "../inc/Location.hpp"
 #include "../inc/Server.hpp"
 
-Location::Location() : _autoindex(false), _cgi(false), _upload(false){}
+Location::Location() : _autoindex(false), _cgi(false), _upload(false)
+{
+    memset(&_dir, 0, sizeof(_dir));
+}
 Location::~Location(){}
 void Location::setIndexs(string const &buff){_indexs.push_back(buff);}
 void Location::setRoot(string const &buff) {_root = buff;}
