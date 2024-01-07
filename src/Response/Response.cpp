@@ -5,164 +5,6 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false), _fdSo
     saveStatus();
 }
 
-void Response::sendResponse(Request &request, int fdSocket)
-{
-    cout << BLUE"======================RESPONSE===========================\n" RESET;
-    if (!this->_flag)
-    {
-        this->_fdSocket = fdSocket;
-        this->_path = request.getRequestTarget();
-        this->_statusCode = request.getStatusCode();
-        this->_path = request.directives.requestedFile;
-        cout << "Method: " << request.getMethod() << endl;
-        cout << "Is error: " << request.isErrorCode << endl;
-    }
-        cout << "Path: " << this->_path << endl;
-    if (request.isErrorCode && !this->_flag)
-        checkErrors(request);
-    else if (is_adir(this->_path) && !this->_flag)
-        checkAutoInedx(request);
-    else if (!this->_flag)
-    {
-        this->file.open(_path.c_str(), ios::in | ios::binary);
-        if (!file.good())
-        {
-            request.isErrorCode = 1;
-            this->_path = getErrorPage(request, 404);
-            this->_statusCode = 404;
-            this->file.open(_path.c_str(), ios::in | ios::binary);
-        }
-        findeContentType();
-        SendHeader();
-        this->_flag = true;
-    }
-
-    if (request.getMethod() == "GET" && !this->_defaultError)
-    {
-        GET(request);
-    }
-    else if (request.getMethod() == "DELETE")
-    {
-        // DELETE(request);
-        cout << "DELETE\n";
-    }
-    cout << BLUE"======================RESPONSE===========================\n" RESET;
-}
-
-void Response::checkAutoInedx(Request &request)
-{
-    cout << "checkAutoInedx: " << request.directives.autoindex << endl;
-    if (request.directives.autoindex)
-    {
-        for (size_t i = 0; i < request.directives.indexs.size(); i++)
-        {
-            string index = this->_path + request._location->getIndexs()[i];
-            cout << "index: " << index << endl;
-            this->file.open(index.c_str(), ios::in | ios::binary);
-            if (file.good())
-            {
-                this->_path = index;
-                this->_statusCode = 200;
-                this->_flag = true;
-                saveStatus();
-                findeContentType();
-                SendHeader();
-                return;
-            }   
-        }
-        cout << "tree file is loading ^^\n";
-        exit(1);
-    }
-    else
-    {
-        request.isErrorCode = 1;
-        this->_statusCode = 403;
-        checkErrors(request);
-    }
-
-}
-
-
-string Response::getErrorPage(Request &request, int statusCode)
-{
-    cout << "getErrorPage\n";
-    map<string, string>::iterator it;
-    it = request.directives.errorPages.find(toSting(statusCode));
-    if (it != request.directives.errorPages.end())
-        return it->second;
-    return "default";
-}
-
-void Response::checkErrors(Request &request)
-{
-    cout << RED "ERRORS HANDLER\n" RESET;
-    this->_path = getErrorPage(request, this->_statusCode);
-    cout << "path: " << this->_path << endl;
-    if (this->_path == "default")
-    {
-        stringstream ss;
-        map<int, string>::iterator it;
-        this->_contentType = "text/plain";
-        SendHeader();
-
-        it = this->status.find(this->_statusCode);
-        ss << hex << it->second.length();
-        this->_body = ss.str() + "\r\n";
-        this->_body += it->second + "\r\n";
-        this->_body += "0\r\n\r\n";
-        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
-        this->_defaultError = true;
-        this->_isfinished = true;
-        this->_flag = false;
-        cout << "end default...!!!!\n";
-    }
-    else
-    {
-        file.open(this->_path.c_str(), ios::in | ios::binary);
-        findeContentType();
-        SendHeader();
-    }
-
-    this->_flag = true;
-    // saveStatus();
-}
-
-int Response::is_adir(string path)
-{
-    struct stat metaData;
-    return (stat(path.c_str(), &metaData) == 0 && (metaData.st_mode & S_IFDIR) ? 1 : 0);
-}
-
-void Response::saveStatus()
-{
-    this->status[200] = "200 OK";
-    this->status[201] = "201 Created";
-    this->status[204] = "204 No Content";
-    this->status[301] = "301 Moved Permanently";
-    this->status[400] = "400 Bad Request";
-    this->status[403] = "403 Forbidden";
-    this->status[404] = "404 Not Found";
-    this->status[405] = "405 Method Not Allowed";
-    this->status[408] = "408 Request Timeout";
-    this->status[409] = "409 Conflict";
-    this->status[500] = "500 Internal Server Error";
-    this->status[501] = "501 Not Implemented";
-}
-
-void Response::SendHeader() 
-{
-    map<int,string>::iterator it;
-    it = this->status.find(this->_statusCode);
-    this->_header = "HTTP/1.1 " + it->second +"\r\n";
-    this->_header += "Content-Type: " + this->_contentType + "\r\n";
-    this->_header += "Transfer-Encoding: chunked\r\n";
-    this->_header += "connection: close\r\n\r\n";
-    int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
-    perror("ERROR");
-    if (n < -1)
-        return;
-}
-
 void Response::GET(Request &request)
 {
     (void)request;
@@ -193,6 +35,210 @@ void Response::GET(Request &request)
     }
 }
 
+void Response::sendResponse(Request &request, int fdSocket)
+{
+    cout << BLUE"======================RESPONSE===========================\n" RESET;
+    if (!this->_flag)
+    {
+        this->_fdSocket = fdSocket;
+        this->_path = request.getRequestTarget();
+        this->_statusCode = request.getStatusCode();
+        this->_path = request.directives.requestedFile;
+        cout << "Method: " << request.getMethod() << endl;
+        cout << "Is error: " << request.isErrorCode << endl;
+    }
+        cout << "Path: " << this->_path << endl;
+    if (request.isErrorCode == true && !this->_flag)
+        checkErrors(request);
+    else if (is_adir(this->_path) && !this->_flag)
+        checkAutoInedx(request);
+    else if (!this->_flag)
+    {
+        cout << "======HERE===========\n";
+        this->file.open(_path.c_str(), ios::in | ios::binary);
+        if (!file.good())
+        {
+        cout << "======NOT OPEN===========\n";
+            cout << "PATHH: " << this->_path << endl;
+            request.isErrorCode = 1;
+            this->_statusCode = 404;
+            checkErrors(request);
+        }
+        else
+        {
+            findeContentType();
+            SendHeader();
+            this->_flag = true;
+        }
+    }
+
+    if (request.getMethod() == "GET" && !this->_defaultError)
+    {
+        GET(request);
+    }
+    else if (request.getMethod() == "POST")
+    {
+        cout << "POSTPOSTPOSTPOSTPOSTPOSTPOSTPOSTPOST\n";
+        this->_isfinished = true;
+        this->_flag = false;
+    }
+    else if (request.getMethod() == "DELETE")
+    {
+        // DELETE(request);
+        cout << "DELETE\n";
+    }
+    cout << BLUE"======================RESPONSE===========================\n" RESET;
+}
+
+void Response::checkAutoInedx(Request &request)
+{
+    cout << "checkAutoInedx: " << request.directives.autoindex << endl;
+    if (request.directives.autoindex)
+    {
+        for (size_t i = 0; i < request.directives.indexs.size(); i++)
+        {
+            string index = this->_path + request._location->getIndexs()[i];
+            cout << "index: " << index << endl;
+            this->file.open(index.c_str(), ios::in | ios::binary);
+            if (file.good())
+            {
+                this->_path = index;
+                this->_statusCode = 200;
+                this->_flag = true;
+                saveStatus();
+                findeContentType();
+                SendHeader();
+                return;
+            }   
+        }
+        tree_dir(request);
+    }
+    else
+    {
+        request.isErrorCode = 1;
+        this->_statusCode = 403;
+        checkErrors(request);
+    }
+}
+
+void Response::tree_dir(Request &request)
+{
+    (void)request;
+    DIR *dir = opendir(this->_path.c_str());
+    if (dir)
+    {
+        struct dirent *dp;
+        string name;
+        string filePath;
+        string body = "<html><head></head><body><ul>";
+        while ((dp = readdir(dir)))
+        {
+            name = dp->d_name;
+            body += "<li><a href='"+ name  +"'>"  + name +"</a></li>";
+        }
+        this->_contentType = "text/html";
+        stringstream ss;
+        SendHeader();
+        ss << hex << body.length();
+        this->_body += ss.str() + "\r\n";
+        this->_body += body + "\r\n";
+        this->_body += "0\r\n\r\n";
+        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+        this->_defaultError = true;
+        this->_isfinished = true;
+        this->_flag = false;
+    }
+}
+
+string Response::getErrorPage(Request &request, int statusCode)
+{
+    cout << "getErrorPage\n";
+    map<string, string>::iterator it;
+    it = request.directives.errorPages.find(toSting(statusCode));
+    if (it != request.directives.errorPages.end())
+        return it->second;
+    return "default";
+}
+
+void Response::checkErrors(Request &request)
+{
+    cout << RED "ERRORS HANDLER\n" RESET;
+    this->_path = getErrorPage(request, this->_statusCode);
+    cout << "error Path: " << this->_path << endl;
+    file.open(this->_path.c_str(), ios::in | ios::binary);
+    if (!file.good() || this->_path == "default")
+    {
+        string error;
+        stringstream ss;
+        map<int, string>::iterator it;
+        this->_contentType = "text/html";
+        SendHeader();
+        it = this->status.find(this->_statusCode);
+        error = templateError(it->second);
+        ss << hex << error.length();
+        this->_body = ss.str() + "\r\n";
+        this->_body += error + "\r\n";
+        this->_body += "0\r\n\r\n";
+        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+        this->_defaultError = true;
+        this->_isfinished = true;
+    }
+    else if (file.good())
+    {
+        cout << "======Test======\n";
+        findeContentType();
+        SendHeader();
+        this->_flag = true;
+    }
+
+}
+
+int Response::is_adir(string &path)
+{
+    struct stat metaData;
+    return (stat(path.c_str(), &metaData) == 0 && (metaData.st_mode & S_IFDIR) ? 1 : 0);
+}
+
+void Response::saveStatus()
+{
+    this->status[200] = "200 OK";
+    this->status[201] = "201 Created";
+    this->status[204] = "204 No Content";
+    this->status[301] = "301 Moved Permanently";
+    this->status[400] = "400 Bad Request";
+    this->status[403] = "403 Forbidden";
+    this->status[404] = "404 Not Found";
+    this->status[405] = "405 Method Not Allowed";
+    this->status[408] = "408 Request Timeout";
+    this->status[409] = "409 Conflict";
+    this->status[500] = "500 Internal Server Error";
+    this->status[501] = "501 Not Implemented";
+}
+
+void Response::SendHeader() 
+{
+    map<int,string>::iterator it;
+    it = this->status.find(this->_statusCode);
+    this->_header = "HTTP/1.1 " + it->second +"\r\n";
+    this->_header += "Content-Type: " + this->_contentType + "\r\n";
+    this->_header += "Transfer-Encoding: chunked\r\n";
+    this->_header += "connection: close\r\n\r\n";
+    int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
+    // perror("ERROR");
+    if (n < -1)
+        return;
+}
+
+string Response::templateError(string errorType)
+{
+    string errorBody;
+
+    errorBody = "<html><head><title>"+ errorType +"</title></head>";
+    errorBody += "<body><center><h1>"+errorType+ "</h1></center><hr><center>M0BLACK</center></body>";
+    return errorBody;
+}
+
+
 void Response::findeContentType()
 {
     ifstream file("./conf/mime.conf");
@@ -220,7 +266,7 @@ void Response::findeContentType()
     }
 }
 
-string Response::toSting(int mun)
+string Response::toSting(int &mun)
 {
     stringstream ss;
     ss << mun;
