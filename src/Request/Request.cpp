@@ -13,7 +13,6 @@ Request::Request(const Request &other)
     *this = other;
 }
 
-
 Request &Request::operator=(const Request &other)
 {
     if (this != &other)
@@ -22,7 +21,6 @@ Request &Request::operator=(const Request &other)
         this->_requestTarget = other._requestTarget;
         this->_httpVersion = other._httpVersion;
         this->_headers = other._headers;
-        this->_fileFullPath = other._fileFullPath;
         this->_filePath = other._filePath;
         this->_socketFd = other._socketFd;
         this->_server = other._server;
@@ -37,12 +35,22 @@ Request &Request::operator=(const Request &other)
         this->_isReadingBody = other._isReadingBody;
         this->_contentLength = other._contentLength;
         this->isErrorCode = other.isErrorCode;
+        this->_isBodyBoundary = other._isBodyBoundary;
     }
     return *this;
 }
-Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCount(0), _statusCode(200), _isRequestFinished(false),
+
+Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), isErrorCode(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
+{
+    this->_location = NULL;
+    memset(_buffer, 0, BUFFER_SIZE);
+}
+
+Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
+    _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
 {
     this->_server = server;
     this->_location = NULL;
@@ -52,7 +60,7 @@ Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCoun
 void Request::readRequest()
 {
     try {
-        int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
+        int readBytes = read(_socketFd, _buffer, BUFFER_SIZE + 1);
         if (readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
         _buffer[readBytes] = '\0';
@@ -139,6 +147,11 @@ void Request::validateRequest()
         setStatusCode(501, "Unsupported Transfer-Encoding");
     if (_headers.find("content-length") != _headers.end() && _headers.find("transfer-encoding") != _headers.end())
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
+    if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
+    {
+        _isBodyBoundary = true;
+        _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
+    }
     if (_method == "POST")
     {
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
@@ -238,6 +251,16 @@ void Request::createOutfile()
     this->_outfileIsCreated = true;
 }
 
+void Request::parseBodyWithBoundaries(string buffer)
+{
+    try {
+        _boundaries.parseBoundary(buffer, _boundary);
+    } catch (int statusCode)
+    {
+        setStatusCode(statusCode, "Boundaris Status Code");
+    }
+}
+
 void Request::parseBody(string buffer)
 {
     if (!this->_isReadingBody)
@@ -250,9 +273,13 @@ void Request::parseBody(string buffer)
     this->_isReadingBody = true;
     if (!directives.isUploadAllowed)
         setStatusCode(200, "OK But upload is not allowed so work of the cgi");
-    if (!this->_outfileIsCreated)
+    if (!this->_outfileIsCreated && !this->_isBodyBoundary)
+    {
         this->createOutfile();
-    if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
+    }
+    if (_isBodyBoundary)
+        parseBodyWithBoundaries(buffer);
+    else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked(buffer);
     else if (_headers.find("content-length") != _headers.end())
         parseBodyWithContentLength(buffer);
@@ -332,6 +359,7 @@ void Request::printRequest()
     cout << "Request Target: " << _requestTarget << endl;
     cout << "HTTP Version: " << _httpVersion << endl;
     cout << "Headers size: " << _headers.size() << endl;
+    cout << "Boundary: " << _boundary << endl;
     cout << "Headers: " << endl;
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
@@ -380,16 +408,6 @@ int Request::getStatusCode() const
 map<string, string> Request::getHeaders() const
 {
     return this->_headers;
-}
-
-fstream *Request::getOutFile() const
-{
-    return this->_outfile;
-}
-
-string Request::getFileFullPath() const
-{
-    return this->_fileFullPath;
 }
 
 Location *Request::getLocation() const

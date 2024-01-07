@@ -2,6 +2,7 @@
 #include "webserv.hpp"
 #include "Server.hpp"
 #include "Helpers.hpp"
+#include "Boundaries.hpp"
 
 #define BUFFER_SIZE 1024
 
@@ -45,7 +46,10 @@ private:
     bool _isReadingBody;
     size_t _contentLength;
 
-    string _fileFullPath;
+    bool _isBodyBoundary;
+    string _boundary;
+
+    Boundaries _boundaries;
 
     map<string, vector<string> > _mimeTypes;
     
@@ -54,10 +58,10 @@ private:
     void parseRequestLine(string& requestLine);
     void parseBody(string buffer);
     void parseBodyWithContentLength(string buffer);
-    void parseBodyWithChunked(string buffer);
+    void parseBodyWithChunked(string buffer);\
+    void parseBodyWithBoundaries(string buffer);
 
     //? Request Helpers
-    void setStatusCode(int statusCode, string statusMessage);
     void setContentLength(string contentLength);
     void createOutfile();
     void setServer();
@@ -76,12 +80,12 @@ public:
     bool isErrorCode;
     Request(Server* server, int socketFd);
     ~Request();
-    Request() {}
+    Request();
     Request(Request const &other);
     Request &operator=(Request const &other);
     void readRequest();
     void validateRequest();
-
+    void setStatusCode(int statusCode, string statusMessage);
     void printRequest();
 
     //? Getters
@@ -92,7 +96,5 @@ public:
     string getHttpVersion() const;
     int getStatusCode() const;
     map<string, string> getHeaders() const;
-    fstream* getOutFile() const;
     Location* getLocation() const;
-    string getFileFullPath() const;
 };

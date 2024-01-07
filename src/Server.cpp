@@ -127,13 +127,13 @@ void Webserver::start()
                 }
                 if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
                 {
-                    resp[ep.events[i].data.fd].sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
-                    if (resp[ep.events[i].data.fd].getIsFinished() == true)
-                    {
+                    // resp[ep.events[i].data.fd].sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
+                    // if (resp[ep.events[i].data.fd].getIsFinished() == true)
+                    // {
                         req.erase(ep.events[i].data.fd);
                         resp.erase(ep.events[i].data.fd);
                         close(ep.events[i].data.fd);
-                    }
+                    // }
 
                 }
             }
