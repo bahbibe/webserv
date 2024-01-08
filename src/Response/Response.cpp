@@ -35,6 +35,45 @@ void Response::GET(Request &request)
     }
 }
 
+void Response::DELETE(string path)
+{
+    cout << "DELETE START\n";
+    cout << path << endl;
+    if (is_adir(path) && remove(path.c_str()) != 0)
+    {
+        cout << path << endl;
+        DIR *dir = opendir(path.c_str());
+        if (dir)
+        {
+            struct dirent *dp;
+            while ((dp = readdir(dir)) != NULL)
+            {
+                if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
+                {
+                    string np = path + "/" + string(dp->d_name);
+                    cout << "delete path: " << np << endl;
+                    if (dp->d_type == DT_DIR)
+                    {
+                        cout << "=====DELETE RECU=========\n";
+                        DELETE(np);
+                    }
+                    else
+                    {
+                        remove(np.c_str());
+                        cout << "DELETE\n";
+                    }
+                }
+
+            }
+            cout << "out \n";
+            closedir(dir);
+            remove(path.c_str());
+        }
+    }
+    else
+        remove(path.c_str());
+}
+
 void Response::sendResponse(Request &request, int fdSocket)
 {
     cout << BLUE"======================RESPONSE===========================\n" RESET;
@@ -44,24 +83,43 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_path = request.getRequestTarget();
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
-        cout << "Method: " << request.getMethod() << endl;
-        cout << "Is error: " << request.isErrorCode << endl;
     }
-        cout << "Path: " << this->_path << endl;
     if (request.isErrorCode == true && !this->_flag)
         checkErrors(request);
-    else if (is_adir(this->_path) && !this->_flag)
+    if (request.getMethod() == "GET")
+    {
+        checks(request);
+        if (!this->_defaultError)
+            GET(request);
+    }
+    else if (request.getMethod() == "POST")
+    {
+        this->_statusCode = 201;
+         checkErrors(request);
+    }
+    else if (request.getMethod() == "DELETE")
+    {
+        DELETE(this->_path);
+        this->_statusCode = 204;
+        checkErrors(request); 
+    }
+    cout << BLUE"======================RESPONSE===========================\n" RESET;
+}
+
+void Response::checks(Request &request)
+{
+    if (is_adir(this->_path) && !this->_flag)
         checkAutoInedx(request);
     else if (!this->_flag)
     {
-        cout << "======HERE===========\n";
         this->file.open(_path.c_str(), ios::in | ios::binary);
         if (!file.good())
         {
-        cout << "======NOT OPEN===========\n";
-            cout << "PATHH: " << this->_path << endl;
             request.isErrorCode = 1;
-            this->_statusCode = 404;
+            if (access(this->_path.c_str(), F_OK) != -1)
+                this->_statusCode = 403;
+            else
+                this->_statusCode = 404;
             checkErrors(request);
         }
         else
@@ -71,25 +129,7 @@ void Response::sendResponse(Request &request, int fdSocket)
             this->_flag = true;
         }
     }
-
-    if (request.getMethod() == "GET" && !this->_defaultError)
-    {
-        GET(request);
-    }
-    else if (request.getMethod() == "POST")
-    {
-        cout << "POSTPOSTPOSTPOSTPOSTPOSTPOSTPOSTPOST\n";
-        this->_isfinished = true;
-        this->_flag = false;
-    }
-    else if (request.getMethod() == "DELETE")
-    {
-        // DELETE(request);
-        cout << "DELETE\n";
-    }
-    cout << BLUE"======================RESPONSE===========================\n" RESET;
 }
-
 void Response::checkAutoInedx(Request &request)
 {
     cout << "checkAutoInedx: " << request.directives.autoindex << endl;
@@ -111,7 +151,7 @@ void Response::checkAutoInedx(Request &request)
                 return;
             }   
         }
-        tree_dir(request);
+        tree_dir();
     }
     else
     {
@@ -121,9 +161,8 @@ void Response::checkAutoInedx(Request &request)
     }
 }
 
-void Response::tree_dir(Request &request)
+void Response::tree_dir()
 {
-    (void)request;
     DIR *dir = opendir(this->_path.c_str());
     if (dir)
     {
@@ -163,11 +202,14 @@ string Response::getErrorPage(Request &request, int statusCode)
 void Response::checkErrors(Request &request)
 {
     cout << RED "ERRORS HANDLER\n" RESET;
+    cout << RED "Status code: "<< this->_statusCode << RESET << endl;
+
     this->_path = getErrorPage(request, this->_statusCode);
     cout << "error Path: " << this->_path << endl;
     file.open(this->_path.c_str(), ios::in | ios::binary);
-    if (!file.good() || this->_path == "default")
+    if (!file.is_open() || this->_path == "default")
     {
+        cout << "=====here======\n";
         string error;
         stringstream ss;
         map<int, string>::iterator it;

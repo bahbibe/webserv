@@ -45,17 +45,24 @@ class Response
         Response(const Response &other);
         Response &operator=(const Response &other);
         bool getIsFinished() const;
-    private:
         void GET(Request &request);
+        void DELETE(string path);
+    private:
         void SendHeader();
         void findeContentType();
         void saveStatus();
         int is_adir(string &path);
         void checkAutoInedx(Request &request);
         void checkErrors(Request &request);
-        void tree_dir(Request &request);
+        void tree_dir();
         string toSting(int &mun);
         string getErrorPage(Request &request, int statusCode);
         string templateError(string errorType);
-        // void Delete(Request &request, Location &locations);
+        void checks(Request &request);
 };
+
+
+//! TO DO
+//! - fix pathes that end with "/"
+//! - Delete method
+//! - clearing code

@@ -77,7 +77,7 @@ public:
     Request(Server* server, int socketFd);
     ~Request();
     Request() {}
-    Request(Request const &other);
+    Request(const Request &other);
     Request &operator=(Request const &other);
     void readRequest();
     void validateRequest();
