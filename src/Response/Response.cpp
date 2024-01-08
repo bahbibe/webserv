@@ -35,35 +35,43 @@ void Response::GET(Request &request)
     }
 }
 
-void Response::DELETE()
+void Response::DELETE(string path)
 {
     cout << "DELETE START\n";
-    cout << this->_path << endl;
-    if (is_adir(this->_path) && remove(this->_path.c_str()) != 0)
+    cout << path << endl;
+    if (is_adir(path) && remove(path.c_str()) != 0)
     {
-        cout << this->_path << endl;
-        DIR *dir = opendir(this->_path.c_str());
-        struct dirent *dp;
-        while ((dp = readdir(dir)) != NULL)
+        cout << path << endl;
+        DIR *dir = opendir(path.c_str());
+        if (dir)
         {
-            if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
+            struct dirent *dp;
+            while ((dp = readdir(dir)) != NULL)
             {
-                string np = this->_path + "/" + dp->d_name;
-                cout << "delete path: " << np << endl;
-                if (dp->d_type == DT_DIR)
+                if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
                 {
-                    this->_path = np;
-                    DELETE();
+                    string np = path + "/" + string(dp->d_name);
+                    cout << "delete path: " << np << endl;
+                    if (dp->d_type == DT_DIR)
+                    {
+                        cout << "=====DELETE RECU=========\n";
+                        DELETE(np);
+                    }
+                    else
+                    {
+                        remove(np.c_str());
+                        cout << "DELETE\n";
+                    }
                 }
-                else
-                {
-                    remove(np.c_str());
-                    cout << "DELETE\n";
-                }
+
             }
+            cout << "out \n";
+            closedir(dir);
+            remove(path.c_str());
         }
     }
-    remove(this->_path.c_str());
+    else
+        remove(path.c_str());
 }
 
 void Response::sendResponse(Request &request, int fdSocket)
@@ -91,7 +99,8 @@ void Response::sendResponse(Request &request, int fdSocket)
     }
     else if (request.getMethod() == "DELETE")
     {
-        DELETE();
+        DELETE(this->_path);
+        this->_statusCode = 204;
         checkErrors(request); 
     }
     cout << BLUE"======================RESPONSE===========================\n" RESET;

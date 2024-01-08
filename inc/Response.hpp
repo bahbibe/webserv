@@ -46,7 +46,7 @@ class Response
         Response &operator=(const Response &other);
         bool getIsFinished() const;
         void GET(Request &request);
-        void DELETE();
+        void DELETE(string path);
     private:
         void SendHeader();
         void findeContentType();
