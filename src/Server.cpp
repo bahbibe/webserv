@@ -92,10 +92,9 @@ void Webserver::newConnection(map<int, Request> &req ,Server &server)
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     cout << "New connection\n";
-    struct epoll_event ev;
-    ev.data.fd = clientSock;
-    ev.events = EPOLLIN | EPOLLOUT;
-    if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ev))
+    ep.event.data.fd = clientSock;
+    ep.event.events = EPOLLIN;
+    if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(pair<int, Request>(clientSock, Request(&server, clientSock)));
 }
@@ -121,9 +120,7 @@ void Webserver::start()
                 {
                     req[ep.events[i].data.fd].readRequest();
                     if(req[ep.events[i].data.fd].getIsRequestFinished())
-                    {
                         resp.insert(pair<int, Response>(ep.events[i].data.fd, Response()));
-                    }
                 }
                 if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
                 {
