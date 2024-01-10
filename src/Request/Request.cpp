@@ -1,5 +1,7 @@
 #include "../../inc/Request.hpp"
 
+typedef pair<map<string, string>::iterator, bool> ret_type;
+
 Request::~Request()
 {
     if (this->_outfileIsCreated)
@@ -36,6 +38,12 @@ Request &Request::operator=(const Request &other)
         this->_contentLength = other._contentLength;
         this->isErrorCode = other.isErrorCode;
         this->_isBodyBoundary = other._isBodyBoundary;
+
+        this->_headersBuffer = other._headersBuffer;
+        this->_rest = other._rest;
+
+        // this->_boundaries = other._boundaries;
+        // this->_chunks = other._chunks;
     }
     return *this;
 }
@@ -71,6 +79,65 @@ void Request::readRequest()
     {
         std::cerr << this->getStatusMessage() << '\n';
         return;
+    }
+}
+
+void Request::parseRequest(string buffer)
+{
+    if (_isReadingBody)
+        return this->parseBody(buffer);
+    _headersBuffer.append(buffer);
+    size_t pos = _headersBuffer.find("\r\n\r\n");
+    if (pos == string::npos)
+        return;
+    _rest = _headersBuffer.substr(pos, _headersBuffer.length() - pos);
+    _rest.erase(0, 4);
+    _headersBuffer = _headersBuffer.substr(0, pos);
+    parseRequestLine();
+    parseHeaders();
+    _headersBuffer.clear();
+    parseBody(_rest);
+}
+
+void Request::parseRequestLine()
+{
+    string requestLine = _headersBuffer.substr(0, _headersBuffer.find("\r\n"));
+    _headersBuffer.erase(0, _headersBuffer.find("\r\n") + 2);
+    vector<string> tokens = this->split(requestLine, " ");
+    if (tokens.size() != 3)
+        this->setStatusCode(400, "Invalid Request Line");
+    this->_method = tokens[0];
+    this->_requestTarget = tokens[1];
+    this->_httpVersion = tokens[2];
+    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
+        setStatusCode(400, "Invalid Method");
+    /*
+        /// TODO: validate the request target
+        /// TODO: parse the query string if exists && decode the uri
+    */
+    if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
+        setStatusCode(400, "Invalid Request Target");
+    if (this->_requestTarget.length() > 1024)
+        setStatusCode(414, "Request-URI Too Long");
+    if (this->_httpVersion.length() != 8 || this->_httpVersion.substr(0, 5) != "HTTP/")
+        setStatusCode(400, "Invalid HTTP Version");
+    else if (this->_httpVersion.substr(5, 3) != "1.1")
+        setStatusCode(505, "HTTP Version Not Supported");
+}
+
+void Request::parseHeaders()
+{
+    while (_headersBuffer.length() > 0)
+    {
+        string header = _headersBuffer.substr(0, _headersBuffer.find("\r\n"));
+        _headersBuffer.erase(0, header.length() + 2);
+        vector<string> headerTokens = this->split(header, ": ");
+        string headerName = toLowerCase(headerTokens[0]);
+        string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
+        trim(headerValue);
+        ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
+        if (ret.second == false)
+            setStatusCode(400, "Duplicate Header");
     }
 }
 
@@ -112,9 +179,6 @@ void Request::setServer()
         setStatusCode(404, "Not Found");
     if (!_location->getReturn().empty())
         setStatusCode(301, "Moved Permanently");
-    cout << GREEN "Location: " RESET << endl;
-    _location->print();
-    cout << GREEN "END location" RESET << endl;
     vector<string> locationMethods = _location->getMethods();
     if (locationMethods.size() > 0)
     {
@@ -162,71 +226,6 @@ void Request::validateRequest()
     }
 }
 
-typedef pair<map<string, string>::iterator, bool> ret_type;
-
-void Request::parseRequest(string buffer)
-{
-    if (this->_isReadingBody)
-        return this->parseBody(buffer);
-    while (buffer.length() > 0)
-    {
-        if (this->_lineCount == 0)
-            this->parseRequestLine(buffer);
-        else
-        {
-            size_t pos = buffer.find("\r\n");
-            if (pos == string::npos)
-                break;
-            string header = buffer.substr(0, pos);
-            buffer.erase(0, pos + 2);
-            if (header.length() == 0)
-                this->parseBody(buffer);
-            if (header.length() != 0)
-            {
-                vector<string> headerTokens = this->split(header, ": ");
-                string headerName = toLowerCase(headerTokens[0]);
-                string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
-                trim(headerValue);
-                ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
-                //! NOTE: random headers can be duplicated
-                if (ret.second == false)
-                    setStatusCode(400, "Duplicate Header");
-            }
-        }
-    }
-}
-
-void Request::parseRequestLine(string& buffer)
-{
-    size_t pos = buffer.find("\r\n");
-    if (pos == string::npos)
-        this->setStatusCode(400, "Invalid Request Line");
-    string requestLine = buffer.substr(0, pos);
-    buffer.erase(0, pos + 2);
-    vector<string> tokens = this->split(requestLine, " ");
-    if (tokens.size() != 3)
-        this->setStatusCode(400, "Invalid Request Line");
-    this->_method = tokens[0];
-    this->_requestTarget = tokens[1];
-    this->_httpVersion = tokens[2];
-    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
-        setStatusCode(400, "Invalid Method");
-    /*
-        /// TODO: validate the request target
-        /// TODO: parse the query string if exists && decode the uri
-        /// - request target too long (2048)
-    */
-    if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
-        setStatusCode(400, "Invalid Request Target");
-    if (this->_requestTarget.length() > 1024)
-        setStatusCode(414, "Request-URI Too Long");
-    if (this->_httpVersion.length() != 8 || this->_httpVersion.substr(0, 5) != "HTTP/")
-        setStatusCode(400, "Invalid HTTP Version");
-    else if (this->_httpVersion.substr(5, 3) != "1.1")
-        setStatusCode(505, "HTTP Version Not Supported");
-    this->_lineCount++;
-}
-
 string Request::getMimeType(string contentType)
 {
     // TODO: wait for the mime types
@@ -248,17 +247,19 @@ void Request::createOutfile()
     this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");
+    cout << RED "created end file" RESET << endl;
     this->_outfileIsCreated = true;
 }
 
 void Request::parseBodyWithBoundaries(string buffer)
 {
-    try {
-        _boundaries.parseBoundary(buffer, _boundary);
-    } catch (int statusCode)
-    {
-        setStatusCode(statusCode, "Boundaris Status Code");
-    }
+    (void) buffer;
+    // try {
+    //     _boundaries.parseBoundary(buffer, _boundary);
+    // } catch (int statusCode)
+    // {
+    //     setStatusCode(statusCode, "Boundaris Status Code");
+    // }
 }
 
 void Request::parseBody(string buffer)
@@ -274,9 +275,7 @@ void Request::parseBody(string buffer)
     if (!directives.isUploadAllowed)
         setStatusCode(200, "OK But upload is not allowed so work of the cgi");
     if (!this->_outfileIsCreated && !this->_isBodyBoundary)
-    {
         this->createOutfile();
-    }
     if (_isBodyBoundary)
         parseBodyWithBoundaries(buffer);
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
@@ -290,7 +289,10 @@ void Request::parseBodyWithContentLength(string buffer)
     if (_contentLength == 0)
         setStatusCode(200, "OK");
     if (buffer.length() > _contentLength)
+    {
+        // TODO: check req-todo.http
         buffer.erase(_contentLength, buffer.length() - _contentLength);
+    }
     if (buffer.length() < _contentLength)
     {
         this->_outfile->write(buffer.c_str(), buffer.length());
@@ -306,36 +308,20 @@ void Request::parseBodyWithContentLength(string buffer)
         _bodyLength += _contentLength;
     }
     // TODO: handle when the content length is bigger than the body length
-    if (buffer.length() == 0 && _bodyLength == _contentLength)
+    cout << RED "Body length: " << _bodyLength << RESET << endl;
+    cout << RED "Content Length: " << _contentLength << RESET << endl;
+    cout << RED "buffer length: " << buffer.length() << RESET << endl;
+    if (buffer.length() == 0 && _bodyLength >= _contentLength)
         setStatusCode(201, "Created");
 }
 
 void Request::parseBodyWithChunked(string buffer)
 {
-    //* get size of chunk
-    size_t pos = buffer.find("\r\n");
-    if (pos == string::npos)
-        return;
-    string chunkSizeStr = buffer.substr(0, pos);
-    buffer.erase(0, pos + 2);
-    for (size_t i = 0; i < chunkSizeStr.length(); i++)
-        if (!isxdigit(chunkSizeStr[i]))
-            setStatusCode(400, "Invalid Chunk Size");
-    size_t chunkSize = strtol(chunkSizeStr.c_str(), NULL, 16);
-    if (chunkSize == 0)
-        setStatusCode(201, "OK");
-    //* get chunk
-    if (buffer.length() < chunkSize)
+    try {
+       _chunks.parse(buffer, _outfile);
+    } catch (int statusCode)
     {
-        this->_outfile->write(buffer.c_str(), buffer.length());
-        this->_outfile->flush();
-        buffer.erase(0, buffer.length());
-    }
-    else
-    {
-        this->_outfile->write(buffer.c_str(), chunkSize);
-        this->_outfile->flush();
-        buffer.erase(0, chunkSize);
+        setStatusCode(statusCode, "Chunks Status Code");
     }
 }
 

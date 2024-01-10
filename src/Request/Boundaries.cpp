@@ -1,8 +1,10 @@
 #include "../../inc/Boundaries.hpp"
 
-Boundaries::Boundaries() : 
-    _index(0), _state(BS_START),
-    _isFileCreated(false), _outfile(NULL) { };
+Boundaries::Boundaries() : _isFileCreated(false), _outfile(NULL), _state(BD_START) { 
+    // _outfile = new fstream("bounds.txt");
+    // if (!_outfile->is_open())
+    //     throw 500;
+};
 
 Boundaries::~Boundaries() { 
     if (_outfile)
@@ -14,77 +16,36 @@ Boundaries::~Boundaries() {
 
 void Boundaries::checkStartBoundary()
 {
-    _helperLine += _buffer[_index++];
-    if (Helpers::checkLineEnd(_helperLine))
-    {
-        if (_helperLine.substr(0, _helperLine.length() - 2) == _boundary)
-        {
-            _helperLine.clear();
-            _state = BS_HEADERS;
-        }
-        else
-            throw 400;
-    }
+    size_t pos = _bd_helper.find("\r\n");
+    string startBound = _bd_helper.substr(0, pos);
+    if (startBound != _boundary)
+        throw 400;
+    // TODO: check headers and content type for extension
 }
 
-void Boundaries::checkBoundaryHeaders()
+void Boundaries::checkEndBoundary()
 {
-    _helperLine += _buffer[_index++]; 
-    if (_helperLine == "\r\n")
-    {
-        _state = BS_BODY;
-        return;
-    }
-    // TODO: Check headers for content type ...
-    if (Helpers::checkLineEnd(_helperLine))
-        _helperLine.clear();
+    // TODO: check this case later
+    // if (_helper.find(_endBoundary) != string::npos)
+    //     throw 201;
+    // _outfile->write(_helper.c_str(), _helper.length());
+    // _outfile->flush();
 }
 
-void Boundaries::checkBoundaryBody()
+void Boundaries::writeBodyContent()
 {
-    if (!_isFileCreated)
-    {
-        _outfile = new fstream("./bounds.txt", ios::out);
-        if (!this->_outfile->is_open())
-            throw 500;
-        _isFileCreated = true;
-    }
-    if (Helpers::checkLineEnd(_helperLine))
-    {
-        _helperLine.clear();
-        _state = BS_END;
-        return;
-    }
-    _outfile->write(&_buffer[_index], 1);
-    _outfile->flush();
-    _helperLine += _buffer[_index++];
-}
-
-void Boundaries::checkBoundaryEnds()
-{
-    cout << YELLOW "END" RESET << endl;
-    _helperLine += _buffer[_index++];
-    throw 200;
-    if (_helperLine == "\r\n")
-        throw 200;
+    
 }
 
 void Boundaries::parseBoundary(const string& buffer, const string& boundary)
 {
-    // TODO: read only the content length
-    _index = 0;
-    this->_helperLine.clear();
+    // // TODO: read only the content length
     this->_buffer = buffer;
     this->_boundary = boundary;
-    while (_index < _buffer.size())
+    this->_endBoundary = this->_boundary + "--";
+    if (_state == BD_START)
     {
-        if (_state == BS_START)
-            checkStartBoundary();
-        else if (_state == BS_HEADERS)
-            checkBoundaryHeaders();
-        else if (_state == BS_BODY)
-            checkBoundaryBody();
-        else if (_state == BS_END)
-            checkBoundaryEnds();
+        string startBound = _buffer.substr(0, _buffer.find("\r\n\r\n"));
     }
+    throw 201;
 }

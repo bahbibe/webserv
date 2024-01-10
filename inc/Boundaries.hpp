@@ -4,30 +4,34 @@
 #include "Server.hpp"
 #include "Helpers.hpp"
 
-#define BS_START "start"
-#define BS_HEADERS "headers"
-#define BS_BODY "body"
-#define BS_END "end"
+#define BD_START "bd_start" // the start boundary and its headers
+#define BD_CONTENT "bd_content" // the boundary content
+#define BD_MID "bd_mid" // the mid boundary and it's headers 
+#define BD_END  "bd_end" // the end boundary
 
 class Boundaries {
     private:
         string _buffer;
-        size_t _index;
         string _boundary;
-        string _state;
+        string _endBoundary;
         bool _isFileCreated;
         fstream *_outfile;
 
-        string _helperLine;
+        string _state;
+        string _bd_helper;
+
+        string _bd_start;
+        string _bd_body;
+        string _bd_end;
+
+        string _buffer_end;
 
     public:
         Boundaries();
         ~Boundaries();
 
         void parseBoundary(const string& buffer, const string& boundary);
-
         void checkStartBoundary();
-        void checkBoundaryHeaders();
-        void checkBoundaryBody();
-        void checkBoundaryEnds();
+        void checkEndBoundary();
+        void writeBodyContent();
 };

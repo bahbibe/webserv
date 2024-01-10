@@ -3,6 +3,7 @@
 #include "Server.hpp"
 #include "Helpers.hpp"
 #include "Boundaries.hpp"
+#include "Chunks.hpp"
 
 #define BUFFER_SIZE 1024
 
@@ -33,7 +34,8 @@ private:
     bool _isFoundCRLF;
     
     char _buffer[BUFFER_SIZE];
-    string _request;
+    string _headersBuffer;
+    string _rest;
 
     string _method;
     string _requestTarget;
@@ -50,12 +52,14 @@ private:
     string _boundary;
 
     Boundaries _boundaries;
+    Chunks _chunks;
 
     map<string, vector<string> > _mimeTypes;
     
     //? Parsing
     void parseRequest(string buffer);
-    void parseRequestLine(string& requestLine);
+    void parseRequestLine();
+    void parseHeaders();
     void parseBody(string buffer);
     void parseBodyWithContentLength(string buffer);
     void parseBodyWithChunked(string buffer);\
