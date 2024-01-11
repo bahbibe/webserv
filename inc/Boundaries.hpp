@@ -4,10 +4,10 @@
 #include "Server.hpp"
 #include "Helpers.hpp"
 
-#define BD_START "bd_start" // the start boundary and its headers
-#define BD_CONTENT "bd_content" // the boundary content
-#define BD_MID "bd_mid" // the mid boundary and it's headers 
-#define BD_END  "bd_end" // the end boundary
+#define BD_START "bd_start"
+#define BD_CONTENT "bd_content"
+#define BD_MID "bd_mid"
+#define BD_END  "bd_end"
 
 class Boundaries {
     private:
@@ -31,7 +31,8 @@ class Boundaries {
         ~Boundaries();
 
         void parseBoundary(const string& buffer, const string& boundary);
+        void parseBoundaryStart();
         void checkStartBoundary();
-        void checkEndBoundary();
+        void checkMidBoundary();
         void writeBodyContent();
 };
