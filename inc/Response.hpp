@@ -9,7 +9,8 @@
 #include <fstream>
 #include <signal.h>
 #include <sys/stat.h>
-
+#include <unistd.h>
+#include <dirent.h>
 
 #define BUFFERSIZE 1024
 using namespace std;
@@ -25,16 +26,17 @@ class Response
         int _statusCode;
         int _contentLength;
 
-        std::string _path;
-        std::string _contentType;
-        std::string _header;
-        std::string _body;
+        string _path;
+        string _contentType;
+        string _header;
+        string _body;
 
-        std::ifstream file;
-        std::stringstream statusString;
+        ifstream file;
+        stringstream statusString;
 
-        std::map<std::string, std::string> mime;
-        std::map<int, std::string> status;
+        map<string, string> mime;
+        map<int, string> status;
+        
 
     public:
         Response();
@@ -43,16 +45,24 @@ class Response
         Response(const Response &other);
         Response &operator=(const Response &other);
         bool getIsFinished() const;
-    private:
         void GET(Request &request);
+        void DELETE(string path);
+    private:
         void SendHeader();
         void findeContentType();
         void saveStatus();
-        int is_adir(std::string path);
+        int is_adir(string &path);
         void checkAutoInedx(Request &request);
         void checkErrors(Request &request);
-        
-        string toSting(int mun);
+        void tree_dir();
+        string toSting(int &mun);
         string getErrorPage(Request &request, int statusCode);
-        // void Delete(Request &request, Location &locations);
+        string templateError(string errorType);
+        void checks(Request &request);
 };
+
+
+//! TO DO
+//! - fix pathes that end with "/"
+//! - Delete method
+//! - clearing code

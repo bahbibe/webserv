@@ -1,135 +1,144 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- saved from url=(0027)https://leyton.com/uk/.html -->
+<html
+  lang="en"
+  style="--mouse-x: 0.6457010963646855; --mouse-y: 0.6269968051118211"
+>
   <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>404 Not Found</title>
-    <link
-      href="https://fonts.googleapis.com/css?family=Cabin:400,700"
-      rel="stylesheet"
-    />
-    <link
-      href="https://fonts.googleapis.com/css?family=Montserrat:900"
-      rel="stylesheet"
-    />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+    <title>Error | Not Allowed To Enter Here</title>
     <style>
-      * {
-        -webkit-box-sizing: border-box;
-        box-sizing: border-box;
-      }
+      @import url("https://fonts.googleapis.com/css?family=Bungee");
 
       body {
-        padding: 0;
-        margin: 0;
+          background: #1b1b1b;
+          color: white;
+          font-family: "Bungee", cursive;
+          margin-top: 50px;
+          text-align: center;
+      }
+      a {
+          color: #2aa7cc;
+          text-decoration: none;
+      }
+      a:hover {
+          color: white;
+      }
+      svg {
+          width: 50vw;
+      }
+      .lightblue {
+          fill: #444;
+      }
+      .eye {
+          cx: calc(115px + 30px * var(--mouse-x));
+          cy: calc(50px + 30px * var(--mouse-y));
+      }
+      #eye-wrap {
+          overflow: hidden;
+      }
+      .error-text {
+          font-size: 120px;
+      }
+      .alarm {
+          animation: alarmOn 0.5s infinite;
       }
 
-      #error {
-        position: relative;
-        height: 100vh;
-      }
-
-      #error .error {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        -webkit-transform: translate(-50%, -50%);
-        -ms-transform: translate(-50%, -50%);
-        transform: translate(-50%, -50%);
-      }
-
-      .error {
-        max-width: 520px;
-        width: 100%;
-        line-height: 1.4;
-        text-align: center;
-      }
-
-      .error .error-code {
-        position: relative;
-        height: 240px;
-      }
-
-      .error .error-code h1 {
-        font-family: "Montserrat", sans-serif;
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        -webkit-transform: translate(-50%, -50%);
-        -ms-transform: translate(-50%, -50%);
-        transform: translate(-50%, -50%);
-        font-size: 252px;
-        font-weight: 900;
-        margin: 0px;
-        color: #262626;
-        text-transform: uppercase;
-        letter-spacing: -40px;
-        margin-left: -20px;
-      }
-
-      .error .error-code h1 > span {
-        text-shadow: -8px 0px 0px #fff;
-      }
-
-      .error .error-code h3 {
-        font-family: "Cabin", sans-serif;
-        position: relative;
-        font-size: 16px;
-        font-weight: 700;
-        text-transform: uppercase;
-        color: #262626;
-        margin: 0px;
-        letter-spacing: 3px;
-        padding-left: 6px;
-      }
-
-      .error h2 {
-        font-family: "Cabin", sans-serif;
-        font-size: 20px;
-        font-weight: 400;
-        text-transform: uppercase;
-        color: #000;
-        margin-top: 0px;
-        margin-bottom: 25px;
-      }
-
-      @media only screen and (max-width: 767px) {
-        .error .error-code {
-          height: 200px;
-        }
-        .error .error-code h1 {
-          font-size: 200px;
-        }
-      }
-
-      @media only screen and (max-width: 480px) {
-        .error .error-code {
-          height: 162px;
-        }
-        .error .error-code h1 {
-          font-size: 162px;
-          height: 150px;
-          line-height: 162px;
-        }
-        .error h2 {
-          font-size: 16px;
-        }
-      }
+      @keyframes alarmOn {
+          to {
+              fill: darkred;
     </style>
-    <!--[if lt IE 9]>
-      <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-    <![endif]-->
   </head>
   <body>
-    <div id="error">
-      <div class="error">
-        <div class="error-code">
-          <h3>403 Forbidden</h3>
-          <h1><span>4</span><span>0</span><span>3</span></h1>
-        </div>
-        <h2>we are sorry, but the page you requested 403 Forbidden</h2>
-      </div>
-    </div>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      id="robot-error"
+      viewBox="0 0 260 118.9"
+    >
+      <defs>
+        <clippath id="white-clip">
+          <circle
+            id="white-eye"
+            fill="#cacaca"
+            cx="130"
+            cy="65"
+            r="20"
+          ></circle>
+        </clippath>
+        <text id="text-s" class="error-text" y="106">403</text>
+      </defs>
+      <path
+        class="alarm"
+        fill="#e62326"
+        d="M120.9 19.6V9.1c0-5 4.1-9.1 9.1-9.1h0c5 0 9.1 4.1 9.1 9.1v10.6"
+      ></path>
+      <use xlink:href="#text-s" x="-0.5px" y="-1px" fill="black"></use>
+      <use xlink:href="#text-s" fill="#2b2b2b"></use>
+      <g id="robot">
+        <g id="eye-wrap">
+          <use xlink:href="#white-eye"></use>
+          <circle
+            id="eyef"
+            class="eye"
+            clip-path="url(#white-clip)"
+            fill="#000"
+            stroke="#2aa7cc"
+            stroke-width="2"
+            stroke-miterlimit="10"
+            cx="134.37103289094057"
+            cy="68.80990415335464"
+            r="11"
+          ></circle>
+          <ellipse
+            id="white-eye"
+            fill="#2b2b2b"
+            cx="130"
+            cy="40"
+            rx="18"
+            ry="12"
+          ></ellipse>
+        </g>
+        <circle
+          class="lightblue"
+          cx="105"
+          cy="32"
+          r="2.5"
+          id="tornillo"
+        ></circle>
+        <use xlink:href="#tornillo" x="50"></use>
+        <use xlink:href="#tornillo" x="50" y="60"></use>
+        <use xlink:href="#tornillo" y="60"></use>
+      </g>
+    </svg>
+    <h1>You are not allowed to enter here</h1>
+
+    <script>
+      var root = document.documentElement;
+      var eyef = document.getElementById("eyef");
+      var cx = document.getElementById("eyef").getAttribute("cx");
+      var cy = document.getElementById("eyef").getAttribute("cy");
+
+      document.addEventListener("mousemove", (evt) => {
+        let x = evt.clientX / innerWidth;
+        let y = evt.clientY / innerHeight;
+
+        root.style.setProperty("--mouse-x", x);
+        root.style.setProperty("--mouse-y", y);
+
+        cx = 115 + 30 * x;
+        cy = 50 + 30 * y;
+        eyef.setAttribute("cx", cx);
+        eyef.setAttribute("cy", cy);
+      });
+
+      document.addEventListener("touchmove", (touchHandler) => {
+        let x = touchHandler.touches[0].clientX / innerWidth;
+        let y = touchHandler.touches[0].clientY / innerHeight;
+
+        root.style.setProperty("--mouse-x", x);
+        root.style.setProperty("--mouse-y", y);
+      });
+    </script>
   </body>
 </html>
