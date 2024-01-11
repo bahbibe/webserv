@@ -1,5 +1,7 @@
 #include "../../inc/Request.hpp"
 
+typedef pair<map<string, string>::iterator, bool> ret_type;
+
 Request::~Request()
 {
     if (this->_outfileIsCreated)
@@ -13,7 +15,6 @@ Request::Request(const Request &other)
     *this = other;
 }
 
-
 Request &Request::operator=(const Request &other)
 {
     if (this != &other)
@@ -22,7 +23,6 @@ Request &Request::operator=(const Request &other)
         this->_requestTarget = other._requestTarget;
         this->_httpVersion = other._httpVersion;
         this->_headers = other._headers;
-        this->_fileFullPath = other._fileFullPath;
         this->_filePath = other._filePath;
         this->_socketFd = other._socketFd;
         this->_server = other._server;
@@ -37,12 +37,28 @@ Request &Request::operator=(const Request &other)
         this->_isReadingBody = other._isReadingBody;
         this->_contentLength = other._contentLength;
         this->isErrorCode = other.isErrorCode;
+        this->_isBodyBoundary = other._isBodyBoundary;
+
+        this->_headersBuffer = other._headersBuffer;
+        this->_rest = other._rest;
+
+        // this->_boundaries = other._boundaries;
+        // this->_chunks = other._chunks;
     }
     return *this;
 }
-Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCount(0), _statusCode(200), _isRequestFinished(false),
+
+Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), isErrorCode(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
+{
+    this->_location = NULL;
+    memset(_buffer, 0, BUFFER_SIZE);
+}
+
+Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
+    _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
 {
     this->_server = server;
     this->_location = NULL;
@@ -52,7 +68,7 @@ Request::Request(Server* server, int socketFd) : _socketFd(socketFd) , _lineCoun
 void Request::readRequest()
 {
     try {
-        int readBytes = read(_socketFd, _buffer, BUFFER_SIZE);
+        int readBytes = read(_socketFd, _buffer, BUFFER_SIZE + 1);
         if (readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
         _buffer[readBytes] = '\0';
@@ -63,6 +79,65 @@ void Request::readRequest()
     {
         std::cerr << this->getStatusMessage() << '\n';
         return;
+    }
+}
+
+void Request::parseRequest(string buffer)
+{
+    if (_isReadingBody)
+        return this->parseBody(buffer);
+    _headersBuffer.append(buffer);
+    size_t pos = _headersBuffer.find("\r\n\r\n");
+    if (pos == string::npos)
+        return;
+    _rest = _headersBuffer.substr(pos, _headersBuffer.length() - pos);
+    _rest.erase(0, 4);
+    _headersBuffer = _headersBuffer.substr(0, pos);
+    parseRequestLine();
+    parseHeaders();
+    _headersBuffer.clear();
+    parseBody(_rest);
+}
+
+void Request::parseRequestLine()
+{
+    string requestLine = _headersBuffer.substr(0, _headersBuffer.find("\r\n"));
+    _headersBuffer.erase(0, _headersBuffer.find("\r\n") + 2);
+    vector<string> tokens = this->split(requestLine, " ");
+    if (tokens.size() != 3)
+        this->setStatusCode(400, "Invalid Request Line");
+    this->_method = tokens[0];
+    this->_requestTarget = tokens[1];
+    this->_httpVersion = tokens[2];
+    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
+        setStatusCode(400, "Invalid Method");
+    /*
+        /// TODO: validate the request target
+        /// TODO: parse the query string if exists && decode the uri
+    */
+    if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
+        setStatusCode(400, "Invalid Request Target");
+    if (this->_requestTarget.length() > 1024)
+        setStatusCode(414, "Request-URI Too Long");
+    if (this->_httpVersion.length() != 8 || this->_httpVersion.substr(0, 5) != "HTTP/")
+        setStatusCode(400, "Invalid HTTP Version");
+    else if (this->_httpVersion.substr(5, 3) != "1.1")
+        setStatusCode(505, "HTTP Version Not Supported");
+}
+
+void Request::parseHeaders()
+{
+    while (_headersBuffer.length() > 0)
+    {
+        string header = _headersBuffer.substr(0, _headersBuffer.find("\r\n"));
+        _headersBuffer.erase(0, header.length() + 2);
+        vector<string> headerTokens = this->split(header, ": ");
+        string headerName = toLowerCase(headerTokens[0]);
+        string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
+        trim(headerValue);
+        ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
+        if (ret.second == false)
+            setStatusCode(400, "Duplicate Header");
     }
 }
 
@@ -104,9 +179,6 @@ void Request::setServer()
         setStatusCode(404, "Not Found");
     if (!_location->getReturn().empty())
         setStatusCode(301, "Moved Permanently");
-    cout << GREEN "Location: " RESET << endl;
-    _location->print();
-    cout << GREEN "END location" RESET << endl;
     vector<string> locationMethods = _location->getMethods();
     if (locationMethods.size() > 0)
     {
@@ -139,6 +211,11 @@ void Request::validateRequest()
         setStatusCode(501, "Unsupported Transfer-Encoding");
     if (_headers.find("content-length") != _headers.end() && _headers.find("transfer-encoding") != _headers.end())
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
+    if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
+    {
+        _isBodyBoundary = true;
+        _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
+    }
     if (_method == "POST")
     {
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
@@ -147,71 +224,6 @@ void Request::validateRequest()
         // if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
         //     setStatusCode(413, "Request Entity Too Large");
     }
-}
-
-typedef pair<map<string, string>::iterator, bool> ret_type;
-
-void Request::parseRequest(string buffer)
-{
-    if (this->_isReadingBody)
-        return this->parseBody(buffer);
-    while (buffer.length() > 0)
-    {
-        if (this->_lineCount == 0)
-            this->parseRequestLine(buffer);
-        else
-        {
-            size_t pos = buffer.find("\r\n");
-            if (pos == string::npos)
-                break;
-            string header = buffer.substr(0, pos);
-            buffer.erase(0, pos + 2);
-            if (header.length() == 0)
-                this->parseBody(buffer);
-            if (header.length() != 0)
-            {
-                vector<string> headerTokens = this->split(header, ": ");
-                string headerName = toLowerCase(headerTokens[0]);
-                string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
-                trim(headerValue);
-                ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
-                //! NOTE: random headers can be duplicated
-                if (ret.second == false)
-                    setStatusCode(400, "Duplicate Header");
-            }
-        }
-    }
-}
-
-void Request::parseRequestLine(string& buffer)
-{
-    size_t pos = buffer.find("\r\n");
-    if (pos == string::npos)
-        this->setStatusCode(400, "Invalid Request Line");
-    string requestLine = buffer.substr(0, pos);
-    buffer.erase(0, pos + 2);
-    vector<string> tokens = this->split(requestLine, " ");
-    if (tokens.size() != 3)
-        this->setStatusCode(400, "Invalid Request Line");
-    this->_method = tokens[0];
-    this->_requestTarget = tokens[1];
-    this->_httpVersion = tokens[2];
-    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
-        setStatusCode(400, "Invalid Method");
-    /*
-        /// TODO: validate the request target
-        /// TODO: parse the query string if exists && decode the uri
-        /// - request target too long (2048)
-    */
-    if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
-        setStatusCode(400, "Invalid Request Target");
-    if (this->_requestTarget.length() > 1024)
-        setStatusCode(414, "Request-URI Too Long");
-    if (this->_httpVersion.length() != 8 || this->_httpVersion.substr(0, 5) != "HTTP/")
-        setStatusCode(400, "Invalid HTTP Version");
-    else if (this->_httpVersion.substr(5, 3) != "1.1")
-        setStatusCode(505, "HTTP Version Not Supported");
-    this->_lineCount++;
 }
 
 string Request::getMimeType(string contentType)
@@ -235,7 +247,19 @@ void Request::createOutfile()
     this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");
+    cout << RED "created end file" RESET << endl;
     this->_outfileIsCreated = true;
+}
+
+void Request::parseBodyWithBoundaries(string buffer)
+{
+    (void) buffer;
+    // try {
+    //     _boundaries.parseBoundary(buffer, _boundary);
+    // } catch (int statusCode)
+    // {
+    //     setStatusCode(statusCode, "Boundaris Status Code");
+    // }
 }
 
 void Request::parseBody(string buffer)
@@ -250,9 +274,11 @@ void Request::parseBody(string buffer)
     this->_isReadingBody = true;
     if (!directives.isUploadAllowed)
         setStatusCode(200, "OK But upload is not allowed so work of the cgi");
-    if (!this->_outfileIsCreated)
+    if (!this->_outfileIsCreated && !this->_isBodyBoundary)
         this->createOutfile();
-    if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
+    if (_isBodyBoundary)
+        parseBodyWithBoundaries(buffer);
+    else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked(buffer);
     else if (_headers.find("content-length") != _headers.end())
         parseBodyWithContentLength(buffer);
@@ -263,7 +289,10 @@ void Request::parseBodyWithContentLength(string buffer)
     if (_contentLength == 0)
         setStatusCode(200, "OK");
     if (buffer.length() > _contentLength)
+    {
+        // TODO: check req-todo.http
         buffer.erase(_contentLength, buffer.length() - _contentLength);
+    }
     if (buffer.length() < _contentLength)
     {
         this->_outfile->write(buffer.c_str(), buffer.length());
@@ -279,36 +308,20 @@ void Request::parseBodyWithContentLength(string buffer)
         _bodyLength += _contentLength;
     }
     // TODO: handle when the content length is bigger than the body length
-    if (buffer.length() == 0 && _bodyLength == _contentLength)
+    cout << RED "Body length: " << _bodyLength << RESET << endl;
+    cout << RED "Content Length: " << _contentLength << RESET << endl;
+    cout << RED "buffer length: " << buffer.length() << RESET << endl;
+    if (buffer.length() == 0 && _bodyLength >= _contentLength)
         setStatusCode(201, "Created");
 }
 
 void Request::parseBodyWithChunked(string buffer)
 {
-    //* get size of chunk
-    size_t pos = buffer.find("\r\n");
-    if (pos == string::npos)
-        return;
-    string chunkSizeStr = buffer.substr(0, pos);
-    buffer.erase(0, pos + 2);
-    for (size_t i = 0; i < chunkSizeStr.length(); i++)
-        if (!isxdigit(chunkSizeStr[i]))
-            setStatusCode(400, "Invalid Chunk Size");
-    size_t chunkSize = strtol(chunkSizeStr.c_str(), NULL, 16);
-    if (chunkSize == 0)
-        setStatusCode(201, "OK");
-    //* get chunk
-    if (buffer.length() < chunkSize)
+    try {
+       _chunks.parse(buffer, _outfile);
+    } catch (int statusCode)
     {
-        this->_outfile->write(buffer.c_str(), buffer.length());
-        this->_outfile->flush();
-        buffer.erase(0, buffer.length());
-    }
-    else
-    {
-        this->_outfile->write(buffer.c_str(), chunkSize);
-        this->_outfile->flush();
-        buffer.erase(0, chunkSize);
+        setStatusCode(statusCode, "Chunks Status Code");
     }
 }
 
@@ -332,6 +345,7 @@ void Request::printRequest()
     cout << "Request Target: " << _requestTarget << endl;
     cout << "HTTP Version: " << _httpVersion << endl;
     cout << "Headers size: " << _headers.size() << endl;
+    cout << "Boundary: " << _boundary << endl;
     cout << "Headers: " << endl;
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
@@ -380,16 +394,6 @@ int Request::getStatusCode() const
 map<string, string> Request::getHeaders() const
 {
     return this->_headers;
-}
-
-fstream *Request::getOutFile() const
-{
-    return this->_outfile;
-}
-
-string Request::getFileFullPath() const
-{
-    return this->_fileFullPath;
 }
 
 Location *Request::getLocation() const

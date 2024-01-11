@@ -2,6 +2,8 @@
 #include "webserv.hpp"
 #include "Server.hpp"
 #include "Helpers.hpp"
+#include "Boundaries.hpp"
+#include "Chunks.hpp"
 
 #define BUFFER_SIZE 1024
 
@@ -32,7 +34,8 @@ private:
     bool _isFoundCRLF;
     
     char _buffer[BUFFER_SIZE];
-    string _request;
+    string _headersBuffer;
+    string _rest;
 
     string _method;
     string _requestTarget;
@@ -45,19 +48,24 @@ private:
     bool _isReadingBody;
     size_t _contentLength;
 
-    string _fileFullPath;
+    bool _isBodyBoundary;
+    string _boundary;
+
+    Boundaries _boundaries;
+    Chunks _chunks;
 
     map<string, vector<string> > _mimeTypes;
     
     //? Parsing
     void parseRequest(string buffer);
-    void parseRequestLine(string& requestLine);
+    void parseRequestLine();
+    void parseHeaders();
     void parseBody(string buffer);
     void parseBodyWithContentLength(string buffer);
-    void parseBodyWithChunked(string buffer);
+    void parseBodyWithChunked(string buffer);\
+    void parseBodyWithBoundaries(string buffer);
 
     //? Request Helpers
-    void setStatusCode(int statusCode, string statusMessage);
     void setContentLength(string contentLength);
     void createOutfile();
     void setServer();
@@ -76,12 +84,12 @@ public:
     bool isErrorCode;
     Request(Server* server, int socketFd);
     ~Request();
-    Request() {}
-    Request(const Request &other);
+    Request();
+    Request(Request const &other);
     Request &operator=(Request const &other);
     void readRequest();
     void validateRequest();
-
+    void setStatusCode(int statusCode, string statusMessage);
     void printRequest();
 
     //? Getters
@@ -92,7 +100,5 @@ public:
     string getHttpVersion() const;
     int getStatusCode() const;
     map<string, string> getHeaders() const;
-    fstream* getOutFile() const;
     Location* getLocation() const;
-    string getFileFullPath() const;
 };

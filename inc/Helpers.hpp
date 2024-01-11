@@ -6,4 +6,5 @@ using namespace std;
 class Helpers {
     public:
         static bool checkURICharSet(const string& requestURI);
+        static bool checkLineEnd(const string& line);
 };

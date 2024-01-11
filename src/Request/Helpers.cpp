@@ -10,3 +10,9 @@ bool Helpers::checkURICharSet(const string& requestURI)
     }
     return true;
 }
+
+bool Helpers::checkLineEnd(const string& line)
+{
+    size_t size = line.length();
+    return (size > 2 && line[size - 2] == '\r' && line[size - 1] == '\n');
+}
