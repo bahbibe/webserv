@@ -26,6 +26,7 @@ class Response
         int _statusCode;
         int _contentLength;
 
+        string _method;
         string _path;
         string _contentType;
         string _header;
@@ -40,6 +41,7 @@ class Response
 
     public:
         Response();
+        // Response(Request request, int fdSocket);
         ~Response();
         void sendResponse(Request &request, int fdSocket);
         Response(const Response &other);

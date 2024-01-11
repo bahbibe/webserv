@@ -4,6 +4,18 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false), _fdSo
 {
     saveStatus();
 }
+// Response::Response(Request request, int fdSocket):_flag(false),_isfinished(false),_defaultError(false)
+// {
+//     this->_fdSocket = fdSocket;
+//     this->_path = request.getRequestTarget();
+//     this->_statusCode = request.getStatusCode();
+//     this->_path = request.directives.requestedFile;
+//     this->_method = request.getMethod();
+//     saveStatus();
+// }
+
+//! redirece directory if does't end with "/"
+//! redirection 
 
 void Response::GET(Request &request)
 {
@@ -37,11 +49,10 @@ void Response::GET(Request &request)
 
 void Response::DELETE(string path)
 {
-    cout << "DELETE START\n";
-    cout << path << endl;
-    if (is_adir(path) && remove(path.c_str()) != 0)
+    cout << RED "======DELETE=======" RESET << endl; 
+    if (is_adir(path))
     {
-        cout << path << endl;
+        cout << RED "======DELETE DIRECTORY=======" RESET << endl; 
         DIR *dir = opendir(path.c_str());
         if (dir)
         {
@@ -51,27 +62,38 @@ void Response::DELETE(string path)
                 if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
                 {
                     string np = path + "/" + string(dp->d_name);
-                    cout << "delete path: " << np << endl;
                     if (dp->d_type == DT_DIR)
-                    {
-                        cout << "=====DELETE RECU=========\n";
                         DELETE(np);
-                    }
                     else
                     {
-                        remove(np.c_str());
-                        cout << "DELETE\n";
+
+                        if (access(np.c_str(), W_OK) != -1)
+                        {
+                            remove(np.c_str());
+                        }
+                        else
+                            this->_statusCode = 403;
                     }
                 }
 
             }
-            cout << "out \n";
             closedir(dir);
             remove(path.c_str());
         }
     }
+    else if (access(path.c_str(), F_OK) != -1)
+    {
+        cout << RED "======DELETE FILE=======" RESET << endl; 
+        ifstream file;
+        cout << "Pth: " << path << endl;
+        file.open(path.c_str(), ios::binary);
+        if (file.is_open())
+            remove(path.c_str());
+        else
+            this->_statusCode = 403;
+    }
     else
-        remove(path.c_str());
+        this->_statusCode = 404;
 }
 
 void Response::sendResponse(Request &request, int fdSocket)
@@ -83,25 +105,40 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_path = request.getRequestTarget();
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
+        this->_method = request.getMethod();
     }
-    if (request.isErrorCode == true && !this->_flag)
-        checkErrors(request);
-    if (request.getMethod() == "GET")
+    cout << "Method: " << this->_method << endl;
+    cout << "Is Error: " << request.isErrorCode  << endl;
+    // if (this->_statusCode == 301)
+    // {
+    //     cout << "redirection\n";
+    //     exit(10);
+    // }
+    if (request.isErrorCode == true)
+    {   if (!this->_flag)
+            checkErrors(request);
+        if (!this->_defaultError)
+            GET(request);
+    }
+    else if (this->_method == "GET" && !request.isErrorCode)
     {
         checks(request);
         if (!this->_defaultError)
             GET(request);
     }
-    else if (request.getMethod() == "POST")
+    else if (this->_method == "POST" && !request.isErrorCode)
     {
-        this->_statusCode = 201;
-         checkErrors(request);
+        cout << RED << "=========>" <<this->_statusCode << RESET << endl;
+        checkErrors(request);
+        if (!this->_defaultError)
+            GET(request);
     }
-    else if (request.getMethod() == "DELETE")
+    else if (this->_method == "DELETE" && !request.isErrorCode)
     {
         DELETE(this->_path);
-        this->_statusCode = 204;
-        checkErrors(request); 
+        checkErrors(request);
+        if (!this->_defaultError)
+            GET(request);
     }
     cout << BLUE"======================RESPONSE===========================\n" RESET;
 }
@@ -206,10 +243,10 @@ void Response::checkErrors(Request &request)
 
     this->_path = getErrorPage(request, this->_statusCode);
     cout << "error Path: " << this->_path << endl;
-    file.open(this->_path.c_str(), ios::in | ios::binary);
+    if (!this->_flag)
+        file.open(this->_path.c_str(), ios::in | ios::binary);
     if (!file.is_open() || this->_path == "default")
     {
-        cout << "=====here======\n";
         string error;
         stringstream ss;
         map<int, string>::iterator it;
@@ -224,10 +261,10 @@ void Response::checkErrors(Request &request)
         write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
         this->_defaultError = true;
         this->_isfinished = true;
+        cout << "END DEFAULT\n" << endl;
     }
-    else if (file.good())
+    else if (file.good() && !this->_flag)
     {
-        cout << "======Test======\n";
         findeContentType();
         SendHeader();
         this->_flag = true;
