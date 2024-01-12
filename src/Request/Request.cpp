@@ -42,8 +42,8 @@ Request &Request::operator=(const Request &other)
         this->_headersBuffer = other._headersBuffer;
         this->_rest = other._rest;
 
-        // this->_boundaries = other._boundaries;
-        // this->_chunks = other._chunks;
+        this->_boundaries = other._boundaries;
+        this->_chunks = other._chunks;
     }
     return *this;
 }
@@ -177,8 +177,6 @@ void Request::setServer()
     _location = this->findLocation();
     if (_location == NULL)
         setStatusCode(404, "Not Found");
-    if (!_location->getReturn().empty())
-        setStatusCode(301, "Moved Permanently");
     vector<string> locationMethods = _location->getMethods();
     if (locationMethods.size() > 0)
     {
@@ -198,6 +196,8 @@ void Request::setServer()
     if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
+    if (!directives.returnRedirect.empty())
+        setStatusCode(301, "Moved Permanently");
 }
 
 void Request::validateRequest()
@@ -213,12 +213,14 @@ void Request::validateRequest()
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
     if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
     {
+        if (_headers.find("transfer-encoding") != _headers.end())
+            setStatusCode(400, "multipart/form-data and Transfer-Encoding are present");
         _isBodyBoundary = true;
         _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
     }
     if (_method == "POST")
     {
-        if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
+        if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end() && !_isBodyBoundary)
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
         // if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
@@ -247,19 +249,17 @@ void Request::createOutfile()
     this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");
-    cout << RED "created end file" RESET << endl;
     this->_outfileIsCreated = true;
 }
 
 void Request::parseBodyWithBoundaries(string buffer)
 {
-    (void) buffer;
-    // try {
-    //     _boundaries.parseBoundary(buffer, _boundary);
-    // } catch (int statusCode)
-    // {
-    //     setStatusCode(statusCode, "Boundaris Status Code");
-    // }
+    try {
+        _boundaries.parseBoundary(buffer, _boundary);
+    } catch (int statusCode)
+    {
+        setStatusCode(statusCode, "Boundaris Status Code");
+    }
 }
 
 void Request::parseBody(string buffer)
@@ -287,7 +287,7 @@ void Request::parseBody(string buffer)
 void Request::parseBodyWithContentLength(string buffer)
 {
     if (_contentLength == 0)
-        setStatusCode(200, "OK");
+        setStatusCode(201, "Created");
     if (buffer.length() > _contentLength)
     {
         // TODO: check req-todo.http
@@ -308,9 +308,6 @@ void Request::parseBodyWithContentLength(string buffer)
         _bodyLength += _contentLength;
     }
     // TODO: handle when the content length is bigger than the body length
-    cout << RED "Body length: " << _bodyLength << RESET << endl;
-    cout << RED "Content Length: " << _contentLength << RESET << endl;
-    cout << RED "buffer length: " << buffer.length() << RESET << endl;
     if (buffer.length() == 0 && _bodyLength >= _contentLength)
         setStatusCode(201, "Created");
 }
