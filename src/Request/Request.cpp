@@ -177,8 +177,6 @@ void Request::setServer()
     _location = this->findLocation();
     if (_location == NULL)
         setStatusCode(404, "Not Found");
-    if (!_location->getReturn().empty())
-        setStatusCode(301, "Moved Permanently");
     vector<string> locationMethods = _location->getMethods();
     if (locationMethods.size() > 0)
     {
@@ -198,6 +196,8 @@ void Request::setServer()
     if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
+    if (!directives.returnRedirect.empty())
+        setStatusCode(301, "Moved Permanently");
 }
 
 void Request::validateRequest()
@@ -287,7 +287,7 @@ void Request::parseBody(string buffer)
 void Request::parseBodyWithContentLength(string buffer)
 {
     if (_contentLength == 0)
-        setStatusCode(200, "OK");
+        setStatusCode(201, "Created");
     if (buffer.length() > _contentLength)
     {
         // TODO: check req-todo.http
