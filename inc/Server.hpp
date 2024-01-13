@@ -9,6 +9,8 @@ class Server
 private:
     map<string, Location *> _locations;
     map<string, string> _error_pages;
+    map<string, vector<string> > _extensions;
+    map<string, string> _types;
     vector<string> _server_names;
     vector<string> _indexs;
     string _host;
@@ -23,6 +25,7 @@ public:
     Server();
     ~Server();
     void parseServer(string const &);
+    void mimeTypes();
     Location *parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void print();

@@ -132,9 +132,36 @@ Location *Server::parseLocation(stringstream &ss)
         location->setAutoindex(_autoindex);
     return location;
 }
-
+void Server::mimeTypes()
+{
+    ifstream mime;
+    mime.open("conf/mime.types");
+    if (mime.is_open())
+    {
+        string buff;
+        stringstream ss;
+        string type, ext;
+        while (getline(mime, buff))
+        {
+            if (buff.empty() || isWhitespace(buff) || isComment(buff))
+                continue;
+            ss << buff;
+            ss >> type;
+            while (ss >> ext)
+            {
+                _extensions[type].push_back(ext);
+                _types[ext] = type;
+            }
+            ss.clear();
+        }
+        mime.close();
+    }
+    else
+        throw Server::ServerException(ERR "Unable to open mime file");
+}
 void Server::parseServer(string const &file)
 {
+    mimeTypes();
     stringstream ss(file);
     ss.seekg(Server::_pos);
     string buff;
