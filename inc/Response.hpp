@@ -21,6 +21,7 @@ class Response
         bool _flag;
         bool _isfinished;
         bool _defaultError;
+        bool _isErrorCode;
 
         int _fdSocket;
         int _statusCode;
