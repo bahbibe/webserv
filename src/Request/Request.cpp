@@ -119,10 +119,20 @@ void Request::parseRequestLine()
         setStatusCode(400, "Invalid Request Target");
     if (this->_requestTarget.length() > 1024)
         setStatusCode(414, "Request-URI Too Long");
+    if (!Helpers::decodeURI(_requestTarget))
+        setStatusCode(400, "Invalid Request Target");
     if (this->_httpVersion.length() != 8 || this->_httpVersion.substr(0, 5) != "HTTP/")
         setStatusCode(400, "Invalid HTTP Version");
     else if (this->_httpVersion.substr(5, 3) != "1.1")
         setStatusCode(505, "HTTP Version Not Supported");
+    if (this->_requestTarget.find("?") != string::npos)
+    {
+        directives.queryString = this->_requestTarget.substr(this->_requestTarget.find("?") + 1);
+        directives.requestTarget = this->_requestTarget.substr(0, this->_requestTarget.find("?"));
+        _requestTarget = directives.requestTarget;
+    }
+    else
+        directives.requestTarget = this->_requestTarget;
 }
 
 void Request::parseHeaders()
@@ -356,6 +366,8 @@ void Request::printRequest()
     cout << "Upload Path: " << directives.uploadPath << endl;
     cout << "Is Cgi Allowed: " << directives.isCgiAllowed << endl;
     cout << "Return Redirect: " << directives.returnRedirect << endl;
+    cout << "requestTarget: " << directives.requestTarget << endl;
+    cout << "queryString: " << directives.queryString << endl;
     cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }

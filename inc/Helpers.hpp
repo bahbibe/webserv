@@ -7,4 +7,5 @@ class Helpers {
     public:
         static bool checkURICharSet(const string& requestURI);
         static bool checkLineEnd(const string& line);
+        static bool decodeURI(string& requestURI);
 };

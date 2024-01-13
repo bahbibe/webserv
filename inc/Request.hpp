@@ -20,6 +20,8 @@ struct Directives {
     string uploadPath;
     bool isCgiAllowed;
     string returnRedirect;
+    string requestTarget;
+    string queryString;
     string requestedFile;
 };
 
