@@ -32,6 +32,7 @@ class Response
         string _contentType;
         string _header;
         string _body;
+        string _target;
 
         ifstream file;
         stringstream statusString;

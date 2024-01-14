@@ -114,8 +114,10 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
+        this->_target = request.getRequestTarget();
         this->_isErrorCode = request.isErrorCode;
     }
+    cout << "Target: " << this->_target << endl;
     cout << "Method: " << this->_method << endl;
     cout << "Is Error: " << this->_isErrorCode  << endl;
     cout << "Path: " << this->_path << endl;
@@ -125,22 +127,16 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_path[this->_path.length() - 1] != '/'))
+    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
         cout << RED"========REDIRECTION======" RESET << endl;
+        cout << RED "****" << this->_target[this->_target.length() - 1] << RESET << endl;
         if (this->_statusCode == 301)
-        {
             this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation:" + request.directives.returnRedirect + "\r\n\r\n";
-        }
         else
         {
-            cout << BLUE "directory redirection\n" RESET;
-            // exit(10);
-            this->_path += "/";
-
-            cout << "PATH REDIRECTION : " << this->_path ;
-            this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation:" + this->_path + "\r\n\r\n";
-            // cout << _path << endl;
+            this->_target += "/";
+            this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation: "+ this->_target +"\r\n\r\n";
         }
         write(this->_fdSocket, this->_header.c_str(), this->_header.length());
         this->_isfinished = true;
@@ -192,6 +188,7 @@ void Response::checks(Request &request)
         }
     }
 }
+
 void Response::checkAutoInedx(Request &request)
 {
     cout << "checkAutoInedx: " << request.directives.autoindex << endl;
@@ -341,7 +338,6 @@ string Response::templateError(string errorType)
     errorBody += "<body><center><h1>"+errorType+ "</h1></center><hr><center>M0BLACK</center></body>";
     return errorBody;
 }
-
 
 void Response::findeContentType()
 {
