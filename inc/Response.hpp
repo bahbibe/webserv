@@ -21,6 +21,7 @@ class Response
         bool _flag;
         bool _isfinished;
         bool _defaultError;
+        bool _isErrorCode;
 
         int _fdSocket;
         int _statusCode;
@@ -31,6 +32,7 @@ class Response
         string _contentType;
         string _header;
         string _body;
+        string _target;
 
         ifstream file;
         stringstream statusString;

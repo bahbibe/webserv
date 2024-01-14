@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false), _fdSocket(0), _statusCode(0)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false), _fdSocket(0), _statusCode(0)
 {
     saveStatus();
 }
@@ -68,11 +68,12 @@ void Response::DELETE(string path)
                     {
 
                         if (access(np.c_str(), W_OK) != -1)
-                        {
                             remove(np.c_str());
-                        }
                         else
+                        {
+                            this->_isErrorCode = true;
                             this->_statusCode = 403;
+                        }
                     }
                 }
 
@@ -90,10 +91,17 @@ void Response::DELETE(string path)
         if (file.is_open())
             remove(path.c_str());
         else
+        {
+            this->_isErrorCode = true;
             this->_statusCode = 403;
+        }
+        
     }
     else
+    {
+        this->_isErrorCode = true;
         this->_statusCode = 404;
+    }
 }
 
 void Response::sendResponse(Request &request, int fdSocket)
@@ -106,34 +114,47 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
+        this->_target = request.getRequestTarget();
+        this->_isErrorCode = request.isErrorCode;
     }
+    cout << "Target: " << this->_target << endl;
     cout << "Method: " << this->_method << endl;
-    cout << "Is Error: " << request.isErrorCode  << endl;
-    // if (this->_statusCode == 301)
-    // {
-    //     cout << "redirection\n";
-    //     exit(10);
-    // }
-    if (request.isErrorCode == true)
+    cout << "Is Error: " << this->_isErrorCode  << endl;
+    cout << "Path: " << this->_path << endl;
+    if (this->_isErrorCode == true)
     {   if (!this->_flag)
             checkErrors(request);
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_method == "GET" && !request.isErrorCode)
+    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
-        checks(request);
+        cout << RED"========REDIRECTION======" RESET << endl;
+        cout << RED "****" << this->_target[this->_target.length() - 1] << RESET << endl;
+        if (this->_statusCode == 301)
+            this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation:" + request.directives.returnRedirect + "\r\n\r\n";
+        else
+        {
+            this->_target += "/";
+            this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation: "+ this->_target +"\r\n\r\n";
+        }
+        write(this->_fdSocket, this->_header.c_str(), this->_header.length());
+        this->_isfinished = true;
+    }
+    else if (this->_method == "GET" && !this->_isErrorCode)
+    {
+        if (!this->_flag)
+            checks(request);
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_method == "POST" && !request.isErrorCode)
+    else if (this->_method == "POST" && !this->_isErrorCode)
     {
-        cout << RED << "=========>" <<this->_statusCode << RESET << endl;
         checkErrors(request);
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_method == "DELETE" && !request.isErrorCode)
+    else if (this->_method == "DELETE" && !this->_isErrorCode)
     {
         DELETE(this->_path);
         checkErrors(request);
@@ -152,7 +173,7 @@ void Response::checks(Request &request)
         this->file.open(_path.c_str(), ios::in | ios::binary);
         if (!file.good())
         {
-            request.isErrorCode = 1;
+            this->_isErrorCode = 1;
             if (access(this->_path.c_str(), F_OK) != -1)
                 this->_statusCode = 403;
             else
@@ -167,6 +188,7 @@ void Response::checks(Request &request)
         }
     }
 }
+
 void Response::checkAutoInedx(Request &request)
 {
     cout << "checkAutoInedx: " << request.directives.autoindex << endl;
@@ -316,7 +338,6 @@ string Response::templateError(string errorType)
     errorBody += "<body><center><h1>"+errorType+ "</h1></center><hr><center>M0BLACK</center></body>";
     return errorBody;
 }
-
 
 void Response::findeContentType()
 {
