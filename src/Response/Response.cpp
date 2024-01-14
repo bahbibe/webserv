@@ -4,14 +4,25 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
 {
     saveStatus();
 }
-// Response::Response(Request request, int fdSocket):_flag(false),_isfinished(false),_defaultError(false)
+// Response::Response(Request request, int fdSocket)
 // {
+//     // :_flag(false),_isfinished(false),_defaultError(false)
+//     this->_flag = false;
+//     this->_isErrorCode = false;
+//     this->_defaultError = false;
+
 //     this->_fdSocket = fdSocket;
 //     this->_path = request.getRequestTarget();
 //     this->_statusCode = request.getStatusCode();
 //     this->_path = request.directives.requestedFile;
 //     this->_method = request.getMethod();
+//     this->_target = request.getRequestTarget();
+//     this->_isErrorCode = request.isErrorCode;
 //     saveStatus();
+//     cout << "***Target: " << this->_target << endl;
+//     cout << "***Method: " << this->_method << endl;
+//     cout << "***Is Error: " << this->_isErrorCode  << endl;
+//     cout << "***Path: " << this->_path << endl;
 // }
 
 //! redirece directory if does't end with "/"
@@ -106,6 +117,7 @@ void Response::DELETE(string path)
 
 void Response::sendResponse(Request &request, int fdSocket)
 {
+    (void)fdSocket;
     cout << BLUE"======================RESPONSE===========================\n" RESET;
     if (!this->_flag)
     {
@@ -114,7 +126,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
-        this->_target = request.getRequestTarget();
+        this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
     }
     cout << "Target: " << this->_target << endl;
