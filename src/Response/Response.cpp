@@ -6,8 +6,8 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
 }
 // Response::Response(Request request, int fdSocket)
 // {
-//     // :_flag(false),_isfinished(false),_defaultError(false)
 //     this->_flag = false;
+//     this->_isfinished = false;
 //     this->_isErrorCode = false;
 //     this->_defaultError = false;
 
@@ -16,7 +16,7 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
 //     this->_statusCode = request.getStatusCode();
 //     this->_path = request.directives.requestedFile;
 //     this->_method = request.getMethod();
-//     this->_target = request.getRequestTarget();
+//     this->_target = request.directives.requestTarget;
 //     this->_isErrorCode = request.isErrorCode;
 //     saveStatus();
 //     cout << "***Target: " << this->_target << endl;
@@ -117,12 +117,11 @@ void Response::DELETE(string path)
 
 void Response::sendResponse(Request &request, int fdSocket)
 {
-    (void)fdSocket;
     cout << BLUE"======================RESPONSE===========================\n" RESET;
     if (!this->_flag)
     {
         this->_fdSocket = fdSocket;
-        this->_path = request.getRequestTarget();
+        this->_path = request.directives.requestedFile;
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
@@ -142,7 +141,6 @@ void Response::sendResponse(Request &request, int fdSocket)
     else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
         cout << RED"========REDIRECTION======" RESET << endl;
-        cout << RED "****" << this->_target[this->_target.length() - 1] << RESET << endl;
         if (this->_statusCode == 301)
             this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation:" + request.directives.returnRedirect + "\r\n\r\n";
         else
@@ -204,8 +202,6 @@ void Response::checks(Request &request)
 void Response::checkAutoInedx(Request &request)
 {
     cout << "checkAutoInedx: " << request.directives.autoindex << endl;
-    if (request.directives.autoindex)
-    {
         for (size_t i = 0; i < request.directives.indexs.size(); i++)
         {
             string index = this->_path + request._location->getIndexs()[i];
@@ -222,8 +218,8 @@ void Response::checkAutoInedx(Request &request)
                 return;
             }   
         }
+    if (request.directives.autoindex)
         tree_dir();
-    }
     else
     {
         request.isErrorCode = 1;
@@ -394,18 +390,21 @@ Response &Response::operator=(const Response &other)
 {
     if (this != &other)
     {
+        this->_flag = other._flag;
+        this->_isfinished = other._isfinished;
+        this->_defaultError = other._defaultError;
+        this->_isErrorCode = other._isErrorCode;
         this->_fdSocket = other._fdSocket;
         this->_statusCode = other._statusCode;
+        this->_method = other._method;
         this->_path = other._path;
         this->_contentType = other._contentType;
         this->_header = other._header;
-        this->_contentLength = other._contentLength;
+        this->_target = other._target;
         this->_body = other._body;
-        // this->file = other.file;
-        this->_flag = other._flag;
-        // this->statusString = other.statusString;
         this->mime = other.mime;
         this->status = other.status;
+
     }
     return *this;
 }
