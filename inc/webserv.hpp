@@ -67,6 +67,8 @@ class Webserver
 {
 private:
     vector<Server> _servers;
+    map<int, Request> _req;
+    map<int , Response> _resp;
 public:
     Webserver();
     ~Webserver();
@@ -75,6 +77,7 @@ public:
     Server &operator[](size_t index);
     void start();
     void newConnection(map<int, Request> &req ,Server &server);
+    bool matchServer(map<int, Request> &req, int sock);
     class ServerException : public exception
     {
     private:

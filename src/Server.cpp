@@ -40,16 +40,19 @@ void Server::print()
     cout << "==================SERVER==================\n";
     cout << "host: " + _host << "\n";
     cout << "port: " + _port << "\n";
-    cout << "server_names: " << "\n";
+    cout << "server_names: "
+         << "\n";
     for (vector<string>::iterator it = _server_names.begin(); it != _server_names.end(); it++)
         cout << "\t" << *it << "\n";
     cout << "indexs: \n";
     for (vector<string>::iterator it = _indexs.begin(); it != _indexs.end(); it++)
         cout << "\t" << *it << "\n";
     cout << "server_root: " + _server_root << "\n";
-    cout << "error_pages: " << "\n";
+    cout << "error_pages: "
+         << "\n";
     for (map<string, string>::iterator it = _error_pages.begin(); it != _error_pages.end(); it++)
-        cout << "\t" << it->first << " " << it->second << " " << "\n";
+        cout << "\t" << it->first << " " << it->second << " "
+             << "\n";
     cout << "client_max_body_size: " << _client_max_body_size << "\n";
     cout << "autoindex: " << _autoindex << "\n";
     cout << "==================LOCATIONS==================\n";
@@ -70,21 +73,20 @@ void Server::setupSocket()
     serverAddr.sin_port = htons(atoi(_port.c_str()));
     if ((_socket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
         throw ServerException(ERR "Failed to create socket");
-    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR , &sockOpt, sizeof(sockOpt)))
+    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
         throw ServerException(ERR "Failed to set socket options");
     if (bind(_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)))
         throw ServerException(ERR "Failed to bind socket");
     if (listen(_socket, 1))
-        throw ServerException(ERR "Failed to listen on socket");    
+        throw ServerException(ERR "Failed to listen on socket");
     cout << LISTENING << _host + ":" + _port + "\n";
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;
-    if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,_socket,&ep.event))
+    if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
         throw ServerException(ERR "Failed to add socket to epoll");
 }
 
-
-void Webserver::newConnection(map<int, Request> &req ,Server &server)
+void Webserver::newConnection(map<int, Request> &req, Server &server)
 {
     int clientSock;
     struct sockaddr_in clientAddr;
@@ -93,46 +95,58 @@ void Webserver::newConnection(map<int, Request> &req ,Server &server)
         throw ServerException(ERR "Accept failed");
     cout << "New connection\n";
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT;
-    if (epoll_ctl(ep.epollFd,EPOLL_CTL_ADD,clientSock,&ep.event))
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(pair<int, Request>(clientSock, Request(&server, clientSock)));
+}
+
+bool Webserver::matchServer(map<int, Request> &req, int sock)
+{
+    for (size_t j = 0; j < _servers.size(); j++)
+    {
+        if (sock == _servers[j].getSocket())
+        {
+            newConnection(req, _servers[j]);
+            return true;
+        }
+    }
+    return false;
+}
+
+void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
+{
+    cout << YELLOW "Connection closed\n" RESET;
+    req.erase(sock);
+    resp.erase(sock);
+    close(sock);
 }
 
 void Webserver::start()
 {
     signal(SIGPIPE, SIG_IGN);
-    map<int, Request> req;
-    map<int, Response> resp;
     while (1)
     {
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
-        for(int i = 0; i < evCount;i++)
+        for (int i = 0; i < evCount; i++)
         {
-            for (size_t j = 0; j < _servers.size(); j++)
+            if (matchServer(_req, ep.events[i].data.fd))
+                continue;
+            if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
+                closeConnection(_req, _resp, ep.events[i].data.fd);
+            else
             {
-                if(ep.events[i].data.fd == _servers[j].getSocket())
+                if (ep.events[i].events & EPOLLIN && !_req[ep.events[i].data.fd].getIsRequestFinished())
                 {
-                    newConnection(req, _servers[j]);
-                    continue;
+                    _req[ep.events[i].data.fd].readRequest();
+                    if (_req[ep.events[i].data.fd].getIsRequestFinished())
+                        _resp.insert(pair<int, Response>(ep.events[i].data.fd, Response()));
                 }
-                if(ep.events[i].events & EPOLLIN && !req[ep.events[i].data.fd].getIsRequestFinished())
+                if (ep.events[i].events & EPOLLOUT && _req[ep.events[i].data.fd].getIsRequestFinished())
                 {
-                    req[ep.events[i].data.fd].readRequest();
-                    if(req[ep.events[i].data.fd].getIsRequestFinished())
-                        resp.insert(pair<int, Response>(ep.events[i].data.fd, Response()));
-                }
-                if(ep.events[i].events & EPOLLOUT && req[ep.events[i].data.fd].getIsRequestFinished())
-                {
-                    resp[ep.events[i].data.fd].sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
-                    if (resp[ep.events[i].data.fd].getIsFinished() == true)
-                    {
-                        cout << YELLOW "Connection closed\n" RESET;
-                        req.erase(ep.events[i].data.fd);
-                        resp.erase(ep.events[i].data.fd);
-                        close(ep.events[i].data.fd);
-                    }
-
+                    _resp[ep.events[i].data.fd].sendResponse(_req[ep.events[i].data.fd], ep.events[i].data.fd);
+                    if (_resp[ep.events[i].data.fd].getIsFinished() == true)
+                        closeConnection(_req, _resp, ep.events[i].data.fd);
                 }
             }
         }
@@ -189,7 +203,7 @@ vector<string> Server::getServerNames() const
     return _server_names;
 }
 
-map<string, vector<string> > Server::getExtensions() const
+map<string, vector<string>> Server::getExtensions() const
 {
     return _extensions;
 }
