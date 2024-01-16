@@ -41,3 +41,13 @@ bool Helpers::decodeURI(string& requestURI)
     requestURI = decodedURI;
     return true;
 }
+
+string& Helpers::generateFileName()
+{
+    static string fileName;
+    fileName = "upload_";
+    srand(time(NULL));
+    for (int i = 0; i < 10; i++)
+        fileName += (char)(rand() % 26 + 97);
+    return fileName;
+}

@@ -71,10 +71,16 @@ void Request::readRequest()
         int readBytes = read(_socketFd, _buffer, BUFFER_SIZE + 1);
         if (readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
+        if (readBytes == 0)
+        {
+            setStatusCode(200, "Request is empty");
+        }
         _buffer[readBytes] = '\0';
+        // cout << GREEN "readed bytes: " RESET << readBytes << endl;
         this->parseRequest(_buffer);
-        if (!this->_isRequestFinished)
-            return;
+        // if (!this->_isRequestFinished)
+        //     return;
+        // cout << GREEN "done here: " RESET << endl;
     } catch (int statusCode)
     {
         std::cerr << this->getStatusMessage() << '\n';
@@ -85,7 +91,11 @@ void Request::readRequest()
 void Request::parseRequest(string buffer)
 {
     if (_isReadingBody)
-        return this->parseBody(buffer);
+    {
+        this->parseBody(buffer);
+        // cout << GREEN "here -1" RESET << endl;
+        return;
+    }
     _headersBuffer.append(buffer);
     size_t pos = _headersBuffer.find("\r\n\r\n");
     if (pos == string::npos)
@@ -111,10 +121,6 @@ void Request::parseRequestLine()
     this->_httpVersion = tokens[2];
     if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
         setStatusCode(400, "Invalid Method");
-    /*
-        /// TODO: validate the request target
-        /// TODO: parse the query string if exists && decode the uri
-    */
     if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
         setStatusCode(400, "Invalid Request Target");
     if (this->_requestTarget.length() > 1024)
@@ -125,14 +131,6 @@ void Request::parseRequestLine()
         setStatusCode(400, "Invalid HTTP Version");
     else if (this->_httpVersion.substr(5, 3) != "1.1")
         setStatusCode(505, "HTTP Version Not Supported");
-    if (this->_requestTarget.find("?") != string::npos)
-    {
-        directives.queryString = this->_requestTarget.substr(this->_requestTarget.find("?") + 1);
-        directives.requestTarget = this->_requestTarget.substr(0, this->_requestTarget.find("?"));
-        _requestTarget = directives.requestTarget;
-    }
-    else
-        directives.requestTarget = this->_requestTarget;
 }
 
 void Request::parseHeaders()
@@ -205,6 +203,14 @@ void Request::setServer()
         directives.indexs = _location->getIndexs();
     if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
+    if (this->_requestTarget.find("?") != string::npos)
+    {
+        directives.queryString = this->_requestTarget.substr(this->_requestTarget.find("?") + 1);
+        directives.requestTarget = this->_requestTarget.substr(0, this->_requestTarget.find("?"));
+        _requestTarget = directives.requestTarget;
+    }
+    else
+        directives.requestTarget = this->_requestTarget;
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
     if (!directives.returnRedirect.empty())
         setStatusCode(301, "Moved Permanently");
@@ -240,23 +246,22 @@ void Request::validateRequest()
 
 string Request::getMimeType(string contentType)
 {
-    // TODO: wait for the mime types
     if (contentType.find(";") != string::npos)
         contentType = contentType.substr(0, contentType.find(";"));
-    map<string, vector<string> >::iterator it = this->_mimeTypes.find(contentType);
+    map<string, vector<string> > extenstions = this->_server->getExtensions();
+    map<string, vector<string> >::iterator it = extenstions.find(contentType);
     if (it == this->_mimeTypes.end())
-        return "txt";
-    return it->second[0];
+        return ".bin";
+    return "." + it->second[0];
 }
 
 void Request::createOutfile()
 {
-    // TODO: upload the file in the upload folder
-    // TODO: apply the extension to the file from the content type header
     string contentType = this->_headers["content-type"];
     string extension = this->getMimeType(contentType);
-    this->_filePath = directives.uploadPath + "/file." + extension;
-    this->_outfile = new fstream(this->_filePath.c_str(), ios::out);
+    string randomFileName = Helpers::generateFileName();
+    this->_filePath = directives.uploadPath + randomFileName + extension;
+    this->_outfile = new fstream(this->_filePath.c_str(), ios::out | ios::binary | ios::trunc | ios::ate);
     if (!this->_outfile->is_open())
         setStatusCode(500, "Failed to create file");
     this->_outfileIsCreated = true;
@@ -276,9 +281,6 @@ void Request::parseBody(string buffer)
 {
     if (!this->_isReadingBody)
         this->validateRequest();
-    //! NOTE: if the request has no body, the body length is 0 maybe should wait for the body 
-    // if (buffer.length() == 0)
-    //     setStatusCode(200, "OK");
     if (this->_method != "POST")
         setStatusCode(200, "OK");
     this->_isReadingBody = true;
@@ -291,7 +293,10 @@ void Request::parseBody(string buffer)
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked(buffer);
     else if (_headers.find("content-length") != _headers.end())
+    {
         parseBodyWithContentLength(buffer);
+        cout << GREEN "here 0" RESET << endl;
+    }
 }
 
 void Request::parseBodyWithContentLength(string buffer)
@@ -309,6 +314,7 @@ void Request::parseBodyWithContentLength(string buffer)
         this->_outfile->flush();
         _bodyLength += buffer.length();
         buffer.erase(0, buffer.length());
+        cout << GREEN "here 1" RESET << endl;
     }
     else
     {
@@ -316,8 +322,12 @@ void Request::parseBodyWithContentLength(string buffer)
         this->_outfile->flush();
         buffer.erase(0, _contentLength);
         _bodyLength += _contentLength;
+        cout << GREEN "here 2" RESET << endl;
     }
     // TODO: handle when the content length is bigger than the body length
+    cout << YELLOW "bodyLength: " << RESET << _bodyLength << endl;
+    cout << YELLOW "contentLength: " << RESET << _contentLength << endl;
+    cout << YELLOW "buffer length: " << RESET << buffer.length() << endl;
     if (buffer.length() == 0 && _bodyLength >= _contentLength)
         setStatusCode(201, "Created");
 }
@@ -325,7 +335,7 @@ void Request::parseBodyWithContentLength(string buffer)
 void Request::parseBodyWithChunked(string buffer)
 {
     try {
-       _chunks.parse(buffer, _outfile);
+       _chunks.parse(buffer, _outfile, _filePath);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Chunks Status Code");

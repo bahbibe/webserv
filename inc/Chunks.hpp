@@ -4,6 +4,7 @@
 #include "Server.hpp"
 #include "Helpers.hpp"
 
+#define CH_START "ch_start"
 #define CH_SIZE "ch_size"
 #define CH_CONTENT "ch_content"
 
@@ -14,6 +15,7 @@ class Chunks {
         string _helper;
 
         fstream *_outfile;
+        string _filePath;
         size_t _chunkSize;
         size_t _writedContent;
     
@@ -21,7 +23,10 @@ class Chunks {
         Chunks();
         ~Chunks();
 
-        void parse(const string& buffer, fstream *outfile);
+        void parse(const string& buffer, fstream *outfile, const string& filePath);
+        void checkHexSize(const string& size);
+        void setFirstSize();
         void setSize();
         void writeContent();
+        void throwException(int code);
 };

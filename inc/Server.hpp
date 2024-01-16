@@ -50,4 +50,5 @@ public:
     map<string, string> getErrorPages() const;
     vector<string> getIndexs() const;
     vector<string> getServerNames() const;
+    map<string, vector<string> > getExtensions() const;
 };

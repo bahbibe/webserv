@@ -116,7 +116,7 @@ void Webserver::start()
                     newConnection(req, _servers[j]);
                     continue;
                 }
-                if(ep.events[i].events & EPOLLIN)
+                if(ep.events[i].events & EPOLLIN && !req[ep.events[i].data.fd].getIsRequestFinished())
                 {
                     req[ep.events[i].data.fd].readRequest();
                     if(req[ep.events[i].data.fd].getIsRequestFinished())
@@ -127,6 +127,7 @@ void Webserver::start()
                     resp[ep.events[i].data.fd].sendResponse(req[ep.events[i].data.fd], ep.events[i].data.fd);
                     if (resp[ep.events[i].data.fd].getIsFinished() == true)
                     {
+                        cout << YELLOW "Connection closed\n" RESET;
                         req.erase(ep.events[i].data.fd);
                         resp.erase(ep.events[i].data.fd);
                         close(ep.events[i].data.fd);
@@ -186,4 +187,9 @@ vector<string> Server::getIndexs() const
 vector<string> Server::getServerNames() const
 {
     return _server_names;
+}
+
+map<string, vector<string> > Server::getExtensions() const
+{
+    return _extensions;
 }
