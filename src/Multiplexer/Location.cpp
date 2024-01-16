@@ -1,6 +1,6 @@
-#include "../inc/webserv.hpp"
-#include "../inc/Location.hpp"
-#include "../inc/Server.hpp"
+#include "../../inc/webserv.hpp"
+#include "../../inc/Location.hpp"
+#include "../../inc/Server.hpp"
 
 Location::Location() : _autoindex(false), _cgi(false), _upload(false)
 {

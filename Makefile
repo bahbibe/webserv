@@ -1,9 +1,9 @@
 CC = c++
 CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -g3 -fsanitize=address 
-SRC = main.cpp src/Server.cpp src/Location.cpp  src/Utils.cpp  src/Config.cpp \
-		src/Request/Request.cpp src/Request/Helpers.cpp src/Response/Response.cpp \
-		src/Request/Boundaries.cpp src/Request/Chunks.cpp \
-		src/Multiplexer/Webserver.cpp
+SRC = main.cpp src/Multiplexer/Server.cpp src/Multiplexer/Location.cpp \
+		src/Multiplexer/Webserver.cpp src/Multiplexer/Utils.cpp  src/Multiplexer/Config.cpp \
+		src/Request/Request.cpp src/Request/Helpers.cpp src/Request/Boundaries.cpp src/Request/Chunks.cpp \
+		src/Response/Response.cpp \
 		
 OBJ = $(SRC:.cpp=.o)
 NAME = webserv

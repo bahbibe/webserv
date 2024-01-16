@@ -32,9 +32,11 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 // #include "Request.hpp"
+// #include "Response.hpp"
 // #include "Server.hpp"
 using namespace std;
 
+class Response;
 class Request;
 class Server;
 typedef struct s_direrctive
@@ -67,8 +69,6 @@ class Webserver
 {
 private:
     vector<Server> _servers;
-    map<int, Request> _req;
-    map<int , Response> _resp;
 public:
     Webserver();
     ~Webserver();
@@ -77,6 +77,7 @@ public:
     Server &operator[](size_t index);
     void start();
     void newConnection(map<int, Request> &req ,Server &server);
+    void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
     bool matchServer(map<int, Request> &req, int sock);
     class ServerException : public exception
     {

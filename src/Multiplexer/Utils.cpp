@@ -1,4 +1,4 @@
-#include "../inc/webserv.hpp"
+#include "../../inc/webserv.hpp"
 
 bool isWhitespace(const string &str)
 {
