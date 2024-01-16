@@ -102,8 +102,6 @@ void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp
 
 void Webserver::start()
 {
-    map<int, Request> _req;
-    map<int, Response> _resp;
     signal(SIGPIPE, SIG_IGN);
     while (1)
     {

@@ -69,6 +69,8 @@ class Webserver
 {
 private:
     vector<Server> _servers;
+    map<int, Request> _req;
+    map<int, Response> _resp;
 public:
     Webserver();
     ~Webserver();
