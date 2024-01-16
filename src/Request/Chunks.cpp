@@ -1,27 +1,86 @@
 #include "../../inc/Chunks.hpp"
 
-Chunks::Chunks() : _state(CH_SIZE), _outfile(NULL), _chunkSize(0), _writedContent(0) {};
+Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0) {};
 
 Chunks::~Chunks() {};
 
-void Chunks::setSize()
+void Chunks::throwException(int code)
+{
+    if (code != 201)
+        remove(_filePath.c_str());
+    throw code;
+}
+
+void Chunks::checkHexSize(const string& size)
+{
+    for (size_t i = 0; i < size.length(); i++)
+    {
+        if (!isxdigit(size[i]))
+        {
+            cout << RED "Chunk Error: invalid hex size" RESET << endl;
+            throwException(400);
+        }
+    }
+}
+
+void Chunks::setFirstSize()
 {
     size_t pos = _buffer.find("\r\n");
+    // TODO: check what to do if pos == string::npos
     if (pos == string::npos)
-        throw 400;
+    {
+        cout << RED "Chunk Error: no CRLF found" RESET << endl;
+        throwException(400);
+    }
     string size = _buffer.substr(0, pos);
-    for (size_t i = 0; i < size.length(); i++)
-        if (!isxdigit(size[i]))
-            throw 400;
+    checkHexSize(size);
     _chunkSize = strtol(size.c_str(), NULL, 16);
-    if (_chunkSize == 0)        
-        throw 201;
+    if (_chunkSize == 0)
+        throwException(201);
     _buffer.erase(0, pos + 2);
+    _writedContent = 0;
     _state = CH_CONTENT;
+    writeContent();
+}
+
+void Chunks::setSize()
+{
+    if (_buffer.empty())
+        return;
+    //? skip the first CRLF
+    size_t pos = _buffer.find("\r\n");
+    // if (pos == string::npos)
+    // {
+    //     cout << RED "Chunk Error: no first CRLF found" RESET << endl;
+    //     _helper = _buffer;
+    //     return;
+    //     // throwException(400);
+    // }
+    _buffer.erase(0, pos + 2);
+    //? skip the second CRLF
+    pos = _buffer.find("\r\n");
+    // if (pos == string::npos)
+    // {
+    //     cout << RED "Chunk Error: no second CRLF found" RESET << endl;
+    //     _helper = _buffer;
+    //     return;
+    //     // throwException(400);
+    // }
+    string size = _buffer.substr(0, pos);
+    checkHexSize(size);
+    _chunkSize = strtol(size.c_str(), NULL, 16);
+    if (_chunkSize == 0)
+        throwException(201);
+    _buffer.erase(0, pos + 2);
+    _writedContent = 0;
+    _state = CH_CONTENT;
+    writeContent();
 }
 
 void Chunks::writeContent()
 {
+    if (_buffer.empty())
+        return;
     if (_buffer.length() <= _chunkSize)
     {
         _outfile->write(_buffer.c_str(), _buffer.length());
@@ -29,30 +88,35 @@ void Chunks::writeContent()
         _chunkSize -= _buffer.length();
         _writedContent += _buffer.length();
         _buffer.erase(0, _buffer.length());
-        if (_chunkSize == _writedContent)
+        if (_chunkSize == 0)
+        {
             _state = CH_SIZE;
-    } else
-    {
+            setSize();
+        }
+    } else {
         string content = _buffer.substr(0, _chunkSize);
         _outfile->write(content.c_str(), content.length());
         _outfile->flush();
         _buffer.erase(0, _chunkSize);
-        if (_buffer.substr(0, 2) != "\r\n")
-            throw 400;
-        _buffer.erase(0, 2);
+        _writedContent += _chunkSize;
+        _chunkSize -= content.length();
+        _chunkSize = 0;
+        _state = CH_SIZE;
         setSize();
     }
 }
 
-void Chunks::parse(const string& buffer, fstream *outfile)
+void Chunks::parse(const string& buffer, fstream *outfile, const string& filePath)
 {
     this->_outfile = outfile;
     this->_buffer = buffer;
-    while (_buffer.length() > 0)
-    {
-        if (_state == CH_SIZE)
-            setSize();
-        else if (_state == CH_CONTENT)
-            writeContent();
-    }
+    this->_filePath = filePath;
+    _buffer.insert(0, _helper);
+    if (_state == CH_START)
+        setFirstSize();
+    else if (_state == CH_SIZE)
+        setSize();
+    else if (_state == CH_CONTENT)
+        writeContent();
+    _helper.clear();
 }

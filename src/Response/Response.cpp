@@ -138,7 +138,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
+    else if (this->_statusCode == 301 || (is_adir(this->_path) && !_target.empty() && this->_target[this->_target.length() - 1] != '/'))
     {
         cout << RED"========REDIRECTION======" RESET << endl;
         if (this->_statusCode == 301)
