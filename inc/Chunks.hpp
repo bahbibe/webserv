@@ -18,12 +18,13 @@ class Chunks {
         string _filePath;
         size_t _chunkSize;
         size_t _writedContent;
+        int _nextBufferSize;
     
     public:
         Chunks();
         ~Chunks();
 
-        void parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes);
+        int parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes);
         void checkHexSize(const string& size);
         void setFirstSize();
         void setSize();

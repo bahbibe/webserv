@@ -45,6 +45,8 @@ Request &Request::operator=(const Request &other)
 
         this->_boundaries = other._boundaries;
         this->_chunks = other._chunks;
+
+        this->bufferSize = other.bufferSize;
     }
     return *this;
 }
@@ -56,6 +58,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     this->_readBytes = 0;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
+    this->bufferSize = BUFFER_SIZE;
 }
 
 Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
@@ -66,22 +69,20 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
     this->_readBytes = 0;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
+    this->bufferSize = BUFFER_SIZE;
 }
 
 void Request::readRequest()
 {
     try {
-        _readBytes = read(_socketFd, _buffer, BUFFER_SIZE + 1);
+        _requestBuffer.clear();
+        _readBytes = read(_socketFd, _buffer, bufferSize);
         if (_readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
         if (_readBytes == 0)
-        {
             setStatusCode(200, "Request is empty");
-        }
         _buffer[_readBytes] = '\0';
-        this->parseRequest(_buffer);
-        // if (!this->_isRequestFinished)
-        //     return;
+        this->parseRequest();
     } catch (int statusCode)
     {
         std::cerr << this->getStatusMessage() << '\n';
@@ -89,25 +90,22 @@ void Request::readRequest()
     }
 }
 
-void Request::parseRequest(string buffer)
+void Request::parseRequest()
 {
-    (void) buffer;
-    string buf;
-    buf.append(_buffer, _readBytes);
+    _requestBuffer.append(_buffer, _readBytes);
     if (_isReadingBody)
-        return this->parseBody(buf);
-    _headersBuffer.append(buf);
+        return this->parseBody();
+    _headersBuffer.append(_requestBuffer);
     size_t pos = _headersBuffer.find("\r\n\r\n");
     if (pos == string::npos)
         return;
-    _rest = _headersBuffer.substr(pos, _headersBuffer.length() - pos);
-    _rest.erase(0, 4);
     _headersBuffer = _headersBuffer.substr(0, pos);
     _readBytes -= _headersBuffer.length() + 4;
+    _requestBuffer.erase(0, _headersBuffer.length() + 4);
     parseRequestLine();
     parseHeaders();
     _headersBuffer.clear();
-    parseBody(_rest);
+    parseBody();
 }
 
 void Request::parseRequestLine()
@@ -247,6 +245,7 @@ void Request::validateRequest()
 
 string Request::getMimeType(string contentType)
 {
+    // TODO: the case where the content type is not found
     if (contentType.find(";") != string::npos)
         contentType = contentType.substr(0, contentType.find(";"));
     map<string, vector<string> > extenstions = this->_server->getExtensions();
@@ -278,7 +277,7 @@ void Request::parseBodyWithBoundaries(string buffer)
     }
 }
 
-void Request::parseBody(string buffer)
+void Request::parseBody()
 {
     if (!this->_isReadingBody)
         this->validateRequest();
@@ -290,11 +289,11 @@ void Request::parseBody(string buffer)
     if (!this->_outfileIsCreated && !this->_isBodyBoundary)
         this->createOutfile();
     if (_isBodyBoundary)
-        parseBodyWithBoundaries(buffer);
+        parseBodyWithBoundaries(_buffer);
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
-        parseBodyWithChunked(buffer);
+        parseBodyWithChunked();
     else if (_headers.find("content-length") != _headers.end())
-        parseBodyWithContentLength(buffer);
+        parseBodyWithContentLength(_buffer);
 }
 
 void Request::parseBodyWithContentLength(string buffer)
@@ -328,10 +327,10 @@ void Request::parseBodyWithContentLength(string buffer)
         setStatusCode(201, "Created");
 }
 
-void Request::parseBodyWithChunked(string buffer)
+void Request::parseBodyWithChunked()
 {
     try {
-       _chunks.parse(buffer, _outfile, _filePath, _readBytes);
+       bufferSize = _chunks.parse(_requestBuffer, _outfile, _filePath, _readBytes);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Chunks Status Code");

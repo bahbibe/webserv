@@ -1,7 +1,7 @@
 // #includ../e "../inc/Multiplexer.hpp"
 #include "../../inc/Chunks.hpp"
 
-Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0) {};
+Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0), _nextBufferSize(BUFFER_SIZE) {};
 
 Chunks::~Chunks() {};
 
@@ -27,12 +27,8 @@ void Chunks::checkHexSize(const string& size)
 void Chunks::setFirstSize()
 {
     size_t pos = _buffer.find("\r\n");
-    // TODO: check what to do if pos == string::npos
     if (pos == string::npos)
-    {
-        cout << RED "Chunk Error: no CRLF found" RESET << endl;
         throwException(400);
-    }
     string size = _buffer.substr(0, pos);
     checkHexSize(size);
     _chunkSize = strtol(size.c_str(), NULL, 16);
@@ -46,6 +42,7 @@ void Chunks::setFirstSize()
 
 void Chunks::setSize()
 {
+    _state = CH_SIZE;
     if (_buffer.empty())
         return;
     size_t pos = _buffer.find("\r\n");
@@ -76,9 +73,15 @@ void Chunks::writeContent()
         if (_chunkSize == 0)
         {
             _state = CH_SIZE;
-            setSize();
+            _nextBufferSize = BUFFER_SIZE;
         }
-    } else {
+        else if (_chunkSize < BUFFER_SIZE)
+            _nextBufferSize = _chunkSize;
+        else
+            _nextBufferSize = BUFFER_SIZE;
+    }
+    // TODO: this the case when the chunk size is set to 0 and the next chunk is 0
+    else {
         string content = _buffer.substr(0, _chunkSize);
         _outfile->write(content.c_str(), content.length());
         _outfile->flush();
@@ -89,9 +92,10 @@ void Chunks::writeContent()
         _state = CH_SIZE;
         setSize();
     }
+
 }
 
-void Chunks::parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes)
+int Chunks::parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes)
 {
     this->_outfile = outfile;
     this->_filePath = filePath;
@@ -102,5 +106,6 @@ void Chunks::parse(const string& buffer, fstream *outfile, const string& filePat
         setSize();
     else if (_state == CH_CONTENT)
         writeContent();
+    return _nextBufferSize;
     // _helper.clear();
 }
