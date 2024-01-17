@@ -84,6 +84,8 @@ public:
     Directives directives;
     Location *_location;
     bool isErrorCode;
+    clock_t _start;
+    bool _ready;
 
     Request(Server* server, int socketFd);
     ~Request();

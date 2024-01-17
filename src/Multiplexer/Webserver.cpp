@@ -77,6 +77,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(pair<int, Request>(clientSock, Request(&server, clientSock)));
+    req[clientSock]._start = clock();
 }
 
 bool Webserver::matchServer(map<int, Request> &req, int sock)
@@ -114,6 +115,9 @@ void Webserver::start()
                 closeConnection(_req, _resp, ep.events[i].data.fd);
             else
             {
+                double timeOut = double(clock() - _req[ep.events[i].data.fd]._start) / CLOCKS_PER_SEC;
+                if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready)
+                    close(ep.events[i].data.fd);
                 if (ep.events[i].events & EPOLLIN && !_req[ep.events[i].data.fd].getIsRequestFinished())
                 {
                     _req[ep.events[i].data.fd].readRequest();

@@ -53,7 +53,7 @@ Request &Request::operator=(const Request &other)
 
 Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false) , _ready(false)
 {
     this->_readBytes = 0;
     this->_location = NULL;
@@ -74,6 +74,7 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
 
 void Request::readRequest()
 {
+    _ready = true;
     try {
         _requestBuffer.clear();
         _readBytes = read(_socketFd, _buffer, bufferSize);
