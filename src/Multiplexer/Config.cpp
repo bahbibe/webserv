@@ -1,7 +1,5 @@
-#include "../inc/webserv.hpp"
-#include "../inc/Server.hpp"
-// #include "../inc/Multiplexer.hpp"
-
+#include "../../inc/webserv.hpp"
+#include "../../inc/Server.hpp"
 
 bool isServerDir(string const &dir)
 {
