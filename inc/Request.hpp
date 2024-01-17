@@ -5,8 +5,6 @@
 #include "Boundaries.hpp"
 #include "Chunks.hpp"
 
-#define BUFFER_SIZE 1024
-
 struct Directives {
     string host;
     string port;
@@ -28,6 +26,7 @@ struct Directives {
 class Request {
 private:
     Server* _server;
+    int _readBytes;
     int _socketFd;
     int _lineCount;
     int _statusCode;
@@ -36,6 +35,7 @@ private:
     bool _isFoundCRLF;
     
     char _buffer[BUFFER_SIZE];
+    string _requestBuffer;
     string _headersBuffer;
     string _rest;
 
@@ -59,12 +59,12 @@ private:
     map<string, vector<string> > _mimeTypes;
     
     //? Parsing
-    void parseRequest(string buffer);
+    void parseRequest();
     void parseRequestLine();
     void parseHeaders();
-    void parseBody(string buffer);
+    void parseBody();
     void parseBodyWithContentLength(string buffer);
-    void parseBodyWithChunked(string buffer);\
+    void parseBodyWithChunked();
     void parseBodyWithBoundaries(string buffer);
 
     //? Request Helpers
@@ -79,11 +79,12 @@ private:
     string toLowerCase(const string &str);
     Location* findLocation();
 public:
+    int bufferSize;
     //? Server directives
     Directives directives;
-
     Location *_location;
     bool isErrorCode;
+
     Request(Server* server, int socketFd);
     ~Request();
     Request();

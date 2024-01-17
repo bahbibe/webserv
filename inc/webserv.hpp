@@ -36,6 +36,8 @@
 // #include "Server.hpp"
 using namespace std;
 
+#define BUFFER_SIZE 1024
+
 class Response;
 class Request;
 class Server;
