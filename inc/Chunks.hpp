@@ -23,7 +23,7 @@ class Chunks {
         Chunks();
         ~Chunks();
 
-        void parse(const string& buffer, fstream *outfile, const string& filePath);
+        void parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes);
         void checkHexSize(const string& size);
         void setFirstSize();
         void setSize();

@@ -19,6 +19,7 @@ Request &Request::operator=(const Request &other)
 {
     if (this != &other)
     {
+        this->_readBytes = other._readBytes;
         this->_method = other._method;
         this->_requestTarget = other._requestTarget;
         this->_httpVersion = other._httpVersion;
@@ -52,6 +53,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
 {
+    this->_readBytes = 0;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
 }
@@ -61,6 +63,7 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
 {
     this->_server = server;
+    this->_readBytes = 0;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
 }
@@ -68,19 +71,17 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
 void Request::readRequest()
 {
     try {
-        int readBytes = read(_socketFd, _buffer, BUFFER_SIZE + 1);
-        if (readBytes == -1)
+        _readBytes = read(_socketFd, _buffer, BUFFER_SIZE + 1);
+        if (_readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
-        if (readBytes == 0)
+        if (_readBytes == 0)
         {
             setStatusCode(200, "Request is empty");
         }
-        _buffer[readBytes] = '\0';
-        // cout << GREEN "readed bytes: " RESET << readBytes << endl;
+        _buffer[_readBytes] = '\0';
         this->parseRequest(_buffer);
         // if (!this->_isRequestFinished)
         //     return;
-        // cout << GREEN "done here: " RESET << endl;
     } catch (int statusCode)
     {
         std::cerr << this->getStatusMessage() << '\n';
@@ -90,19 +91,19 @@ void Request::readRequest()
 
 void Request::parseRequest(string buffer)
 {
+    (void) buffer;
+    string buf;
+    buf.append(_buffer, _readBytes);
     if (_isReadingBody)
-    {
-        this->parseBody(buffer);
-        // cout << GREEN "here -1" RESET << endl;
-        return;
-    }
-    _headersBuffer.append(buffer);
+        return this->parseBody(buf);
+    _headersBuffer.append(buf);
     size_t pos = _headersBuffer.find("\r\n\r\n");
     if (pos == string::npos)
         return;
     _rest = _headersBuffer.substr(pos, _headersBuffer.length() - pos);
     _rest.erase(0, 4);
     _headersBuffer = _headersBuffer.substr(0, pos);
+    _readBytes -= _headersBuffer.length() + 4;
     parseRequestLine();
     parseHeaders();
     _headersBuffer.clear();
@@ -293,10 +294,7 @@ void Request::parseBody(string buffer)
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked(buffer);
     else if (_headers.find("content-length") != _headers.end())
-    {
         parseBodyWithContentLength(buffer);
-        cout << GREEN "here 0" RESET << endl;
-    }
 }
 
 void Request::parseBodyWithContentLength(string buffer)
@@ -314,7 +312,6 @@ void Request::parseBodyWithContentLength(string buffer)
         this->_outfile->flush();
         _bodyLength += buffer.length();
         buffer.erase(0, buffer.length());
-        cout << GREEN "here 1" RESET << endl;
     }
     else
     {
@@ -322,12 +319,11 @@ void Request::parseBodyWithContentLength(string buffer)
         this->_outfile->flush();
         buffer.erase(0, _contentLength);
         _bodyLength += _contentLength;
-        cout << GREEN "here 2" RESET << endl;
     }
     // TODO: handle when the content length is bigger than the body length
-    cout << YELLOW "bodyLength: " << RESET << _bodyLength << endl;
-    cout << YELLOW "contentLength: " << RESET << _contentLength << endl;
-    cout << YELLOW "buffer length: " << RESET << buffer.length() << endl;
+    // cout << YELLOW "bodyLength: " << RESET << _bodyLength << endl;
+    // cout << YELLOW "contentLength: " << RESET << _contentLength << endl;
+    // cout << YELLOW "buffer length: " << RESET << buffer.length() << endl;
     if (buffer.length() == 0 && _bodyLength >= _contentLength)
         setStatusCode(201, "Created");
 }
@@ -335,7 +331,7 @@ void Request::parseBodyWithContentLength(string buffer)
 void Request::parseBodyWithChunked(string buffer)
 {
     try {
-       _chunks.parse(buffer, _outfile, _filePath);
+       _chunks.parse(buffer, _outfile, _filePath, _readBytes);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Chunks Status Code");

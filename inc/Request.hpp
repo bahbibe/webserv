@@ -28,6 +28,7 @@ struct Directives {
 class Request {
 private:
     Server* _server;
+    int _readBytes;
     int _socketFd;
     int _lineCount;
     int _statusCode;

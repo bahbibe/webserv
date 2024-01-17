@@ -47,25 +47,9 @@ void Chunks::setSize()
 {
     if (_buffer.empty())
         return;
-    //? skip the first CRLF
     size_t pos = _buffer.find("\r\n");
-    // if (pos == string::npos)
-    // {
-    //     cout << RED "Chunk Error: no first CRLF found" RESET << endl;
-    //     _helper = _buffer;
-    //     return;
-    //     // throwException(400);
-    // }
     _buffer.erase(0, pos + 2);
-    //? skip the second CRLF
     pos = _buffer.find("\r\n");
-    // if (pos == string::npos)
-    // {
-    //     cout << RED "Chunk Error: no second CRLF found" RESET << endl;
-    //     _helper = _buffer;
-    //     return;
-    //     // throwException(400);
-    // }
     string size = _buffer.substr(0, pos);
     checkHexSize(size);
     _chunkSize = strtol(size.c_str(), NULL, 16);
@@ -106,17 +90,16 @@ void Chunks::writeContent()
     }
 }
 
-void Chunks::parse(const string& buffer, fstream *outfile, const string& filePath)
+void Chunks::parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes)
 {
     this->_outfile = outfile;
-    this->_buffer = buffer;
     this->_filePath = filePath;
-    _buffer.insert(0, _helper);
+    _buffer.append(buffer, 0, readBytes);
     if (_state == CH_START)
         setFirstSize();
     else if (_state == CH_SIZE)
         setSize();
     else if (_state == CH_CONTENT)
         writeContent();
-    _helper.clear();
+    // _helper.clear();
 }
