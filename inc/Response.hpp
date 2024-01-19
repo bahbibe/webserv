@@ -32,6 +32,7 @@ class Response
         string _header;
         string _body;
         string _target;
+        char **env;
 
         ifstream file;
         stringstream statusString;
@@ -62,10 +63,5 @@ class Response
         string getErrorPage(Request &request, int statusCode);
         string templateError(string errorType);
         void checks(Request &request);
+        // void fillEnv();
 };
-
-
-//! TO DO
-//! - fix pathes that end with "/"
-//! - Delete method
-//! - clearing code
