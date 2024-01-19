@@ -138,7 +138,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_statusCode == 301 || (is_adir(this->_path) && !_target.empty() && this->_target[this->_target.length() - 1] != '/'))
+    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
         cout << RED"========REDIRECTION======" RESET << endl;
         if (this->_statusCode == 301)
@@ -176,7 +176,21 @@ void Response::sendResponse(Request &request, int fdSocket)
 
 void Response::checks(Request &request)
 {
-    if (is_adir(this->_path) && !this->_flag)
+    
+    if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
+    {
+         cout << RED"========REDIRECTION======" RESET << endl;
+        if (this->_statusCode == 301)
+            this->_path = request.directives.returnRedirect;
+        else
+        {
+            this->_path = this->_target + "/";
+            this->_statusCode = 301;
+        }
+        SendHeader();
+        this->_isfinished = true;
+    }
+    else if (is_adir(this->_path) && !this->_flag)
         checkAutoInedx(request);
     else if (!this->_flag)
     {
@@ -216,7 +230,7 @@ void Response::checkAutoInedx(Request &request)
                 findeContentType();
                 SendHeader();
                 return;
-            }   
+            }
         }
     if (request.directives.autoindex)
         tree_dir();
@@ -329,11 +343,16 @@ void Response::SendHeader()
     map<int,string>::iterator it;
     it = this->status.find(this->_statusCode);
     this->_header = "HTTP/1.1 " + it->second +"\r\n";
-    this->_header += "Content-Type: " + this->_contentType + "\r\n";
-    this->_header += "Transfer-Encoding: chunked\r\n";
-    this->_header += "connection: close\r\n\r\n";
+    if(_statusCode == 301)
+        this->_header += "Location: " + this->_path +"\r\n\r\n";
+    else
+    {
+        this->_header += "Content-Type: " + this->_contentType + "\r\n";
+        this->_header += "Transfer-Encoding: chunked\r\n";
+        this->_header += "connection: close\r\n\r\n";
+    }
+    cout << "Header: " << this->_header << endl;
     int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
-    // perror("ERROR");
     if (n < -1)
         return;
 }
@@ -408,6 +427,15 @@ Response &Response::operator=(const Response &other)
     }
     return *this;
 }
+
+// void Response::fillEnv()
+// {
+//      this->env[0] =  strdup("CONTENT_TYPE: text/html");
+//      this->env[0] =  strdup("REQUEST_METHOD:");
+//     //  HTTP_COOKIE
+
+
+// }
 
 bool Response::getIsFinished() const
 {
