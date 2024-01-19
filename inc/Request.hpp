@@ -19,8 +19,10 @@ struct Directives {
     bool isCgiAllowed;
     string returnRedirect;
     string requestTarget;
-    string queryString;
     string requestedFile;
+    string queryString;
+    string httpCookie;
+    string httpAccept;
 };
 
 class Request {
@@ -44,7 +46,7 @@ private:
     string _httpVersion;
     map<string, string> _headers;
     string _filePath;
-    fstream *_outfile;
+    fstream _outfile;
     bool _outfileIsCreated;
     size_t _bodyLength;
     bool _isReadingBody;
@@ -65,7 +67,7 @@ private:
     void parseBody();
     void parseBodyWithContentLength(string buffer);
     void parseBodyWithChunked();
-    void parseBodyWithBoundaries(string buffer);
+    void parseBodyWithBoundaries();
 
     //? Request Helpers
     void setContentLength(string contentLength);
