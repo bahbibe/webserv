@@ -6,8 +6,8 @@ Request::~Request()
 {
     if (this->_outfileIsCreated)
     {
-        this->_outfile->close();
-        delete this->_outfile;
+        this->_outfile.close();
+        // delete this->_outfile;
     }
 }
 Request::Request(const Request &other)
@@ -32,7 +32,7 @@ Request &Request::operator=(const Request &other)
         this->_statusCode = other._statusCode;
         this->_isRequestFinished = other._isRequestFinished;
         this->_isFoundCRLF = other._isFoundCRLF;
-        this->_outfile = other._outfile;
+        // this->_outfile = other._outfile;
         this->_outfileIsCreated = other._outfileIsCreated;
         this->_bodyLength = other._bodyLength;
         this->_isReadingBody = other._isReadingBody;
@@ -52,7 +52,7 @@ Request &Request::operator=(const Request &other)
 }
 
 Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
-    _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
+    _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false) , _ready(false)
 {
     this->_readBytes = 0;
@@ -62,7 +62,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
 }
 
 Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
-    _isFoundCRLF(false), _outfile(NULL), _outfileIsCreated(false), _bodyLength(0),
+    _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
 {
     this->_server = server;
@@ -229,8 +229,9 @@ void Request::validateRequest()
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
     if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
     {
-        if (_headers.find("transfer-encoding") != _headers.end())
-            setStatusCode(400, "multipart/form-data and Transfer-Encoding are present");
+        // TODO: I think is unsupported
+        // if (_headers.find("transfer-encoding") != _headers.end())
+        //     setStatusCode(400, "multipart/form-data and Transfer-Encoding are present");
         _isBodyBoundary = true;
         _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
     }
@@ -262,16 +263,17 @@ void Request::createOutfile()
     string extension = this->getMimeType(contentType);
     string randomFileName = Helpers::generateFileName();
     this->_filePath = directives.uploadPath + randomFileName + extension;
-    this->_outfile = new fstream(this->_filePath.c_str(), ios::out | ios::binary | ios::trunc | ios::ate);
-    if (!this->_outfile->is_open())
+    // this->_outfile = fstream(this->_filePath.c_str(), ios::out | ios::binary);
+    this->_outfile.open(this->_filePath.c_str(), ios::out | ios::binary);
+    if (!this->_outfile.is_open())
         setStatusCode(500, "Failed to create file");
     this->_outfileIsCreated = true;
 }
 
-void Request::parseBodyWithBoundaries(string buffer)
+void Request::parseBodyWithBoundaries()
 {
     try {
-        _boundaries.parseBoundary(buffer, _boundary);
+        _boundaries.parseBoundary(_requestBuffer, _boundary, _readBytes, directives.uploadPath);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Boundaris Status Code");
@@ -290,7 +292,7 @@ void Request::parseBody()
     if (!this->_outfileIsCreated && !this->_isBodyBoundary)
         this->createOutfile();
     if (_isBodyBoundary)
-        parseBodyWithBoundaries(_buffer);
+        parseBodyWithBoundaries();
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked();
     else if (_headers.find("content-length") != _headers.end())
@@ -308,15 +310,15 @@ void Request::parseBodyWithContentLength(string buffer)
     }
     if (buffer.length() < _contentLength)
     {
-        this->_outfile->write(buffer.c_str(), buffer.length());
-        this->_outfile->flush();
+        this->_outfile.write(buffer.c_str(), buffer.length());
+        this->_outfile.flush();
         _bodyLength += buffer.length();
         buffer.erase(0, buffer.length());
     }
     else
     {
-        this->_outfile->write(buffer.c_str(), _contentLength);
-        this->_outfile->flush();
+        this->_outfile.write(buffer.c_str(), _contentLength);
+        this->_outfile.flush();
         buffer.erase(0, _contentLength);
         _bodyLength += _contentLength;
     }
@@ -331,7 +333,7 @@ void Request::parseBodyWithContentLength(string buffer)
 void Request::parseBodyWithChunked()
 {
     try {
-       bufferSize = _chunks.parse(_requestBuffer, _outfile, _filePath, _readBytes);
+       bufferSize = _chunks.parse(_requestBuffer, &_outfile, _filePath, _readBytes);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Chunks Status Code");

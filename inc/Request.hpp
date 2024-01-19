@@ -44,7 +44,7 @@ private:
     string _httpVersion;
     map<string, string> _headers;
     string _filePath;
-    fstream *_outfile;
+    fstream _outfile;
     bool _outfileIsCreated;
     size_t _bodyLength;
     bool _isReadingBody;
@@ -65,7 +65,7 @@ private:
     void parseBody();
     void parseBodyWithContentLength(string buffer);
     void parseBodyWithChunked();
-    void parseBodyWithBoundaries(string buffer);
+    void parseBodyWithBoundaries();
 
     //? Request Helpers
     void setContentLength(string contentLength);

@@ -3,6 +3,7 @@
 #include "webserv.hpp"
 #include "Server.hpp"
 #include "Helpers.hpp"
+#include <sys/time.h>
 
 #define BD_START "bd_start"
 #define BD_CONTENT "bd_content"
@@ -16,23 +17,23 @@ class Boundaries {
         string _endBoundary;
         bool _isFileCreated;
         fstream *_outfile;
+        string _uploadPath;
 
         string _state;
-        string _bd_helper;
-
         string _bd_start;
-        string _bd_body;
-        string _bd_end;
-
-        string _buffer_end;
+        string _rest;
+        size_t _filesCounter;
 
     public:
         Boundaries();
+        // Boundaries(const Boundaries& other);
+        // Boundaries& operator=(const Boundaries& rhs);
         ~Boundaries();
 
-        void parseBoundary(const string& buffer, const string& boundary);
-        void parseBoundaryStart();
-        void checkStartBoundary();
-        void checkMidBoundary();
-        void writeBodyContent();
+        void parseBoundary(const string& buffer, const string& boundary, int readBytes, const string& uploadPath);
+        void checkFirstBoundary();
+        void handleBoundaries();
+        void writeContent();
+        void createFile();
+        void throwException(int code);
 };

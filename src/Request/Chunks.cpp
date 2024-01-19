@@ -17,10 +17,7 @@ void Chunks::checkHexSize(const string& size)
     for (size_t i = 0; i < size.length(); i++)
     {
         if (!isxdigit(size[i]))
-        {
-            cout << RED "Chunk Error: invalid hex size" RESET << endl;
             throwException(400);
-        }
     }
 }
 
@@ -107,5 +104,4 @@ int Chunks::parse(const string& buffer, fstream *outfile, const string& filePath
     else if (_state == CH_CONTENT)
         writeContent();
     return _nextBufferSize;
-    // _helper.clear();
 }
