@@ -55,7 +55,6 @@ void Boundaries::createFile()
     ss.str("");
     ss << _filesCounter++;
     string fileName = _uploadPath + "upload_" + timestamp + "_" + ss.str() + ".txt";
-    cout << GREEN "Creating file: " RESET << fileName << endl;
     _outfile = new fstream(fileName.c_str(), ios::out | ios::binary);
     if (!_outfile->is_open())
         throwException(500);
@@ -128,7 +127,6 @@ void Boundaries::parseBoundary(const string& buffer, const string& boundary, int
     this->_buffer.append(_rest);
     this->_buffer.append(buffer, 0, readBytes);
     this->_uploadPath = uploadPath;
-    // cout << YELLOW "Buffer: " RESET << _buffer << endl;
     if (!_isFileCreated)
         createFile();
     if (_state == BD_START)

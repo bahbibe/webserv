@@ -19,8 +19,10 @@ struct Directives {
     bool isCgiAllowed;
     string returnRedirect;
     string requestTarget;
-    string queryString;
     string requestedFile;
+    string queryString;
+    string httpCookie;
+    string httpAccept;
 };
 
 class Request {

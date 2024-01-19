@@ -143,6 +143,10 @@ void Request::parseHeaders()
         string headerName = toLowerCase(headerTokens[0]);
         string headerValue = headerTokens.size() > 1 ? headerTokens[1] : "";
         trim(headerValue);
+        if (headerName == "cookie")
+            directives.httpCookie = headerValue;
+        if (headerName == "accept")
+            directives.httpAccept = headerValue;
         ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
         if (ret.second == false)
             setStatusCode(400, "Duplicate Header");
@@ -376,6 +380,8 @@ void Request::printRequest()
     cout << "Return Redirect: " << directives.returnRedirect << endl;
     cout << "requestTarget: " << directives.requestTarget << endl;
     cout << "queryString: " << directives.queryString << endl;
+    cout << "httpCookie: " << directives.httpCookie << endl;
+    cout << "httpAccept: " << directives.httpAccept << endl;
     cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }
