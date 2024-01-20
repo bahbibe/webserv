@@ -103,3 +103,5 @@ bool isLocationDir(string const &);
 bool isIpV4(string const &str);
 bool isNumber(string const &);
 bool duplicateDirective(t_dir dir);
+bool allowedConfig(string const &line);
+void trim(string &str);

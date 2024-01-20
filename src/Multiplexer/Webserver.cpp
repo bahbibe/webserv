@@ -30,38 +30,45 @@ void Webserver::brackets(string const &file)
     stringstream ss(file);
     string buff;
     stack<string> lim;
-    while (ss >> buff)
+    string tmp;
+    while (getline(ss, buff))
     {
-        if (buff == "server")
+        trim(buff);
+        if (buff.empty() || buff[0] == '#')
+            continue;
+        stringstream line(buff);
+        line >> tmp;
+        if (tmp == "server")
         {
-            _servers.push_back(Server());
-            ss >> buff;
-            if (buff == OPEN_BR)
-                lim.push(buff);
-            else
-                throw Server::ServerException(ERR "Expected '{'");
+            if (!lim.empty())
+                throw ServerException(ERR "Invalid brackets");
+            line >> tmp;
+            if (tmp != "{")
+                throw ServerException(ERR "Invalid brackets");
+            if (line.get() != EOF)
+                throw ServerException(ERR "Invalid brackets");
+            lim.push(tmp);
         }
-        else if (buff == "location")
+        else if (tmp == "location")
         {
-            ss >> buff;
-            if (buff[0] != '/')
-                throw Server::ServerException(ERR "Expected '/'");
-            ss >> buff;
-            if (buff == OPEN_BR)
-                lim.push(buff);
-            else
-                throw Server::ServerException(ERR "Expected '{'");
+            line >> tmp >> tmp;
+            if (tmp != "{" )
+                throw ServerException(ERR "Invalid brackets");
+            if (line.get() != EOF)
+                throw ServerException(ERR "Invalid brackets");
+            lim.push(tmp);
         }
-        else if (buff == CLOSE_BR)
+        else if (tmp == "}")
         {
-            if (!lim.empty() && lim.top() == OPEN_BR)
-                lim.pop();
-            else
-                throw Server::ServerException(ERR "Expected '}'");
+            if (lim.empty())
+                throw ServerException(ERR "Invalid brackets");
+            lim.pop();
         }
+        else if (!allowedConfig(tmp))
+            throw ServerException(ERR "Invalid config " + tmp);
     }
     if (!lim.empty())
-        throw Server::ServerException(ERR "Unclosed '{'");
+        throw ServerException(ERR "Invalid brackets");
 }
 
 void Webserver::newConnection(map<int, Request> &req, Server &server)
@@ -71,7 +78,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
-    cout << "New connection\n";
+    // cout << "New connection\n";
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))

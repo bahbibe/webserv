@@ -10,6 +10,30 @@ bool isWhitespace(const string &str)
     return true;
 }
 
+void trim(string &str)
+{
+    size_t start = str.find_first_not_of(" \t");
+    size_t end = str.find_last_not_of(" \t");
+    if (start == string::npos || end == string::npos)
+        str = "";
+    else
+        str = str.substr(start, end - start + 1);
+}
+
+bool allowedConfig(string const &line)
+{
+    if (line == "host" || line == "listen" \
+     || line == "server_name" || line == "index" \
+     || line == "root" || line == "autoindex" \
+     || line == "client_max_body_size" || line == "cgi" \
+     || line == "upload" || line == "upload_path" \
+     || line == "allow" || line == "return" \
+     || line == "server" || line == "location" \
+     || line == "error_page" || line == "cgi_upload_path")
+        return true;
+    return false;
+}
+
 bool isIpV4(string const &str)
 {
     vector<string> octets;
@@ -35,6 +59,7 @@ bool isIpV4(string const &str)
     }
     return true;
 }
+
 bool isComment(const string &str)
 {
     string::const_iterator it = str.begin();
