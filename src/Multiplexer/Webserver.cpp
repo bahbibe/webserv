@@ -40,6 +40,7 @@ void Webserver::brackets(string const &file)
         line >> tmp;
         if (tmp == "server")
         {
+            _servers.push_back(Server());
             if (!lim.empty())
                 throw ServerException(ERR "Invalid brackets");
             line >> tmp;
