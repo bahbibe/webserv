@@ -53,6 +53,7 @@ Location *Server::parseLocation(stringstream &ss)
     Location *location = new Location();
     while (getline(ss, buff))
     {
+        trim(buff);
         if (isBrackets(buff) && buff.find("}") != string::npos)
             break;
         if (buff.empty() || isWhitespace(buff) || isComment(buff) || isBrackets(buff))
@@ -111,6 +112,12 @@ Location *Server::parseLocation(stringstream &ss)
                 location->_dir.upload_path++;
                 line >> tmp;
                 location->setUploadPath(tmp);
+            }
+            else if (tmp == "cgi_upload_path")
+            {
+                location->_dir.cgi_upload_path++;
+                line >> tmp;
+                location->setCgiUploadPath(tmp);
             }
             else if (tmp == "return")
             {

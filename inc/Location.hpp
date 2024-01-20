@@ -11,6 +11,7 @@ private:
     vector<string> _indexs;
     string _root;
     string _upload_path;
+    string _cgi_upload_path;
     string _return;
 
 public:
@@ -24,6 +25,7 @@ public:
     void setUpload(bool);
     void setCgi(bool);
     void setUploadPath(string const &);
+    void setCgiUploadPath(string const &);
     void setReturn(string const &);
     void print();
 
@@ -34,5 +36,6 @@ public:
     bool getAutoindex() const;
     bool getCgi() const;
     string getUploadPath() const;
+    string getCgiUploadPath() const;
     vector<string> getIndexs() const;
 };

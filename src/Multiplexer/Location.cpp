@@ -12,6 +12,7 @@ void Location::setRoot(string const &buff) {_root = buff;}
 void Location::setAutoindex(bool flag) {_autoindex = flag;}
 void Location::setUpload(bool flag) {_upload = flag;}
 void Location::setUploadPath(string const &buff) {_upload_path = buff;}
+void Location::setCgiUploadPath(string const &buff) {_cgi_upload_path = buff;}
 void Location::setCgi(bool flag) {_cgi = flag;}
 void Location::setReturn(string const &buff) {_return = buff;}
 void Location::setMethods(string const &buff)
@@ -58,3 +59,5 @@ bool Location::getCgi() const { return _cgi; }
 string Location::getUploadPath() const { return _upload_path; }
 
 vector<string> Location::getIndexs() const { return _indexs; }
+
+string Location::getCgiUploadPath() const { return _cgi_upload_path; }

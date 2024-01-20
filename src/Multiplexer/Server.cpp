@@ -12,8 +12,8 @@ Server::~Server()
     map<string, Location *>::iterator it = _locations.begin();
     for (; it != _locations.end(); it++)
     {
-        // if(it->second)
-        //     delete it->second;
+        if(it->second)
+            delete it->second;
     }
     close(_socket);
 }

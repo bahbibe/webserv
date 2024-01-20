@@ -54,6 +54,7 @@ typedef struct s_direrctive
     int cgi;
     int upload;
     int upload_path;
+    int cgi_upload_path;
     int allow;
     int return_code;
     int server;
