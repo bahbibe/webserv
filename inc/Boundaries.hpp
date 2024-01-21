@@ -36,4 +36,5 @@ class Boundaries {
         void writeContent();
         void createFile();
         void throwException(int code);
+        void closeOutFile();
 };

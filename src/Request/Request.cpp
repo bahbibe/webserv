@@ -5,10 +5,7 @@ typedef pair<map<string, string>::iterator, bool> ret_type;
 Request::~Request()
 {
     if (this->_outfileIsCreated)
-    {
         this->_outfile.close();
-        // delete this->_outfile;
-    }
 }
 Request::Request(const Request &other)
 {
@@ -180,6 +177,7 @@ Location* Request::findLocation()
 void Request::setServer()
 {
     //! TODO: first find the server according to the host header
+    // TODO: add default max body client size (nginx default is 1m == 1048576 MB)
     directives.host = _server->getHost();
     directives.port = _server->getPort();
     directives.clientMaxBodySize = _server->getClientMaxBodySize();
@@ -267,7 +265,6 @@ void Request::createOutfile()
     string extension = this->getMimeType(contentType);
     string randomFileName = Helpers::generateFileName();
     this->_filePath = directives.uploadPath + randomFileName + extension;
-    // this->_outfile = fstream(this->_filePath.c_str(), ios::out | ios::binary);
     this->_outfile.open(this->_filePath.c_str(), ios::out | ios::binary);
     if (!this->_outfile.is_open())
         setStatusCode(500, "Failed to create file");
@@ -300,37 +297,37 @@ void Request::parseBody()
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked();
     else if (_headers.find("content-length") != _headers.end())
-        parseBodyWithContentLength(_buffer);
+        parseBodyWithContentLength();
 }
 
-void Request::parseBodyWithContentLength(string buffer)
+void Request::parseBodyWithContentLength()
 {
     if (_contentLength == 0)
         setStatusCode(201, "Created");
-    if (buffer.length() > _contentLength)
+    if (_requestBuffer.length() > _contentLength)
     {
         // TODO: check req-todo.http
-        buffer.erase(_contentLength, buffer.length() - _contentLength);
+        _requestBuffer.erase(_contentLength, _requestBuffer.length() - _contentLength);
     }
-    if (buffer.length() < _contentLength)
+    if (_requestBuffer.length() < _contentLength)
     {
-        this->_outfile.write(buffer.c_str(), buffer.length());
+        this->_outfile.write(_requestBuffer.c_str(), _requestBuffer.length());
         this->_outfile.flush();
-        _bodyLength += buffer.length();
-        buffer.erase(0, buffer.length());
+        _bodyLength += _requestBuffer.length();
+        _requestBuffer.erase(0, _requestBuffer.length());
     }
     else
     {
-        this->_outfile.write(buffer.c_str(), _contentLength);
+        this->_outfile.write(_requestBuffer.c_str(), _contentLength);
         this->_outfile.flush();
-        buffer.erase(0, _contentLength);
+        _requestBuffer.erase(0, _contentLength);
         _bodyLength += _contentLength;
     }
     // TODO: handle when the content length is bigger than the body length
     // cout << YELLOW "bodyLength: " << RESET << _bodyLength << endl;
     // cout << YELLOW "contentLength: " << RESET << _contentLength << endl;
-    // cout << YELLOW "buffer length: " << RESET << buffer.length() << endl;
-    if (buffer.length() == 0 && _bodyLength >= _contentLength)
+    // cout << YELLOW "_requestBuffer length: " << RESET << _requestBuffer.length() << endl;
+    if (_requestBuffer.length() == 0 && _bodyLength >= _contentLength)
         setStatusCode(201, "Created");
 }
 

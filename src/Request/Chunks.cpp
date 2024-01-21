@@ -32,7 +32,6 @@ void Chunks::setFirstSize()
     if (_chunkSize == 0)
         throwException(201);
     _buffer.erase(0, pos + 2);
-    _writedContent = 0;
     _state = CH_CONTENT;
     writeContent();
 }
@@ -51,7 +50,6 @@ void Chunks::setSize()
     if (_chunkSize == 0)
         throwException(201);
     _buffer.erase(0, pos + 2);
-    _writedContent = 0;
     _state = CH_CONTENT;
     writeContent();
 }
@@ -60,6 +58,9 @@ void Chunks::writeContent()
 {
     if (_buffer.empty())
         return;
+    // TODO: check if the content is too big
+    // if (_writedContent + _chunkSize > maxBodyClientSize)
+    //     throwException(413);
     if (_buffer.length() <= _chunkSize)
     {
         _outfile->write(_buffer.c_str(), _buffer.length());

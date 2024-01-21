@@ -46,6 +46,11 @@ void Boundaries::createFile()
     if (_isFileCreated)
         return;
     // TODO: to get the extension later
+    size_t pos = _buffer.find("\r\n\r\n");
+    if (pos == string::npos)
+        return;
+    _bd_start = _buffer.substr(0, pos + 4);
+    _buffer.erase(0, pos + 4);
     struct timeval tp;
     gettimeofday(&tp, NULL);
     long long ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
@@ -64,13 +69,13 @@ void Boundaries::createFile()
 void Boundaries::checkFirstBoundary()
 {
     // TODO: to handle later the case where the boundary at first buffer not found
-    size_t pos = _buffer.find("\r\n\r\n");
+    size_t pos = _bd_start.find("\r\n\r\n");
     if (pos == string::npos)
         return;
-    string boundary = _buffer.substr(0, _buffer.find("\r\n"));
+    string boundary = _bd_start.substr(0, _bd_start.find("\r\n"));
     if (boundary != _boundary)
         throwException(400);
-    _buffer.erase(0, pos + 4);
+    // _bd_start.erase(0, pos + 4);
     _state = BD_CONTENT;
     handleBoundaries();
 }
@@ -82,8 +87,17 @@ void Boundaries::writeContent()
     _buffer.clear();
 }
 
+void Boundaries::closeOutFile()
+{
+    _outfile->close();
+    delete _outfile;
+    _isFileCreated = false;
+    _outfile = NULL;
+}
+
 void Boundaries::handleBoundaries()
 {
+    // TODO: check if the content is too big than maxBodyClientSize
     size_t midBoundaryPos = _buffer.find(_boundary);
     size_t endBoundaryPos = _buffer.find(_endBoundary);
 
@@ -101,11 +115,44 @@ void Boundaries::handleBoundaries()
         }
         writeContent();
     }
+    else if (midBoundaryPos != string::npos && endBoundaryPos != string::npos)
+    {
+        string content = _buffer.substr(0, midBoundaryPos);
+        _buffer.erase(0, midBoundaryPos);
+        _outfile->write(content.c_str(), content.length());
+        _outfile->flush();
+        closeOutFile();
+        while (1)
+        {
+            if (!_isFileCreated)
+                createFile();
+            else
+            {
+                midBoundaryPos = _buffer.find(_boundary);
+                endBoundaryPos = _buffer.find(_endBoundary);
+                if (midBoundaryPos != string::npos && midBoundaryPos < endBoundaryPos)
+                {
+                    string content = _buffer.substr(0, midBoundaryPos);
+                    _outfile->write(content.c_str(), content.length());
+                    _outfile->flush();
+                    _buffer.erase(0, midBoundaryPos);
+                    closeOutFile();
+                } else {
+                    string content = _buffer.substr(0, endBoundaryPos);
+                    _outfile->write(content.c_str(), content.length());
+                    _outfile->flush();
+                    _buffer.erase(0, endBoundaryPos);
+                    closeOutFile();
+                    throwException(201);
+                }
+            }
+        }
+    }
     else if (endBoundaryPos != string::npos)
     {
         _buffer.erase(endBoundaryPos);
         writeContent();
-        _isFileCreated = false;
+        closeOutFile();
         throwException(201);
     }
     else if (midBoundaryPos != string::npos)
@@ -113,9 +160,7 @@ void Boundaries::handleBoundaries()
         _rest = _buffer.substr(midBoundaryPos);
         _buffer.erase(_buffer.length() - (_buffer.length() - midBoundaryPos));
         writeContent();
-        _outfile->close();
-        delete _outfile;
-        _isFileCreated = false;
+        closeOutFile();
     }
 }
 

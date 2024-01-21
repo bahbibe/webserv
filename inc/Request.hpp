@@ -65,7 +65,7 @@ private:
     void parseRequestLine();
     void parseHeaders();
     void parseBody();
-    void parseBodyWithContentLength(string buffer);
+    void parseBodyWithContentLength();
     void parseBodyWithChunked();
     void parseBodyWithBoundaries();
 
