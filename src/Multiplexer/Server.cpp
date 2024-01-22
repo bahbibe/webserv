@@ -7,26 +7,6 @@ Server::Server() : _autoindex(false)
     memset(&_dir, 0, sizeof(_dir));
 }
 
-Server::~Server()
-{
-    map<string, Location *>::iterator it = _locations.begin();
-    for (; it != _locations.end(); it++)
-    {
-        if(it->second)
-            delete it->second;
-    }
-    close(_socket);
-}
-
-size_t Server::getClientMaxBodySize() const
-{
-    if (_client_max_body_size == "")
-        return 0;
-    size_t size = 0;
-    stringstream ss(_client_max_body_size);
-    ss >> size;
-    return size;
-}
 
 map<string, Location *> Server::getLocations() const
 {
@@ -77,6 +57,26 @@ int Server::getSocket() const
     return _socket;
 }
 
+Server::~Server()
+{
+    map<string, Location *>::iterator it = _locations.begin();
+    for (; it != _locations.end(); it++)
+    {
+        if(it->second)
+            delete it->second;
+    }
+    close(_socket);
+}
+
+size_t Server::getClientMaxBodySize() const
+{
+    if (_client_max_body_size == "")
+        return 0;
+    size_t size = 0;
+    stringstream ss(_client_max_body_size);
+    ss >> size;
+    return size;
+}
 void Server::setErrorCodes(string const &code, string const &buff)
 {
     string codes[9] = {"400", "403", "404", "405", "409", "413", "414", "500", "501"};
@@ -139,5 +139,3 @@ void Server::setupSocket()
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
         throw ServerException(ERR "Failed to add socket to epoll");
 }
-
-

@@ -34,6 +34,51 @@ bool allowedConfig(string const &line)
     return false;
 }
 
+bool isServerDir(string const &dir)
+{
+    vector<string> directives;
+    directives.push_back("host");
+    directives.push_back("listen");
+    directives.push_back("server_name");
+    directives.push_back("root");
+    directives.push_back("error_page");
+    directives.push_back("client_max_body_size");
+    directives.push_back("index");
+    directives.push_back("autoindex");
+    directives.push_back("location");
+    vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
+    if (it != directives.end())
+        return true;
+    return false;
+}
+
+bool isLocationDir(string const &dir)
+{
+    vector<string> directives;
+    directives.push_back("root");
+    directives.push_back("return");
+    directives.push_back("allow");
+    directives.push_back("index");
+    directives.push_back("autoindex");
+    directives.push_back("cgi");
+    directives.push_back("upload");
+    directives.push_back("upload_path");
+    directives.push_back("cgi_upload_path");
+    vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
+    if (it != directives.end())
+        return true;
+    return false;
+}
+
+bool duplicateDirective(t_dir dir)
+{
+    for (size_t i = 0; i < sizeof(t_dir) / sizeof(int); i++)
+    {
+        if (((int *)&dir)[i] > 1)
+            return true;
+    }
+    return false;
+}
 bool isIpV4(string const &str)
 {
     vector<string> octets;
