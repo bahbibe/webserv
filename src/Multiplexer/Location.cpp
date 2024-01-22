@@ -15,6 +15,16 @@ void Location::setUploadPath(string const &buff) {_upload_path = buff;}
 void Location::setCgiUploadPath(string const &buff) {_cgi_upload_path = buff;}
 void Location::setCgi(bool flag) {_cgi = flag;}
 void Location::setReturn(string const &buff) {_return = buff;}
+string Location::getReturn() const { return _return; }
+vector<string> Location::getMethods() const { return _methods; }
+string Location::getRoot() const { return _root; }
+bool Location::getUpload() const { return _upload; }
+bool Location::getAutoindex() const { return _autoindex; }
+bool Location::getCgi() const { return _cgi; }
+string Location::getUploadPath() const { return _upload_path; }
+vector<string> Location::getIndexs() const { return _indexs; }
+string Location::getCgiUploadPath() const { return _cgi_upload_path; }
+
 void Location::setMethods(string const &buff)
 {
     string method[3] = {"GET", "POST", "DELETE"};
@@ -26,6 +36,7 @@ void Location::setMethods(string const &buff)
         }
     throw Server::ServerException(ERR "Invalid method");
 }
+
 void Location::print()
 {
     cout << "    indexs: ";
@@ -43,21 +54,3 @@ void Location::print()
         cout << _methods[i] << " ";
     cout << endl;
 }
-
-string Location::getReturn() const { return _return; }
-
-vector<string> Location::getMethods() const { return _methods; }
-
-string Location::getRoot() const { return _root; }
-
-bool Location::getUpload() const { return _upload; }
-
-bool Location::getAutoindex() const { return _autoindex; }
-
-bool Location::getCgi() const { return _cgi; }
-
-string Location::getUploadPath() const { return _upload_path; }
-
-vector<string> Location::getIndexs() const { return _indexs; }
-
-string Location::getCgiUploadPath() const { return _cgi_upload_path; }

@@ -88,6 +88,14 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     req[clientSock]._start = clock();
 }
 
+void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
+{
+    cout << YELLOW "Connection closed\n" RESET;
+    req.erase(sock);
+    resp.erase(sock);
+    close(sock);
+}
+
 bool Webserver::matchServer(map<int, Request> &req, int sock)
 {
     for (size_t j = 0; j < _servers.size(); j++)
@@ -101,13 +109,6 @@ bool Webserver::matchServer(map<int, Request> &req, int sock)
     return false;
 }
 
-void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
-{
-    cout << YELLOW "Connection closed\n" RESET;
-    req.erase(sock);
-    resp.erase(sock);
-    close(sock);
-}
 
 void Webserver::start()
 {
