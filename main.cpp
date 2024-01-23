@@ -16,10 +16,10 @@ int main(int argc, char const *argv[])
             for (size_t i = 0; i < server.serverCount(); i++)
             {
                 server[i].parseServer(buff);
-                server[i].print();
-                // server[i].setupSocket();
+                // server[i].print();
+                server[i].setupSocket();
             }
-            // server.start();
+            server.start();
         }
         else
             throw Server::ServerException(ERR "Unable to open file");
