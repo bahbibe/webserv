@@ -25,8 +25,69 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
 //     cout << "***Path: " << this->_path << endl;
 // }
 
-//! redirece directory if does't end with "/"
-//! redirection 
+void Response::CGI(Request &req)
+{
+    cout << "CGI executing" << endl;
+    int fd[2];
+    pid_t pid;
+    int fdCGI = -1;
+    srand(time(NULL));
+    const char *argv[] = {this->_cgiPath.c_str(), this->_absPath.append(this->_path).c_str() ,NULL};
+    string  pathCGI = "CGI/" + toSting(rand());
+    fdCGI = open(pathCGI.c_str(), O_CREAT | O_WRONLY | O_RDONLY, 0644);
+    this->_path = pathCGI;
+    fillEnv(req);
+
+
+    pipe(fd);
+    pid = fork();
+    if (pid == 0)
+    {
+        dup2(fdCGI, 1);
+        close(fd[1]) ;
+        close(fd[0]) ;
+        close(0);
+        execve(argv[0], (char* const*)argv, this->env);
+        perror("execve");
+        exit(127) ;
+    }
+    else
+    {
+        close(fd[0]);
+        close(fd[1]);
+        close(fdCGI);
+        int status ;
+        waitpid(pid, &status, 0);
+        kill(pid, SIGTERM);
+        // ifstream file(this->_path.c_str(), ios::in | ios::binary);
+        // string buffer;
+        // string c_header;
+        // size_t pos;
+        // if (file.is_open())
+        // {
+        //     getline(file, buffer, '\0');
+        //     if ((pos = buffer.find("\r\n\r\n"))!= string::npos)
+        //     {
+        //         c_header = buffer.substr(0, buffer.find("\r\n\r\n"));
+        //         buffer = buffer.erase(0, c_header.length());
+        //         cout << c_header << endl;
+        //         cout << "=========================";
+        //         cout << buffer<< endl;
+        //         // file << buffer;
+        //         cout << "=========================\n";
+        //     }   
+        // }
+        // else
+        // {
+        //     cout << "file not open\n";
+        // }
+        
+        // file.close();
+        checks(req);
+        // exit(0);
+        cout << "status: " << status << endl;
+    }
+}
 
 void Response::GET(Request &request)
 {
@@ -52,6 +113,11 @@ void Response::GET(Request &request)
         this->_body = "0\r\n\r\n";
         write(this->_fdSocket, this->_body.c_str(),   this->_body.length());
         file.close();
+        if (this->_isCGI)
+        {
+            remove(this->_path.c_str());
+            this->_isCGI = false;
+        }
         this->_flag = false;
         this->_isfinished = true;
         cout << GREEN "=====>end<====\n" RESET;
@@ -127,10 +193,11 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_method = request.getMethod();
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
+        this->_absPath = "/home/kali/42_webserv/";
     }
-    cout << "Target: " << this->_target << endl;
-    cout << "Method: " << this->_method << endl;
-    cout << "Is Error: " << this->_isErrorCode  << endl;
+    // cout << "Target: " << this->_target << endl;
+    // cout << "Method: " << this->_method << endl;
+    // cout << "Is Error: " << this->_isErrorCode  << endl;
     cout << "Path: " << this->_path << endl;
     if (this->_isErrorCode == true)
     {   if (!this->_flag)
@@ -138,18 +205,15 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
+    else if (request.directives.isCgiAllowed && (this->_path.rfind(".php") != string::npos || this->_path.rfind(".py") != string::npos))
     {
-        cout << RED"========REDIRECTION======" RESET << endl;
-        if (this->_statusCode == 301)
-            this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation:" + request.directives.returnRedirect + "\r\n\r\n";
+        cout << RED"========CGI======" RESET << endl;
+        if (this->_path.rfind(".php") != string::npos)
+            this->_cgiPath = "/usr/bin/php-cgi";
         else
-        {
-            this->_target += "/";
-            this->_header += "HTTP/1.1 301 Moved Permanently\r\nLocation: "+ this->_target +"\r\n\r\n";
-        }
-        write(this->_fdSocket, this->_header.c_str(), this->_header.length());
-        this->_isfinished = true;
+            this->_cgiPath = "/usr/bin/python3";
+        CGI(request);
+        this->_isCGI = true;
     }
     else if (this->_method == "GET" && !this->_isErrorCode)
     {
@@ -176,10 +240,13 @@ void Response::sendResponse(Request &request, int fdSocket)
 
 void Response::checks(Request &request)
 {
+    if (this->_target.empty())
+        this->_target = "/";
     
     if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
-         cout << RED"========REDIRECTION======" RESET << endl;
+        cout << RED"========REDIRECTION======"  << endl;
+        cout << "Target: " << this->_target << RESET<< endl;
         if (this->_statusCode == 301)
             this->_path = request.directives.returnRedirect;
         else
@@ -347,11 +414,11 @@ void Response::SendHeader()
         this->_header += "Location: " + this->_path +"\r\n\r\n";
     else
     {
-        this->_header += "Content-Type: " + this->_contentType + "\r\n";
+        if (!this->_isCGI)
+            this->_header += "Content-Type: " + this->_contentType + "\r\n";
         this->_header += "Transfer-Encoding: chunked\r\n";
         this->_header += "connection: close\r\n\r\n";
     }
-    cout << "Header: " << this->_header << endl;
     int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
     if (n < -1)
         return;
@@ -393,11 +460,27 @@ void Response::findeContentType()
     }
 }
 
-string Response::toSting(int &mun)
+string Response::toSting(long long mun)
 {
     stringstream ss;
     ss << mun;
     return ss.str();
+}
+
+int Response::fillEnv(Request &req)
+{
+    if (this->_method == "GET")
+    {
+        this->env = new char *[6]; 
+
+        env[0] = strdup("REQUEST_METHOD=GET");
+        env[1] = strdup(("QUERY_STRING=" + req.directives.queryString).c_str());
+        env[2] = strdup("REDIRECT_STATUS=200");
+        env[3] = strdup(("PATH_INFO=" + this->_absPath).c_str());
+        env[4] = strdup(("SCRIPT_FILENAME=" + this->_absPath).c_str());
+        env[5] = NULL;
+    }
+    return 1;
 }
 
 Response::Response(const Response &other)
@@ -427,15 +510,6 @@ Response &Response::operator=(const Response &other)
     }
     return *this;
 }
-
-// void Response::fillEnv()
-// {
-//      this->env[0] =  strdup("CONTENT_TYPE: text/html");
-//      this->env[0] =  strdup("REQUEST_METHOD:");
-//     //  HTTP_COOKIE
-
-
-// }
 
 bool Response::getIsFinished() const
 {
