@@ -34,6 +34,7 @@ class Boundaries {
         void checkFirstBoundary();
         void handleBoundaries();
         void writeContent();
+        string getExtension();
         void createFile();
         void throwException(int code);
         void closeOutFile();

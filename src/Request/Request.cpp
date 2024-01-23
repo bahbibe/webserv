@@ -178,6 +178,7 @@ void Request::setServer()
 {
     //! TODO: first find the server according to the host header
     // TODO: add default max body client size (nginx default is 1m == 1048576 MB)
+    this->_mimeTypes = _server->getExtensions();
     directives.host = _server->getHost();
     directives.port = _server->getPort();
     directives.clientMaxBodySize = _server->getClientMaxBodySize();
@@ -218,10 +219,24 @@ void Request::setServer()
         setStatusCode(301, "Moved Permanently");
 }
 
+void Request::validatePath()
+{
+    char realPath[PATH_MAX];
+    if (realpath(directives.requestedFile.c_str(), realPath) != NULL)
+    {
+        string realPathStr = realPath;
+        cout << GREEN "realPath: " << RESET << realPathStr << endl;
+        cout << GREEN "rootPath: " << RESET << directives.serverRoot << endl;
+        // TODO: to check the case where the real path is not in the server root
+        // if (realPathStr.find(directives.serverRoot) == string::npos)
+        //     setStatusCode(403, "Forbidden");
+    }
+}
+
 void Request::validateRequest()
 {
     this->setServer();
-
+    this->validatePath();
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
@@ -247,13 +262,12 @@ void Request::validateRequest()
     }
 }
 
-string Request::getMimeType(string contentType)
+string Request::getExtension(string contentType)
 {
     // TODO: the case where the content type is not found
     if (contentType.find(";") != string::npos)
         contentType = contentType.substr(0, contentType.find(";"));
-    map<string, vector<string> > extenstions = this->_server->getExtensions();
-    map<string, vector<string> >::iterator it = extenstions.find(contentType);
+    map<string, vector<string> >::iterator it = _mimeTypes.find(contentType);
     if (it == this->_mimeTypes.end())
         return ".bin";
     return "." + it->second[0];
@@ -262,7 +276,7 @@ string Request::getMimeType(string contentType)
 void Request::createOutfile()
 {
     string contentType = this->_headers["content-type"];
-    string extension = this->getMimeType(contentType);
+    string extension = this->getExtension(contentType);
     string randomFileName = Helpers::generateFileName();
     this->_filePath = directives.uploadPath + randomFileName + extension;
     this->_outfile.open(this->_filePath.c_str(), ios::out | ios::binary);

@@ -51,3 +51,12 @@ string& Helpers::generateFileName()
         fileName += (char)(rand() % 26 + 97);
     return fileName;
 }
+
+string Helpers::findExtension(const string& mimeType)
+{
+    return ".txt";
+    // map<string, vector<string> >::iterator it = mimeTypes.find(mimeType);
+    // if (it == mimeTypes.end())
+    //     return ".bin";
+    // return string("." + it->second[0]);
+}

@@ -41,6 +41,22 @@ void Boundaries::throwException(int code)
     throw code;
 }
 
+string Boundaries::getExtension()
+{
+    size_t pos = _bd_start.find("Content-Type: ");
+    if (pos == string::npos)
+        return ".txt";
+    string contentType = _bd_start.substr(pos + 14);
+    pos = contentType.find("\r\n");
+    if (pos == string::npos)
+        return ".txt";
+    contentType.erase(pos);
+    pos = contentType.find(";");
+    if (pos != string::npos)
+        contentType.erase(pos);
+    return Helpers::findExtension(contentType);
+}
+
 void Boundaries::createFile()
 {
     if (_isFileCreated)
@@ -59,7 +75,7 @@ void Boundaries::createFile()
     string timestamp = ss.str();
     ss.str("");
     ss << _filesCounter++;
-    string fileName = _uploadPath + "upload_" + timestamp + "_" + ss.str() + ".txt";
+    string fileName = _uploadPath + "upload_" + timestamp + "_" + ss.str() + getExtension();
     _outfile = new fstream(fileName.c_str(), ios::out | ios::binary);
     if (!_outfile->is_open())
         throwException(500);
@@ -115,7 +131,7 @@ void Boundaries::handleBoundaries()
         }
         writeContent();
     }
-    else if (midBoundaryPos != string::npos && endBoundaryPos != string::npos)
+    else if (midBoundaryPos != string::npos && endBoundaryPos != string::npos && midBoundaryPos < endBoundaryPos)
     {
         string content = _buffer.substr(0, midBoundaryPos);
         _buffer.erase(0, midBoundaryPos);

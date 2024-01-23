@@ -4,6 +4,7 @@
 #include "Helpers.hpp"
 #include "Boundaries.hpp"
 #include "Chunks.hpp"
+#include <climits>
 
 struct Directives {
     string host;
@@ -73,7 +74,8 @@ private:
     void setContentLength(string contentLength);
     void createOutfile();
     void setServer();
-    string getMimeType(string contentType);
+    void validatePath();
+    string getExtension(string contentType);
 
     //? Helpers
     vector<string> split(string str, string delimiter);
