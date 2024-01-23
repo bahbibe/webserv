@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define BUFFERSIZE 1024
 using namespace std;
@@ -22,6 +24,7 @@ class Response
         bool _isfinished;
         bool _defaultError;
         bool _isErrorCode;
+        bool _isCGI;
 
         int _fdSocket;
         int _statusCode;
@@ -32,6 +35,9 @@ class Response
         string _header;
         string _body;
         string _target;
+        string _cgiPath;
+        string _absPath;
+
         char **env;
 
         ifstream file;
@@ -59,9 +65,10 @@ class Response
         void checkAutoInedx(Request &request);
         void checkErrors(Request &request);
         void tree_dir();
-        string toSting(int &mun);
+        string toSting(long long mun);
         string getErrorPage(Request &request, int statusCode);
         string templateError(string errorType);
         void checks(Request &request);
-        // void fillEnv();
+        void CGI(Request &req);
+        int fillEnv(Request &req);
 };
