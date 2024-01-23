@@ -82,8 +82,7 @@ void Response::CGI(Request &req)
         //     cout << "file not open\n";
         // }
         
-        // file.close();
-        checks(req);
+        file.close();
         // exit(0);
         cout << "status: " << status << endl;
     }
@@ -113,11 +112,11 @@ void Response::GET(Request &request)
         this->_body = "0\r\n\r\n";
         write(this->_fdSocket, this->_body.c_str(),   this->_body.length());
         file.close();
-        if (this->_isCGI)
-        {
-            remove(this->_path.c_str());
-            this->_isCGI = false;
-        }
+        // if (this->_isCGI)
+        // {
+        //     remove(this->_path.c_str());
+        //     this->_isCGI = false;
+        // }
         this->_flag = false;
         this->_isfinished = true;
         cout << GREEN "=====>end<====\n" RESET;
