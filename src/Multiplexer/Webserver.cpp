@@ -84,7 +84,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
-    req.insert(pair<int, Request>(clientSock, Request(&server, clientSock)));
+    req.insert(make_pair(clientSock, Request(&server, clientSock)));
     req[clientSock]._start = clock();
 }
 
