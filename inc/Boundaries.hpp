@@ -23,6 +23,7 @@ class Boundaries {
         string _bd_start;
         string _rest;
         size_t _filesCounter;
+        map<string, vector<string> > _mimeTypes;
 
     public:
         Boundaries();
@@ -34,6 +35,9 @@ class Boundaries {
         void checkFirstBoundary();
         void handleBoundaries();
         void writeContent();
+        string getExtension();
         void createFile();
         void throwException(int code);
+        void closeOutFile();
+        void setMimeTypes(map<string, vector<string> > mimeTypes);
 };

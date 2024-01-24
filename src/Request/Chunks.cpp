@@ -1,4 +1,3 @@
-// #includ../e "../inc/Multiplexer.hpp"
 #include "../../inc/Chunks.hpp"
 
 Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0), _nextBufferSize(BUFFER_SIZE) {};
@@ -32,7 +31,6 @@ void Chunks::setFirstSize()
     if (_chunkSize == 0)
         throwException(201);
     _buffer.erase(0, pos + 2);
-    _writedContent = 0;
     _state = CH_CONTENT;
     writeContent();
 }
@@ -51,7 +49,6 @@ void Chunks::setSize()
     if (_chunkSize == 0)
         throwException(201);
     _buffer.erase(0, pos + 2);
-    _writedContent = 0;
     _state = CH_CONTENT;
     writeContent();
 }
@@ -60,6 +57,9 @@ void Chunks::writeContent()
 {
     if (_buffer.empty())
         return;
+    // TODO: check if the content is too big
+    // if (_writedContent + _chunkSize > maxBodyClientSize)
+    //     throwException(413);
     if (_buffer.length() <= _chunkSize)
     {
         _outfile->write(_buffer.c_str(), _buffer.length());
@@ -77,7 +77,6 @@ void Chunks::writeContent()
         else
             _nextBufferSize = BUFFER_SIZE;
     }
-    // TODO: this the case when the chunk size is set to 0 and the next chunk is 0
     else {
         string content = _buffer.substr(0, _chunkSize);
         _outfile->write(content.c_str(), content.length());
