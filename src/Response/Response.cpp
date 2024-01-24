@@ -4,26 +4,26 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
 {
     saveStatus();
 }
-// Response::Response(Request request, int fdSocket)
-// {
-//     this->_flag = false;
-//     this->_isfinished = false;
-//     this->_isErrorCode = false;
-//     this->_defaultError = false;
+Response::Response(Request request, int fdSocket)
+{
+    this->_flag = false;
+    this->_isfinished = false;
+    this->_isErrorCode = false;
+    this->_defaultError = false;
 
-//     this->_fdSocket = fdSocket;
-//     this->_path = request.getRequestTarget();
-//     this->_statusCode = request.getStatusCode();
-//     this->_path = request.directives.requestedFile;
-//     this->_method = request.getMethod();
-//     this->_target = request.directives.requestTarget;
-//     this->_isErrorCode = request.isErrorCode;
-//     saveStatus();
-//     cout << "***Target: " << this->_target << endl;
-//     cout << "***Method: " << this->_method << endl;
-//     cout << "***Is Error: " << this->_isErrorCode  << endl;
-//     cout << "***Path: " << this->_path << endl;
-// }
+    this->_fdSocket = fdSocket;
+    this->_path = request.getRequestTarget();
+    this->_statusCode = request.getStatusCode();
+    this->_path = request.directives.requestedFile;
+    this->_method = request.getMethod();
+    this->_target = request.directives.requestTarget;
+    this->_isErrorCode = request.isErrorCode;
+    saveStatus();
+    cout << "***Target: " << this->_target << endl;
+    cout << "***Method: " << this->_method << endl;
+    cout << "***Is Error: " << this->_isErrorCode  << endl;
+    cout << "***Path: " << this->_path << endl;
+}
 
 void Response::CGI(Request &req)
 {
@@ -82,8 +82,7 @@ void Response::CGI(Request &req)
         //     cout << "file not open\n";
         // }
         
-        // file.close();
-        checks(req);
+        file.close();
         // exit(0);
         cout << "status: " << status << endl;
     }
@@ -113,11 +112,11 @@ void Response::GET(Request &request)
         this->_body = "0\r\n\r\n";
         write(this->_fdSocket, this->_body.c_str(),   this->_body.length());
         file.close();
-        if (this->_isCGI)
-        {
-            remove(this->_path.c_str());
-            this->_isCGI = false;
-        }
+        // if (this->_isCGI)
+        // {
+        //     remove(this->_path.c_str());
+        //     this->_isCGI = false;
+        // }
         this->_flag = false;
         this->_isfinished = true;
         cout << GREEN "=====>end<====\n" RESET;
