@@ -222,14 +222,15 @@ void Request::setServer()
 void Request::validatePath()
 {
     char realPath[PATH_MAX];
+    // char rootRealPath[PATH_MAX];
     if (realpath(directives.requestedFile.c_str(), realPath) != NULL)
     {
         string realPathStr = realPath;
+        // string rootPathStr = rootRealPath;
         cout << GREEN "realPath: " << RESET << realPathStr << endl;
-        cout << GREEN "rootPath: " << RESET << directives.serverRoot << endl;
         // TODO: to check the case where the real path is not in the server root
-        // if (realPathStr.find(directives.serverRoot) == string::npos)
-        //     setStatusCode(403, "Forbidden");
+        if (realPathStr.find("WWW") == string::npos)
+            setStatusCode(403, "Forbidden");
     }
 }
 
@@ -240,21 +241,21 @@ void Request::validateRequest()
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
+    if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
+    {
+        if (_headers.find("transfer-encoding") != _headers.end())
+            setStatusCode(501, "multipart/form-data and Transfer-Encoding are present");
+        _isBodyBoundary = true;
+        _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
+        _boundaries.setMimeTypes(_mimeTypes);
+    }
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
         setStatusCode(501, "Unsupported Transfer-Encoding");
     if (_headers.find("content-length") != _headers.end() && _headers.find("transfer-encoding") != _headers.end())
         setStatusCode(400, "Both Content-Length and Transfer-Encoding are present");
-    if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
-    {
-        // TODO: I think is unsupported
-        // if (_headers.find("transfer-encoding") != _headers.end())
-        //     setStatusCode(400, "multipart/form-data and Transfer-Encoding are present");
-        _isBodyBoundary = true;
-        _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
-    }
     if (_method == "POST")
     {
-        if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end() && !_isBodyBoundary)
+        if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
         // if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
@@ -264,13 +265,15 @@ void Request::validateRequest()
 
 string Request::getExtension(string contentType)
 {
-    // TODO: the case where the content type is not found
     if (contentType.find(";") != string::npos)
         contentType = contentType.substr(0, contentType.find(";"));
     map<string, vector<string> >::iterator it = _mimeTypes.find(contentType);
-    if (it == this->_mimeTypes.end())
-        return ".bin";
-    return "." + it->second[0];
+    if (it != this->_mimeTypes.end())
+    {
+        if (it->second.size() > 0)
+            return "." + it->second[0];
+    }
+    return ".bin";
 }
 
 void Request::createOutfile()

@@ -9,5 +9,4 @@ class Helpers {
         static bool checkLineEnd(const string& line);
         static bool decodeURI(string& requestURI);
         static string& generateFileName();
-        static string findExtension(const string& mimeType);
 };

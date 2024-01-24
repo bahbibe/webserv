@@ -1,4 +1,3 @@
-// #includ../e "../inc/Multiplexer.hpp"
 #include "../../inc/Chunks.hpp"
 
 Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0), _nextBufferSize(BUFFER_SIZE) {};
@@ -78,7 +77,6 @@ void Chunks::writeContent()
         else
             _nextBufferSize = BUFFER_SIZE;
     }
-    // TODO: this the case when the chunk size is set to 0 and the next chunk is 0
     else {
         string content = _buffer.substr(0, _chunkSize);
         _outfile->write(content.c_str(), content.length());

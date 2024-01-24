@@ -27,6 +27,11 @@ Boundaries::~Boundaries() { };
 //     return *this;
 // }
 
+void Boundaries::setMimeTypes(map<string, vector<string> > mimeTypes)
+{
+    this->_mimeTypes = mimeTypes;
+}
+
 void Boundaries::throwException(int code)
 {
     if (code != 201)
@@ -54,14 +59,20 @@ string Boundaries::getExtension()
     pos = contentType.find(";");
     if (pos != string::npos)
         contentType.erase(pos);
-    return Helpers::findExtension(contentType);
+    map<string, vector<string> >::iterator it = _mimeTypes.find(contentType);
+    if (it != _mimeTypes.end())
+    {
+        vector<string> extensions = it->second;
+        if (extensions.size() > 0)
+            return string("." + extensions[0]);
+    } 
+    return ".txt";
 }
 
 void Boundaries::createFile()
 {
     if (_isFileCreated)
         return;
-    // TODO: to get the extension later
     size_t pos = _buffer.find("\r\n\r\n");
     if (pos == string::npos)
         return;
