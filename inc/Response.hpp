@@ -49,7 +49,7 @@ class Response
 
     public:
         Response();
-        // Response(Request request, int fdSocket);
+        Response(Request request, int fdSocket);
         ~Response();
         void sendResponse(Request &request, int fdSocket);
         Response(const Response &other);
