@@ -37,6 +37,7 @@ class Response
         string _target;
         string _cgiPath;
         string _absPath;
+        string _cgiHeader;
 
         char **env;
 
@@ -49,7 +50,7 @@ class Response
 
     public:
         Response();
-        Response(Request request, int fdSocket);
+        // Response(Request request, int fdSocket);
         ~Response();
         void sendResponse(Request &request, int fdSocket);
         Response(const Response &other);
@@ -70,5 +71,5 @@ class Response
         string templateError(string errorType);
         void checks(Request &request);
         void CGI(Request &req);
-        int fillEnv(Request &req);
+        int fillEnv(Request &req, double contentLenght);
 };
