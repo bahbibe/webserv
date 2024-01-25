@@ -225,12 +225,9 @@ void Request::setServer()
 void Request::validatePath()
 {
     char realPath[PATH_MAX];
-    // char rootRealPath[PATH_MAX];
     if (realpath(directives.requestedFile.c_str(), realPath) != NULL)
     {
         string realPathStr = realPath;
-        // string rootPathStr = rootRealPath;
-        cout << GREEN "realPath: " << RESET << realPathStr << endl;
         // TODO: to check the case where the real path is not in the server root
         if (realPathStr.find("WWW") == string::npos)
             setStatusCode(403, "Forbidden");
@@ -261,8 +258,8 @@ void Request::validateRequest()
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
-        // if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
-        //     setStatusCode(413, "Request Entity Too Large");
+        if (_headers.find("content-length") != _headers.end() && directives.clientMaxBodySize > 0 && this->_contentLength > directives.clientMaxBodySize)
+            setStatusCode(413, "Request Entity Too Large");
     }
 }
 
@@ -309,6 +306,8 @@ void Request::createOutfile()
     if (!this->_outfile.is_open())
         setStatusCode(500, "Failed to create file");
     this->_outfileIsCreated = true;
+    if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
+        this->_chunks.setChunks(&_outfile, _filePath, directives.clientMaxBodySize);
 }
 
 void Request::parseBodyWithBoundaries()
@@ -342,37 +341,25 @@ void Request::parseBodyWithContentLength()
 {
     if (_contentLength == 0)
         setStatusCode(201, "Created");
-    if (_requestBuffer.length() > _contentLength)
-    {
-        // TODO: check req-todo.http
-        _requestBuffer.erase(_contentLength, _requestBuffer.length() - _contentLength);
-    }
-    if (_requestBuffer.length() < _contentLength)
+    if (_contentLength >= _requestBuffer.length())
     {
         this->_outfile.write(_requestBuffer.c_str(), _requestBuffer.length());
         this->_outfile.flush();
-        _bodyLength += _requestBuffer.length();
-        _requestBuffer.erase(0, _requestBuffer.length());
-    }
-    else
-    {
+        _contentLength -= _requestBuffer.length();
+    } else {
         this->_outfile.write(_requestBuffer.c_str(), _contentLength);
         this->_outfile.flush();
-        _requestBuffer.erase(0, _contentLength);
-        _bodyLength += _contentLength;
+        _contentLength = 0;
     }
-    // TODO: handle when the content length is bigger than the body length
-    // cout << YELLOW "bodyLength: " << RESET << _bodyLength << endl;
-    // cout << YELLOW "contentLength: " << RESET << _contentLength << endl;
-    // cout << YELLOW "_requestBuffer length: " << RESET << _requestBuffer.length() << endl;
-    if (_requestBuffer.length() == 0 && _bodyLength >= _contentLength)
+    if (_contentLength == 0)
         setStatusCode(201, "Created");
 }
 
 void Request::parseBodyWithChunked()
 {
     try {
-       bufferSize = _chunks.parse(_requestBuffer, &_outfile, _filePath, _readBytes);
+    //    bufferSize = _chunks.parse(_requestBuffer, &_outfile, _filePath, _readBytes);
+       bufferSize = _chunks.parse(_requestBuffer, _readBytes);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Chunks Status Code");
