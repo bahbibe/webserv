@@ -44,13 +44,15 @@ Request &Request::operator=(const Request &other)
         this->_chunks = other._chunks;
 
         this->bufferSize = other.bufferSize;
+
+        this->_isCgi = other._isCgi;
     }
     return *this;
 }
 
 Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false) , _ready(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false) , _ready(false)
 {
     this->_readBytes = 0;
     this->_location = NULL;
@@ -60,7 +62,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
 
 Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), isErrorCode(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false), _ready(false)
 {
     this->_server = server;
     this->_readBytes = 0;
@@ -199,6 +201,7 @@ void Request::setServer()
     directives.isUploadAllowed = _location->getUpload();
     directives.uploadPath = _location->getUploadPath();
     directives.isCgiAllowed = _location->getCgi();
+    directives.cgiUploadPath = _location->getCgiUploadPath();
     directives.returnRedirect = _location->getReturn();
     directives.autoindex = _location->getAutoindex();
     directives.serverRoot = _location->getRoot();
@@ -278,6 +281,26 @@ string Request::getExtension(string contentType)
 
 void Request::createOutfile()
 {
+    bool isCgiExtension = _requestTarget.find(".php") != string::npos || _requestTarget.find(".py") != string::npos;
+    if (directives.isCgiAllowed)
+    {
+        if (isCgiExtension)
+        {
+            this->_isCgi = true;
+            string randomFileName = Helpers::generateFileName();
+            this->_filePath = directives.cgiUploadPath + randomFileName + ".cgi";
+            directives.cgiFileName = this->_filePath;
+            this->_outfile.open(this->_filePath.c_str(), ios::out | ios::binary);
+            if (!this->_outfile.is_open())
+                setStatusCode(500, "Failed to create file");
+            this->_outfileIsCreated = true;
+            return;
+        }
+    }
+    if (!directives.isUploadAllowed)
+        setStatusCode(403, "upload is not allowed");
+    if (_isBodyBoundary)
+        return;
     string contentType = this->_headers["content-type"];
     string extension = this->getExtension(contentType);
     string randomFileName = Helpers::generateFileName();
@@ -305,15 +328,13 @@ void Request::parseBody()
     if (this->_method != "POST")
         setStatusCode(200, "OK");
     this->_isReadingBody = true;
-    if (!directives.isUploadAllowed)
-        setStatusCode(200, "OK But upload is not allowed so work of the cgi");
-    if (!this->_outfileIsCreated && !this->_isBodyBoundary)
+    if (!this->_outfileIsCreated)
         this->createOutfile();
-    if (_isBodyBoundary)
+    if (_isBodyBoundary && !_isCgi)
         parseBodyWithBoundaries();
     else if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
         parseBodyWithChunked();
-    else if (_headers.find("content-length") != _headers.end())
+    else
         parseBodyWithContentLength();
 }
 
@@ -379,6 +400,7 @@ void Request::printRequest()
     cout << "HTTP Version: " << _httpVersion << endl;
     cout << "Headers size: " << _headers.size() << endl;
     cout << "Boundary: " << _boundary << endl;
+    cout << "isCgi: " << _isCgi << endl;
     cout << "Headers: " << endl;
     map<string, string>::iterator it = _headers.begin();
     for (; it != _headers.end(); it++)
@@ -396,6 +418,7 @@ void Request::printRequest()
     cout << "queryString: " << directives.queryString << endl;
     cout << "httpCookie: " << directives.httpCookie << endl;
     cout << "httpAccept: " << directives.httpAccept << endl;
+    cout << "CgiFileName: " << directives.cgiFileName << endl;
     cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }
