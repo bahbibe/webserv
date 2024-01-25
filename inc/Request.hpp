@@ -18,12 +18,14 @@ struct Directives {
     bool isUploadAllowed;
     string uploadPath;
     bool isCgiAllowed;
+    string cgiUploadPath;
     string returnRedirect;
     string requestTarget;
     string requestedFile;
     string queryString;
     string httpCookie;
     string httpAccept;
+    string cgiFileName;
 };
 
 class Request {
@@ -58,6 +60,8 @@ private:
 
     Boundaries _boundaries;
     Chunks _chunks;
+    
+    bool _isCgi;
 
     map<string, vector<string> > _mimeTypes;
     
