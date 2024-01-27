@@ -57,6 +57,7 @@ void Chunks::setSize()
         throwException(201);
     _buffer.erase(0, pos + 2);
     _state = CH_CONTENT;
+    // _writedContent = 0;
     writeContent();
 }
 
@@ -64,8 +65,8 @@ void Chunks::writeContent()
 {
     if (_buffer.empty())
         return;
-    if (_clientMaxBodySize > 0 && (_writedContent + _chunkSize > _clientMaxBodySize))
-        throwException(413);
+    // if (_clientMaxBodySize > 0 && (_writedContent + _chunkSize > _clientMaxBodySize))
+    //     throwException(413);
     if (_buffer.length() <= _chunkSize)
     {
         _outfile->write(_buffer.c_str(), _buffer.length());
@@ -94,13 +95,17 @@ void Chunks::writeContent()
         _state = CH_SIZE;
         setSize();
     }
-
 }
 
 int Chunks::parse(const string& buffer, int readBytes)
 {
-    // this->_outfile = outfile;
-    // this->_filePath = filePath;
+    if (_state.compare(CH_START) != 0 && readBytes != _nextBufferSize)
+    {
+        _helper.append(buffer, 0, readBytes);
+        if (_helper.find("\r\n0\r\n") == string::npos)
+            return _nextBufferSize;
+    }
+    _buffer.append(_helper);
     _buffer.append(buffer, 0, readBytes);
     if (_state == CH_START)
         setFirstSize();
@@ -108,5 +113,6 @@ int Chunks::parse(const string& buffer, int readBytes)
         setSize();
     else if (_state == CH_CONTENT)
         writeContent();
+    _helper.clear();
     return _nextBufferSize;
 }

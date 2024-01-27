@@ -73,14 +73,13 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
 
 void Request::readRequest()
 {
-    _ready = true;
     try {
         _requestBuffer.clear();
         _readBytes = read(_socketFd, _buffer, bufferSize);
         if (_readBytes == -1)
             throw Server::ServerException(ERR "Failed to read from socket");
-        if (_readBytes == 0)
-            setStatusCode(200, "Request is empty");
+        // if (_readBytes == 0)
+        //     setStatusCode(200, "Request is empty");
         _buffer[_readBytes] = '\0';
         this->parseRequest();
     } catch (int statusCode)
@@ -99,6 +98,7 @@ void Request::parseRequest()
     size_t pos = _headersBuffer.find("\r\n\r\n");
     if (pos == string::npos)
         return;
+    _ready = true;
     _headersBuffer = _headersBuffer.substr(0, pos);
     _readBytes -= _headersBuffer.length() + 4;
     _requestBuffer.erase(0, _headersBuffer.length() + 4);
