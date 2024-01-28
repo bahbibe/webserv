@@ -2,3 +2,5 @@
 webserv
 upload
 uploads/
+CGI/
+*.json

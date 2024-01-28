@@ -134,7 +134,7 @@ void Webserver::start()
                     // _req[ep.events[i].data.fd]._ready = false;
                     // _req[ep.events[i].data.fd]._start = clock();
                     if (_req[ep.events[i].data.fd].getIsRequestFinished())
-                        _resp.insert(make_pair(ep.events[i].data.fd, Response(_req[ep.events[i].data.fd], ep.events[i].data.fd)));
+                        _resp.insert(make_pair(ep.events[i].data.fd, Response()));
                 }
                 if (ep.events[i].events & EPOLLOUT && _req[ep.events[i].data.fd].getIsRequestFinished())
                 {
