@@ -161,6 +161,7 @@ void Request::setContentLength(string contentLength)
         if (!isdigit(contentLength[i]))
             setStatusCode(400, "Invalid Content-Length");
     this->_contentLength = atoi(contentLength.c_str());
+    directives.contentLength = this->_contentLength;
 }
 
 Location* Request::findLocation()
@@ -250,6 +251,8 @@ void Request::validateRequest()
         _isBodyBoundary = true;
         _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
         _boundaries.setMimeTypes(_mimeTypes);
+        directives.contentType = _headers["content-type"];
+        directives.boundary = _boundary;
     }
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
         setStatusCode(501, "Unsupported Transfer-Encoding");
@@ -416,6 +419,9 @@ void Request::printRequest()
     cout << "httpCookie: " << directives.httpCookie << endl;
     cout << "httpAccept: " << directives.httpAccept << endl;
     cout << "CgiFileName: " << directives.cgiFileName << endl;
+    cout << "Content Type: " << directives.contentType << endl;
+    cout << "Boundary: " << directives.boundary << endl;
+    cout << "Content Length: " << directives.contentLength << endl;
     cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }

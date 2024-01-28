@@ -26,6 +26,9 @@ struct Directives {
     string httpCookie;
     string httpAccept;
     string cgiFileName;
+    string contentType;
+    string boundary;
+    size_t contentLength;
 };
 
 class Request {
