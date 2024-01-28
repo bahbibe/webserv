@@ -25,6 +25,13 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
 //     cout << "***Path: " << this->_path << endl;
 // }
 
+double Response::fileSize(string path)
+{
+    struct stat metadata;
+    stat(path.c_str(), &metadata);
+    return metadata.st_size;
+}
+
 void Response::CGI(Request &req)
 {
     cout << "CGI executing" << endl;
@@ -34,40 +41,36 @@ void Response::CGI(Request &req)
     double pos;
     string str;
     stringstream ss;
-    int fdCGI = -1;
     srand(time(NULL));
+
     string  pathCGI = "CGI/" + toSting(rand());
-    fdCGI = open(pathCGI.c_str(), O_CREAT | O_WRONLY | O_RDONLY, 0644);
     this->_path = pathCGI;
-    cout << "AbsPth: " << this->_absPath;
+    cout << "AbsPth: " << this->_absPath << endl;
     const char *argv[] = {this->_cgiPath.c_str(), this->_absPath.c_str() ,NULL};
 
     cout << "pathCGI: " << this->_path << endl;
-    if (this->_method == "GET")
-        fillEnv(req, 0);
+    fillEnv(req);
     cout << this->_cgiPath << endl;
     pipe(fd);
     pid = fork();
     if (pid == 0)
     {
+        close(fd[0]);
+        close(fd[1]);
+        freopen(this->_path.c_str(), "w", stdout);
         if (this->_method == "GET")
-        {
-            freopen(pathCGI.c_str(), "w", stdout);
             close(0);
-        }
         else
-            freopen(pathCGI.c_str(), "r", stdin);
+            freopen(req.directives.cgiFileName.c_str(), "r", stdin);
         execve(argv[0], (char* const*)argv, this->env);
         perror("execve");
         exit(127);
     }
     else
     {
-        close(fd[0]);
-        close(fd[1]);
-        close(fdCGI);
         int status ;
         waitpid(pid, &status, 0);
+        // exit(0);
         cout << "Status: " << status << endl;
         kill(pid, SIGTERM);
         // exit(0);
@@ -99,9 +102,13 @@ void Response::CGI(Request &req)
             }
         }
     }
-    SendHeader();
     if (!this->_defaultError)
+    {
+        this->_statusCode = 200;
+        this->_method = "GET";
+        SendHeader();
         GET(req);
+    }
 }
 
 void Response::GET(Request &request)
@@ -112,7 +119,7 @@ void Response::GET(Request &request)
     file.read(_body1, 1023);
     if (file.gcount() > 0)
     {
-        cout << YELLOW "====>start reading<====\n" RESET;
+        cout << GREEN "====>start reading<====\n" RESET;
         stringstream ss;
         ss << hex << file.gcount();
         this->_body = ss.str() + "\r\n";
@@ -131,7 +138,10 @@ void Response::GET(Request &request)
         this->_flag = false;
         this->_isfinished = true;
         if (this->_isCGI == true)
+        {
+            freeEnv(this->env);
             remove(this->_path.c_str());
+        }
         this->_isCGI = false;
         cout << GREEN "=====>end<====\n" RESET;
     }
@@ -209,30 +219,46 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_absPath = request.directives.requestedFile;
     }
     // cout << "Target: " << this->_target << endl;
-    // cout << "Method: " << this->_method << endl;
     // cout << "Is Error: " << this->_isErrorCode  << endl;
     cout << "Path: " << this->_path << endl;
+    cout << "Method: " << this->_method << endl;
     if (this->_isErrorCode == true)
     {   if (!this->_flag)
             checkErrors(request);
         if (!this->_defaultError)
             GET(request);
     }
-    else if (request.directives.isCgiAllowed && (this->_path.rfind(".php") != string::npos || this->_path.rfind(".py") != string::npos))
+    else if ((!this->_flag && request.directives.isCgiAllowed)
+        && (this->_path.rfind(".php") != string::npos
+        || this->_path.rfind(".py") != string::npos))
     {
-        cout << RED"========CGI======" RESET << endl;
-        if (this->_path.rfind(".php") != string::npos)
-            this->_cgiPath = "/usr/bin/php-cgi";
+        ifstream file;
+        file.open(this->_path.c_str(), ios::binary);
+        if (file.is_open())
+        {
+            cout << RED"========CGI======" RESET << endl;
+            file.close();
+            if (this->_path.rfind(".php") != string::npos)
+                this->_cgiPath = "/usr/bin/php-cgi";
+            else
+                this->_cgiPath = "/usr/bin/python3";
+            this->_isCGI = true;
+            CGI(request);
+        }
         else
-            this->_cgiPath = "/usr/bin/python3";
-        this->_isCGI = true;
-        CGI(request);
+        {
+            this->_isErrorCode = true;
+            this->_statusCode = 404;
+            checkErrors(request);
+            if (!this->_defaultError)
+                GET(request);
+        }
     }
     else if (this->_method == "GET" && !this->_isErrorCode)
     {
         if (!this->_flag)
             checks(request);
-        if (!this->_defaultError)
+        if (!this->_defaultError || this->_isCGI == true)
             GET(request);
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
@@ -304,11 +330,26 @@ void Response::checkAutoInedx(Request &request)
             if (file.good())
             {
                 this->_path = index;
-                this->_statusCode = 200;
-                this->_flag = true;
+                this->_absPath = index;
                 saveStatus();
                 findeContentType();
-                SendHeader();
+                cout << "==============>INDEX Path: " << this->_path << endl;
+                if (request.directives.isCgiAllowed && (this->_path.rfind(".php") != string::npos || this->_path.rfind(".py") != string::npos))
+                {
+                    file.close();
+                    if (this->_path.rfind(".php") != string::npos)
+                        this->_cgiPath = "/usr/bin/php-cgi";
+                    else
+                        this->_cgiPath = "/usr/bin/python3";
+                    this->_isCGI = true;
+                    CGI(request);
+                }
+                else
+                {
+                    this->_statusCode = 200;
+                    this->_flag = true;
+                    SendHeader();
+                }
                 return;
             }
         }
@@ -436,6 +477,7 @@ void Response::SendHeader()
             this->_header += this->_cgiHeader;
         this->_header += "connection: close\r\n\r\n";
     }
+    // cout << "Header: " << this->_header << endl;
     int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
     if (n < -1)
         return;
@@ -446,7 +488,7 @@ string Response::templateError(string errorType)
     string errorBody;
 
     errorBody = "<html><head><title>"+ errorType +"</title></head>";
-    errorBody += "<body><center><h1>"+errorType+ "</h1></center><hr><center>M0BLACK</center></body>";
+    errorBody += "<body><center><h1>"+ errorType + "</h1></center><hr><center>M0BLACK</center></body>";
     return errorBody;
 }
 
@@ -484,19 +526,36 @@ string Response::toSting(long long mun)
     return ss.str();
 }
 
-int Response::fillEnv(Request &req,double contentLenght)
+int Response::fillEnv(Request &req)
 {
-    (void)contentLenght;
-    this->env = new char *[8]; 
+    this->env = new char *[9]; 
     env[0] = strdup("REQUEST_METHOD=GET");
     env[1] = strdup(("QUERY_STRING=" + req.directives.queryString).c_str());
     env[2] = strdup("REDIRECT_STATUS=200");
     env[3] = strdup(("PATH_INFO=" + this->_absPath).c_str());
     env[4] = strdup(("SCRIPT_FILENAME=" + this->_absPath).c_str());
-    env[5] = strdup("CONTENT_LENGTH=0"); //+ toSting(contentLenght)).c_str());
+    if (this->_contentType.empty())
+        env[5] = strdup("CONTENT_TYPE=text/html");
+    else
+        env[5] = strdup(("CONTENT_TYPE=" + this->_contentType).c_str());
+    env[5] = strdup(("CONTENT_TYPE=" + this->_contentType).c_str());
+    if (this->_method == "GET")
+        env[6] = strdup("CONTENT_LENGTH=0");
+    else
+    {
+        double size = fileSize(req.directives.cgiFileName);
+        env[6] = strdup(("CONTENT_LENGTH=" + toSting(size)).c_str());
+    }
     env[6] = strdup(("HTTP_COOKIE=" + req.directives.httpCookie).c_str());
     env[7] = NULL;
     return 1;
+}
+
+void Response::freeEnv(char **env)
+{
+    for (int i = 0; env[i]; i++)
+        free(env[i]);
+    delete[] env;
 }
 
 Response::Response(const Response &other)

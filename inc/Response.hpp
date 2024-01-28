@@ -71,5 +71,8 @@ class Response
         string templateError(string errorType);
         void checks(Request &request);
         void CGI(Request &req);
-        int fillEnv(Request &req, double contentLenght);
+        int fillEnv(Request &req);
+        double fileSize(string path);
+        void freeEnv(char **env);
+
 };
