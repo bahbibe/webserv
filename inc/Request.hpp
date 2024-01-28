@@ -114,4 +114,5 @@ public:
     int getStatusCode() const;
     map<string, string> getHeaders() const;
     Location* getLocation() const;
+    void setTimeout();
 };

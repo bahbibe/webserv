@@ -58,6 +58,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
+    this->_start = 0;
 }
 
 Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
@@ -69,15 +70,17 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
+    this->_start = 0;
 }
 
 void Request::readRequest()
 {
     try {
         _requestBuffer.clear();
+        _start = clock();
         _readBytes = read(_socketFd, _buffer, bufferSize);
-        if (_readBytes == -1)
-            throw Server::ServerException(ERR "Failed to read from socket");
+        // if (_readBytes == -1)
+        //     throw Server::ServerException(ERR "Failed to read from socket");
         // if (_readBytes == 0)
         //     setStatusCode(200, "Request is empty");
         _buffer[_readBytes] = '\0';
@@ -228,7 +231,6 @@ void Request::validatePath()
     if (realpath(directives.requestedFile.c_str(), realPath) != NULL)
     {
         string realPathStr = realPath;
-        // TODO: to check the case where the real path is not in the server root
         if (realPathStr.find("WWW") == string::npos)
             setStatusCode(403, "Forbidden");
     }
@@ -358,7 +360,6 @@ void Request::parseBodyWithContentLength()
 void Request::parseBodyWithChunked()
 {
     try {
-    //    bufferSize = _chunks.parse(_requestBuffer, &_outfile, _filePath, _readBytes);
        bufferSize = _chunks.parse(_requestBuffer, _readBytes);
     } catch (int statusCode)
     {
@@ -377,6 +378,15 @@ void Request::setStatusCode(int statusCode, string statusMessage)
         this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
     throw  statusCode;
+}
+
+void Request::setTimeout()
+{
+    this->printRequest();
+    this->_statusCode = 408;
+    this->_isRequestFinished = true;
+    this->isErrorCode = true;
+    this->_statusMessage = RED "Request Timeout: 408" RESET;
 }
 
 void Request::printRequest()

@@ -126,7 +126,7 @@ void Webserver::start()
             {
                 double timeOut = double(clock() - _req[ep.events[i].data.fd]._start) / CLOCKS_PER_SEC;
                 if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready)
-                    close(ep.events[i].data.fd);
+                    _req[ep.events[i].data.fd].setTimeout();
                 if (ep.events[i].events & EPOLLIN && !_req[ep.events[i].data.fd].getIsRequestFinished())
                 {
                     _req[ep.events[i].data.fd].readRequest();

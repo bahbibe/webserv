@@ -95,14 +95,12 @@ void Boundaries::createFile()
 
 void Boundaries::checkFirstBoundary()
 {
-    // TODO: to handle later the case where the boundary at first buffer not found
     size_t pos = _bd_start.find("\r\n\r\n");
     if (pos == string::npos)
         return;
     string boundary = _bd_start.substr(0, _bd_start.find("\r\n"));
     if (boundary != _boundary)
         throwException(400);
-    // _bd_start.erase(0, pos + 4);
     _state = BD_CONTENT;
     handleBoundaries();
 }
@@ -124,7 +122,6 @@ void Boundaries::closeOutFile()
 
 void Boundaries::handleBoundaries()
 {
-    // TODO: check if the content is too big than maxBodyClientSize
     size_t midBoundaryPos = _buffer.find(_boundary);
     size_t endBoundaryPos = _buffer.find(_endBoundary);
 
