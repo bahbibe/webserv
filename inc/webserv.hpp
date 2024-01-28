@@ -13,7 +13,7 @@
 #define DEFAULT_CONF "conf/default.conf"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
-#define TIMEOUT 30
+#define TIMEOUT 5
 #define LISTENING GREEN "Listening on " RESET
 #include <iostream>
 #include <fstream>

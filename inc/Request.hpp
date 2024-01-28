@@ -26,6 +26,9 @@ struct Directives {
     string httpCookie;
     string httpAccept;
     string cgiFileName;
+    string contentType;
+    string boundary;
+    size_t contentLength;
 };
 
 class Request {
@@ -114,4 +117,5 @@ public:
     int getStatusCode() const;
     map<string, string> getHeaders() const;
     Location* getLocation() const;
+    void setTimeout();
 };

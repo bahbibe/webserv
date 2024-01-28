@@ -58,6 +58,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
+    this->_start = 0;
 }
 
 Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
@@ -69,18 +70,19 @@ Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
+    this->_start = 0;
 }
 
 void Request::readRequest()
 {
-    _ready = true;
     try {
         _requestBuffer.clear();
+        _start = clock();
         _readBytes = read(_socketFd, _buffer, bufferSize);
-        if (_readBytes == -1)
-            throw Server::ServerException(ERR "Failed to read from socket");
-        if (_readBytes == 0)
-            setStatusCode(200, "Request is empty");
+        // if (_readBytes == -1)
+        //     throw Server::ServerException(ERR "Failed to read from socket");
+        // if (_readBytes == 0)
+        //     setStatusCode(200, "Request is empty");
         _buffer[_readBytes] = '\0';
         this->parseRequest();
     } catch (int statusCode)
@@ -99,6 +101,7 @@ void Request::parseRequest()
     size_t pos = _headersBuffer.find("\r\n\r\n");
     if (pos == string::npos)
         return;
+    _ready = true;
     _headersBuffer = _headersBuffer.substr(0, pos);
     _readBytes -= _headersBuffer.length() + 4;
     _requestBuffer.erase(0, _headersBuffer.length() + 4);
@@ -158,6 +161,7 @@ void Request::setContentLength(string contentLength)
         if (!isdigit(contentLength[i]))
             setStatusCode(400, "Invalid Content-Length");
     this->_contentLength = atoi(contentLength.c_str());
+    directives.contentLength = this->_contentLength;
 }
 
 Location* Request::findLocation()
@@ -225,13 +229,9 @@ void Request::setServer()
 void Request::validatePath()
 {
     char realPath[PATH_MAX];
-    // char rootRealPath[PATH_MAX];
     if (realpath(directives.requestedFile.c_str(), realPath) != NULL)
     {
         string realPathStr = realPath;
-        // string rootPathStr = rootRealPath;
-        cout << GREEN "realPath: " << RESET << realPathStr << endl;
-        // TODO: to check the case where the real path is not in the server root
         if (realPathStr.find("WWW") == string::npos)
             setStatusCode(403, "Forbidden");
     }
@@ -251,6 +251,8 @@ void Request::validateRequest()
         _isBodyBoundary = true;
         _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
         _boundaries.setMimeTypes(_mimeTypes);
+        directives.contentType = _headers["content-type"];
+        directives.boundary = _boundary;
     }
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
         setStatusCode(501, "Unsupported Transfer-Encoding");
@@ -261,8 +263,8 @@ void Request::validateRequest()
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
             setStatusCode(400, "Length Required");
         setContentLength(_headers["content-length"]);
-        // if (_headers.find("content-length") != _headers.end() && this->_contentLength > this->_server->getClientMaxBodySize())
-        //     setStatusCode(413, "Request Entity Too Large");
+        if (_headers.find("content-length") != _headers.end() && directives.clientMaxBodySize > 0 && this->_contentLength > directives.clientMaxBodySize)
+            setStatusCode(413, "Request Entity Too Large");
     }
 }
 
@@ -309,6 +311,8 @@ void Request::createOutfile()
     if (!this->_outfile.is_open())
         setStatusCode(500, "Failed to create file");
     this->_outfileIsCreated = true;
+    if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] == "chunked")
+        this->_chunks.setChunks(&_outfile, _filePath, directives.clientMaxBodySize);
 }
 
 void Request::parseBodyWithBoundaries()
@@ -342,37 +346,24 @@ void Request::parseBodyWithContentLength()
 {
     if (_contentLength == 0)
         setStatusCode(201, "Created");
-    if (_requestBuffer.length() > _contentLength)
-    {
-        // TODO: check req-todo.http
-        _requestBuffer.erase(_contentLength, _requestBuffer.length() - _contentLength);
-    }
-    if (_requestBuffer.length() < _contentLength)
+    if (_contentLength >= _requestBuffer.length())
     {
         this->_outfile.write(_requestBuffer.c_str(), _requestBuffer.length());
         this->_outfile.flush();
-        _bodyLength += _requestBuffer.length();
-        _requestBuffer.erase(0, _requestBuffer.length());
-    }
-    else
-    {
+        _contentLength -= _requestBuffer.length();
+    } else {
         this->_outfile.write(_requestBuffer.c_str(), _contentLength);
         this->_outfile.flush();
-        _requestBuffer.erase(0, _contentLength);
-        _bodyLength += _contentLength;
+        _contentLength = 0;
     }
-    // TODO: handle when the content length is bigger than the body length
-    // cout << YELLOW "bodyLength: " << RESET << _bodyLength << endl;
-    // cout << YELLOW "contentLength: " << RESET << _contentLength << endl;
-    // cout << YELLOW "_requestBuffer length: " << RESET << _requestBuffer.length() << endl;
-    if (_requestBuffer.length() == 0 && _bodyLength >= _contentLength)
+    if (_contentLength == 0)
         setStatusCode(201, "Created");
 }
 
 void Request::parseBodyWithChunked()
 {
     try {
-       bufferSize = _chunks.parse(_requestBuffer, &_outfile, _filePath, _readBytes);
+       bufferSize = _chunks.parse(_requestBuffer, _readBytes);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Chunks Status Code");
@@ -390,6 +381,15 @@ void Request::setStatusCode(int statusCode, string statusMessage)
         this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
     throw  statusCode;
+}
+
+void Request::setTimeout()
+{
+    this->printRequest();
+    this->_statusCode = 408;
+    this->_isRequestFinished = true;
+    this->isErrorCode = true;
+    this->_statusMessage = RED "Request Timeout: 408" RESET;
 }
 
 void Request::printRequest()
@@ -419,6 +419,9 @@ void Request::printRequest()
     cout << "httpCookie: " << directives.httpCookie << endl;
     cout << "httpAccept: " << directives.httpAccept << endl;
     cout << "CgiFileName: " << directives.cgiFileName << endl;
+    cout << "Content Type: " << directives.contentType << endl;
+    cout << "Boundary: " << directives.boundary << endl;
+    cout << "Content Length: " << directives.contentLength << endl;
     cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }

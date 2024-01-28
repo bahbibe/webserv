@@ -1,8 +1,15 @@
 #include "../../inc/Chunks.hpp"
 
-Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0), _nextBufferSize(BUFFER_SIZE) {};
+Chunks::Chunks() : _state(CH_START), _outfile(NULL), _chunkSize(0), _writedContent(0), _nextBufferSize(BUFFER_SIZE), _clientMaxBodySize(0) {};
 
 Chunks::~Chunks() {};
+
+void Chunks::setChunks(fstream *outfile, const string& filePath, size_t clientMaxBodySize)
+{
+    this->_outfile = outfile;
+    this->_filePath = filePath;
+    this->_clientMaxBodySize = clientMaxBodySize;
+}
 
 void Chunks::throwException(int code)
 {
@@ -57,9 +64,8 @@ void Chunks::writeContent()
 {
     if (_buffer.empty())
         return;
-    // TODO: check if the content is too big
-    // if (_writedContent + _chunkSize > maxBodyClientSize)
-    //     throwException(413);
+    if (_clientMaxBodySize > 0 && (_writedContent + _chunkSize > _clientMaxBodySize))
+        throwException(413);
     if (_buffer.length() <= _chunkSize)
     {
         _outfile->write(_buffer.c_str(), _buffer.length());
@@ -88,13 +94,17 @@ void Chunks::writeContent()
         _state = CH_SIZE;
         setSize();
     }
-
 }
 
-int Chunks::parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes)
+int Chunks::parse(const string& buffer, int readBytes)
 {
-    this->_outfile = outfile;
-    this->_filePath = filePath;
+    if (_state.compare(CH_START) != 0 && readBytes != _nextBufferSize)
+    {
+        _helper.append(buffer, 0, readBytes);
+        if (_helper.find("\r\n0\r\n") == string::npos)
+            return _nextBufferSize;
+    }
+    _buffer.append(_helper);
     _buffer.append(buffer, 0, readBytes);
     if (_state == CH_START)
         setFirstSize();
@@ -102,5 +112,6 @@ int Chunks::parse(const string& buffer, fstream *outfile, const string& filePath
         setSize();
     else if (_state == CH_CONTENT)
         writeContent();
+    _helper.clear();
     return _nextBufferSize;
 }
