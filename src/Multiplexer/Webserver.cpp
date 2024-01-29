@@ -81,7 +81,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
         throw ServerException(ERR "Accept failed");
     // cout << "New connection\n";
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP ;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(make_pair(clientSock, Request(&server, clientSock)));
@@ -118,21 +118,20 @@ void Webserver::start()
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
         for (int i = 0; i < evCount; i++)
         {
+            
             if (matchServer(_req, ep.events[i].data.fd))
                 continue;
             if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
                 closeConnection(_req, _resp, ep.events[i].data.fd);
+            double timeOut = double(clock() - _req[ep.events[i].data.fd]._start) / CLOCKS_PER_SEC;
+            if (!_req[ep.events[i].data.fd].getIsRequestFinished() && timeOut > TIMEOUT)
+                closeConnection(_req, _resp, ep.events[i].data.fd);
             else
             {
-                double timeOut = double(clock() - _req[ep.events[i].data.fd]._start) / CLOCKS_PER_SEC;
-                // if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready && !_req[ep.events[i].data.fd].getIsRequestFinished())
-                if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready)
-                    _req[ep.events[i].data.fd].setTimeout();
                 if (ep.events[i].events & EPOLLIN)
                 {
+                    _req[ep.events[i].data.fd]._start = clock();
                     _req[ep.events[i].data.fd].readRequest();
-                    // _req[ep.events[i].data.fd]._ready = false;
-                    // _req[ep.events[i].data.fd]._start = clock();
                     if (_req[ep.events[i].data.fd].getIsRequestFinished())
                         _resp.insert(make_pair(ep.events[i].data.fd, Response()));
                 }
