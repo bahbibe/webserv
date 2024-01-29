@@ -1,20 +1,4 @@
 #pragma once 
-#define RED "\033[0;31m"
-#define GREEN "\033[0;32m"
-#define YELLOW "\033[0;33m"
-#define BLUE "\033[0;34m"
-#define RESET "\033[0m"
-#define USAGE YELLOW "Usage: ./webserv [config_file] if no config file is provided, default.conf will be used" RESET
-#define OPEN_BR "{"
-#define CLOSE_BR "}"
-#define COLON ":"
-#define SEMICOLON ";"
-#define ERR RED "Error: " RESET
-#define DEFAULT_CONF "conf/default.conf"
-#define DEFAULT_PORT "80"
-#define MAX_EVENTS 1024
-#define TIMEOUT 10
-#define LISTENING GREEN "Listening on " RESET
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,12 +16,29 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
+#define RED "\033[0;31m"
+#define GREEN "\033[0;32m"
+#define YELLOW "\033[0;33m"
+#define BLUE "\033[0;34m"
+#define RESET "\033[0m"
+#define USAGE YELLOW "Usage: ./webserv [config_file] if no config file is provided, default.conf will be used" RESET
+#define OPEN_BR "{"
+#define CLOSE_BR "}"
+#define COLON ":"
+#define SEMICOLON ";"
+#define ERR RED "Error: " RESET
+#define DEFAULT_CONF "conf/default.conf"
+#define DEFAULT_PORT "80"
+#define MAX_EVENTS 1024
+#define TIMEOUT 10
+#define CLOCKWORK(x) double(clock() - x) / CLOCKS_PER_SEC
+#define LISTENING GREEN "Listening on " RESET
+#define BUFFER_SIZE 1024
 // #include "Request.hpp"
 // #include "Response.hpp"
 // #include "Server.hpp"
 using namespace std;
 
-#define BUFFER_SIZE 1024
 
 class Response;
 class Request;
@@ -84,6 +85,7 @@ public:
     void start();
     void newConnection(map<int, Request> &req ,Server &server);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
+    bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
     bool matchServer(map<int, Request> &req, int sock);
     class ServerException : public exception
     {

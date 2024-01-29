@@ -121,16 +121,15 @@ void Webserver::start()
             
             if (matchServer(_req, ep.events[i].data.fd))
                 continue;
-            if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
+            if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP)
                 closeConnection(_req, _resp, ep.events[i].data.fd);
-            double timeOut = double(clock() - _req[ep.events[i].data.fd]._start) / CLOCKS_PER_SEC;
-            if (!_req[ep.events[i].data.fd].getIsRequestFinished() && timeOut > TIMEOUT)
+            if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
                 closeConnection(_req, _resp, ep.events[i].data.fd);
             else
             {
                 if (ep.events[i].events & EPOLLIN)
                 {
-                    _req[ep.events[i].data.fd]._start = clock();
+                    _req[ep.events[i].data.fd]._start = clock();    
                     _req[ep.events[i].data.fd].readRequest();
                     if (_req[ep.events[i].data.fd].getIsRequestFinished())
                         _resp.insert(make_pair(ep.events[i].data.fd, Response()));
