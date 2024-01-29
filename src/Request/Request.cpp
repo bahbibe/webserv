@@ -79,10 +79,6 @@ void Request::readRequest()
         _requestBuffer.clear();
         _start = clock();
         _readBytes = read(_socketFd, _buffer, bufferSize);
-        // if (_readBytes == -1)
-        //     throw Server::ServerException(ERR "Failed to read from socket");
-        // if (_readBytes == 0)
-        //     setStatusCode(200, "Request is empty");
         _buffer[_readBytes] = '\0';
         this->parseRequest();
     } catch (int statusCode)
@@ -170,7 +166,7 @@ Location* Request::findLocation()
     map<string, Location *> locations = this->_server->getLocations();
     map<string, Location *>::iterator itb = locations.begin();
     map<string, Location *>::iterator ite = locations.end();
-    while (ite-- != itb)
+    while (locations.size() > 0 && ite-- != itb)
     {
         if (!this->_requestTarget.compare(0, ite->first.length(), ite->first))
         {
@@ -181,17 +177,41 @@ Location* Request::findLocation()
     return NULL;
 }
 
-void Request::setServer()
+void Request::setDefaultDirectives()
 {
-    //! TODO: first find the server according to the host header
-    // TODO: add default max body client size (nginx default is 1m == 1048576 MB)
-    this->_mimeTypes = _server->getExtensions();
     directives.host = _server->getHost();
     directives.port = _server->getPort();
+    directives.serverRoot = _server->getRoot();
+    directives.autoindex = _server->getAutoindex();
     directives.clientMaxBodySize = _server->getClientMaxBodySize();
     directives.errorPages = _server->getErrorPages();
     directives.indexs = _server->getIndexs();
     directives.serverNames = _server->getServerNames();
+    directives.isUploadAllowed = false;
+    directives.uploadPath = "";
+    directives.isCgiAllowed = false;
+    directives.contentLength = 0;
+}
+
+void Request::findServer()
+{
+    //! TODO: first find the server according to the host header
+    
+}
+
+void Request::setServer()
+{
+    if (this->_requestTarget.find("?") != string::npos)
+    {
+        directives.queryString = this->_requestTarget.substr(this->_requestTarget.find("?") + 1);
+        directives.requestTarget = this->_requestTarget.substr(0, this->_requestTarget.find("?"));
+        _requestTarget = directives.requestTarget;
+    }
+    else
+        directives.requestTarget = this->_requestTarget;
+    findServer();
+    this->_mimeTypes = _server->getExtensions();
+    setDefaultDirectives();
     _location = this->findLocation();
     if (_location == NULL)
         setStatusCode(404, "Not Found");
@@ -214,14 +234,7 @@ void Request::setServer()
         directives.indexs = _location->getIndexs();
     if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
-    if (this->_requestTarget.find("?") != string::npos)
-    {
-        directives.queryString = this->_requestTarget.substr(this->_requestTarget.find("?") + 1);
-        directives.requestTarget = this->_requestTarget.substr(0, this->_requestTarget.find("?"));
-        _requestTarget = directives.requestTarget;
-    }
-    else
-        directives.requestTarget = this->_requestTarget;
+    
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
     if (!directives.returnRedirect.empty())
         setStatusCode(301, "Moved Permanently");
@@ -262,7 +275,7 @@ void Request::validateRequest()
     if (_method == "POST")
     {
         if (_headers.find("content-length") == _headers.end() && _headers.find("transfer-encoding") == _headers.end())
-            setStatusCode(400, "Length Required");
+            setStatusCode(411, "Length Required");
         setContentLength(_headers["content-length"]);
         if (_headers.find("content-length") != _headers.end() && directives.clientMaxBodySize > 0 && this->_contentLength > directives.clientMaxBodySize)
             setStatusCode(413, "Request Entity Too Large");
