@@ -125,14 +125,13 @@ void Webserver::start()
             else
             {
                 double timeOut = double(clock() - _req[ep.events[i].data.fd]._start) / CLOCKS_PER_SEC;
-                // if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready && !_req[ep.events[i].data.fd].getIsRequestFinished())
-                if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready)
+                if (timeOut > TIMEOUT && !_req[ep.events[i].data.fd]._ready && !_req[ep.events[i].data.fd].getIsRequestFinished())
                     _req[ep.events[i].data.fd].setTimeout();
                 if (ep.events[i].events & EPOLLIN)
                 {
+                    _req[ep.events[i].data.fd]._start = clock();
                     _req[ep.events[i].data.fd].readRequest();
-                    // _req[ep.events[i].data.fd]._ready = false;
-                    // _req[ep.events[i].data.fd]._start = clock();
+                    _req[ep.events[i].data.fd]._ready = false;
                     if (_req[ep.events[i].data.fd].getIsRequestFinished())
                         _resp.insert(make_pair(ep.events[i].data.fd, Response()));
                 }

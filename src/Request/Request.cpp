@@ -160,7 +160,8 @@ void Request::setContentLength(string contentLength)
     for (size_t i = 0; i < contentLength.length(); i++)
         if (!isdigit(contentLength[i]))
             setStatusCode(400, "Invalid Content-Length");
-    this->_contentLength = atoi(contentLength.c_str());
+    stringstream ss(contentLength);
+    ss >> this->_contentLength;
     directives.contentLength = this->_contentLength;
 }
 
