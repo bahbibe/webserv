@@ -1,1 +1,2 @@
-print("Hello, World!");
+while True:
+    print('This is an infinite loop!')

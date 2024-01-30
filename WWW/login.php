@@ -3,14 +3,14 @@ ob_start();
 session_start();
 
 if (isset($_COOKIE["name"]) && isset($_COOKIE["email"]) && isset($_COOKIE["profile"])) {
-    echo "<meta http-equiv='refresh' content='0; url=profile.php'>";
+    echo "<meta http-equiv='refresh' content='0; url=./profile.php'>";
     exit(0);
 }
 
 if (isset($_POST["submit"])) {
     setcookie("name", $_POST["name"], time() + (60 * 60 * 24), "/");
     setcookie("email", $_POST["email"], time() + (60 * 60 * 24), "/");
-    $uploadDir = "../WWW/uploads";
+    $uploadDir = "../";
     if (!file_exists($uploadDir))
         mkdir($uploadDir, 0777, true);
     $uploadedFiles = [];

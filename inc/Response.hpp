@@ -28,6 +28,9 @@ class Response
 
         int _fdSocket;
         int _statusCode;
+        int fd[2];
+
+        pid_t pid;
 
         string _method;
         string _path;
@@ -38,6 +41,8 @@ class Response
         string _cgiPath;
         string _absPath;
         string _cgiHeader;
+        string _randPath;
+        clock_t start;
 
         char **env;
 
