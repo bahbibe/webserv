@@ -34,56 +34,72 @@ double Response::fileSize(string path)
 
 void Response::CGI(Request &req)
 {
-    cout << "CGI executing" << endl;
-    int fd[2];
-    pid_t pid;
-    char buffer[1024];
-    double pos;
-    string str;
-    stringstream ss;
-    srand(time(NULL));
-
-    string  pathCGI = "CGI/" + toSting(rand());
-    this->_path = pathCGI;
-    cout << "AbsPth: " << this->_absPath << endl;
-    const char *argv[] = {this->_cgiPath.c_str(), this->_absPath.c_str() ,NULL};
-
-    cout << "pathCGI: " << this->_path << endl;
-    fillEnv(req);
-    cout << this->_cgiPath << endl;
-    pipe(fd);
-    pid = fork();
-    if (pid == 0)
+    // int fd[2];
+    // pid_t pid;
+ 
+    int status ;
+    cout << this->_isCGI <<  endl;
+    if (this->_isCGI == false)
     {
-        close(fd[0]);
-        close(fd[1]);
-        freopen(this->_path.c_str(), "w", stdout);
-        if (this->_method == "GET")
-            close(0);
-        else
-            freopen(req.directives.cgiFileName.c_str(), "r", stdin);
-        execve(argv[0], (char* const*)argv, this->env);
-        perror("execve");
-        exit(127);
+        cout << RED "CGI executing" << RESET << endl;
+        this->_isCGI = true;
+        this->start = clock();
+        srand(time(NULL));
+        this->_randPath = "CGI/" + toSting(rand());
+        cout << "AbsPth: " << this->_absPath << endl;
+        cout << "pathCGI: " << this->_path << endl;
+        fillEnv(req);
+        cout << this->_cgiPath << endl;
+        pipe(fd);
+        this->pid = fork();
+        if (this->pid == 0)
+        {
+            const char *argv[] = {this->_cgiPath.c_str(), this->_absPath.c_str() ,NULL};
+            close(fd[0]);
+            close(fd[1]);
+            freopen(this->_randPath.c_str(), "w", stdout);
+            if (this->_method == "GET")
+                close(0);
+            else
+                freopen(req.directives.cgiFileName.c_str(), "r", stdin);
+            execve(argv[0], (char* const*)argv, this->env);
+            perror("execve");
+            exit(127);
+        }
     }
-    else
+
+    pid_t wPid = waitpid(pid, &status, WNOHANG);
+    clock_t end = clock();
+    cout << "Start: " << this->start << endl;
+    cout << "End: " << end << endl;
+    double time = (double)(end - this->start) / (double)CLOCKS_PER_SEC;
+    cout << "Time: " << time << endl;
+    cout << "WAITPID: " <<  wPid << endl;
+    if (wPid == -1  || wPid > 0 || time > 5)
     {
-        int status ;
-        waitpid(pid, &status, 0);
-        // exit(0);
+        cout << "geggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg" << endl;
+        char buffer[1024];
+        double pos;
+        string str;
+        stringstream ss;
+
         cout << "Status: " << status << endl;
         kill(pid, SIGTERM);
-        // exit(0);
+        this->_path = this->_randPath;
         this->file.open(this->_path.c_str(), ios::in | ios::binary);
         this->_flag = true;
         this->_isCGI = true;
-      if (status != 0)
-      {
-        this->_statusCode = 500;
-        file.close();
-        checkErrors(req);
-      }
-      else if (file.is_open())
+        if (status != 0 || time > 5)
+        {
+            this->_isErrorCode = true;
+            if (status != 0)
+                this->_statusCode = 500;
+            else
+                this->_statusCode = 408;
+            file.close();
+            checkErrors(req);
+        }
+        else if (file.is_open())
         {
             file.read(buffer, 1023);
             ss << buffer;
@@ -101,13 +117,13 @@ void Response::CGI(Request &req)
                 file.seekg(0 ,ios::beg);
             }
         }
-    }
-    if (!this->_defaultError)
-    {
-        this->_statusCode = 200;
-        this->_method = "GET";
-        SendHeader();
-        GET(req);
+        if (!this->_defaultError)
+        {
+            this->_statusCode = 200;
+            this->_method = "GET";
+            SendHeader();
+            GET(req);
+        }
     }
 }
 
@@ -217,6 +233,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
         this->_absPath = request.directives.requestedFile;
+        // this->_isCGI = false;
     }
     // cout << "Target: " << this->_target << endl;
     // cout << "Is Error: " << this->_isErrorCode  << endl;
@@ -242,7 +259,6 @@ void Response::sendResponse(Request &request, int fdSocket)
                 this->_cgiPath = "/usr/bin/php-cgi";
             else
                 this->_cgiPath = "/usr/bin/python3";
-            this->_isCGI = true;
             CGI(request);
         }
         else
@@ -341,7 +357,6 @@ void Response::checkAutoInedx(Request &request)
                         this->_cgiPath = "/usr/bin/php-cgi";
                     else
                         this->_cgiPath = "/usr/bin/python3";
-                    this->_isCGI = true;
                     CGI(request);
                 }
                 else
@@ -455,8 +470,12 @@ void Response::saveStatus()
     this->status[405] = "405 Method Not Allowed";
     this->status[408] = "408 Request Timeout";
     this->status[409] = "409 Conflict";
+    this->status[411] = "411 Length Required";
+    this->status[413] = "413 Content Too Large";
+    this->status[414] = "414 URI Too Long";
     this->status[500] = "500 Internal Server Error";
     this->status[501] = "501 Not Implemented";
+    this->status[505] = "505 HTTP Version Not Supported";
 }
 
 void Response::SendHeader() 
@@ -477,7 +496,6 @@ void Response::SendHeader()
             this->_header += this->_cgiHeader;
         this->_header += "connection: close\r\n\r\n";
     }
-    // cout << "Header: " << this->_header << endl;
     int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
     if (n < -1)
         return;
@@ -529,16 +547,12 @@ string Response::toSting(long long mun)
 int Response::fillEnv(Request &req)
 {
     this->env = new char *[9]; 
-    env[0] = strdup("REQUEST_METHOD=GET");
+    env[0] = strdup(("REQUEST_METHOD=" + this->_method).c_str());
     env[1] = strdup(("QUERY_STRING=" + req.directives.queryString).c_str());
     env[2] = strdup("REDIRECT_STATUS=200");
     env[3] = strdup(("PATH_INFO=" + this->_absPath).c_str());
     env[4] = strdup(("SCRIPT_FILENAME=" + this->_absPath).c_str());
-    if (this->_contentType.empty())
-        env[5] = strdup("CONTENT_TYPE=text/html");
-    else
-        env[5] = strdup(("CONTENT_TYPE=" + this->_contentType).c_str());
-    env[5] = strdup(("CONTENT_TYPE=" + this->_contentType).c_str());
+    env[5] = strdup(("CONTENT_TYPE=" + req.directives.contentType).c_str());
     if (this->_method == "GET")
         env[6] = strdup("CONTENT_LENGTH=0");
     else
@@ -546,8 +560,8 @@ int Response::fillEnv(Request &req)
         double size = fileSize(req.directives.cgiFileName);
         env[6] = strdup(("CONTENT_LENGTH=" + toSting(size)).c_str());
     }
-    env[6] = strdup(("HTTP_COOKIE=" + req.directives.httpCookie).c_str());
-    env[7] = NULL;
+    env[7] = strdup(("HTTP_COOKIE=" + req.directives.httpCookie).c_str());
+    env[8] = NULL;
     return 1;
 }
 
@@ -581,7 +595,12 @@ Response &Response::operator=(const Response &other)
         this->_body = other._body;
         this->mime = other.mime;
         this->status = other.status;
-
+        this->_isCGI = other._isCGI;
+        this->_absPath = other._absPath;
+        this->_cgiPath = other._cgiPath;
+        this->_cgiHeader = other._cgiHeader;
+        this->pid = other.pid;
+        this->env = other.env;
     }
     return *this;
 }
