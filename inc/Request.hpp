@@ -83,11 +83,13 @@ private:
     void setServer();
     void validatePath();
     string getExtension(string contentType);
+    void setDefaultDirectives();
 
     //? Helpers
     vector<string> split(string str, string delimiter);
     void trim(string& str);
     string toLowerCase(const string &str);
+    void findServer();
     Location* findLocation();
 public:
     int bufferSize;
