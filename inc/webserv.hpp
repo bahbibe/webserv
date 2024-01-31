@@ -21,11 +21,7 @@
 #define YELLOW "\033[0;33m"
 #define BLUE "\033[0;34m"
 #define RESET "\033[0m"
-#define USAGE YELLOW "Usage: ./webserv [config_file] if no config file is provided, default.conf will be used" RESET
-#define OPEN_BR "{"
-#define CLOSE_BR "}"
-#define COLON ":"
-#define SEMICOLON ";"
+#define USAGE YELLOW "Usage: ./webserv [config_file] DEFAULT=NONE" RESET
 #define ERR RED "Error: " RESET
 #define DEFAULT_CONF "conf/default.conf"
 #define DEFAULT_PORT "80"
