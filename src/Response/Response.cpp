@@ -242,32 +242,32 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    else if ((!this->_flag && request.directives.isCgiAllowed)
-        && (this->_path.rfind(".php") != string::npos
-        || this->_path.rfind(".py") != string::npos))
-    {
-        ifstream file;
-        file.open(this->_path.c_str(), ios::binary);
-        cout << "CGI: " << this->_path << endl;
-        if (file.is_open())
-        {
-            cout << GREEN"========CGI======" RESET << endl;
-            file.close();
-            if (this->_path.rfind(".php") != string::npos)
-                this->_cgiPath = "/usr/bin/php-cgi";
-            else
-                this->_cgiPath = "/usr/bin/python3";
-            CGI(request);
-        }
-        else
-        {
-            this->_isErrorCode = true;
-            this->_statusCode = 404;
-            checkErrors(request);
-            if (!this->_defaultError)
-                GET(request);
-        }
-    }
+    // else if ((!this->_flag && request.directives.isCgiAllowed)
+    //     && (this->_path.rfind(".php") != string::npos
+    //     || this->_path.rfind(".py") != string::npos))
+    // {
+    //     ifstream file;
+    //     file.open(this->_path.c_str(), ios::binary);
+    //     cout << "CGI: " << this->_path << endl;
+    //     if (file.is_open())
+    //     {
+    //         cout << GREEN"========CGI======" RESET << endl;
+    //         file.close();
+    //         if (this->_path.rfind(".php") != string::npos)
+    //             this->_cgiPath = "/usr/bin/php-cgi";
+    //         else
+    //             this->_cgiPath = "/usr/bin/python3";
+    //         CGI(request);
+    //     }
+    //     else
+    //     {
+    //         this->_isErrorCode = true;
+    //         this->_statusCode = 404;
+    //         checkErrors(request);
+    //         if (!this->_defaultError)
+    //             GET(request);
+    //     }
+    // }
     else if (this->_method == "GET" && !this->_isErrorCode)
     {
         if (!this->_flag)
@@ -328,7 +328,7 @@ void Response::checks(Request &request)
         }
         else
         {
-            findeContentType();
+            findeContentType(request);
             SendHeader();
             this->_flag = true;
         }
@@ -366,7 +366,7 @@ void Response::checkAutoInedx(Request &request)
                 {
                     this->_statusCode = 200;
                     this->_flag = true;
-                    findeContentType();
+                    findeContentType(request);
                     SendHeader();
                 }
                 return;
@@ -453,7 +453,7 @@ void Response::checkErrors(Request &request)
     }
     else if (file.good() && !this->_flag)
     {
-        findeContentType();
+        findeContentType(request);
         SendHeader();
         this->_flag = true;
     }
@@ -520,31 +520,13 @@ string Response::templateError(string errorType)
     return errorBody;
 }
 
-void Response::findeContentType()
+void Response::findeContentType(Request &req)
 {
-    ifstream file("./conf/mime.conf");
     int idex= this->_path.rfind(".");
     string extention = this->_path.substr(idex + 1);
-
-    if (file.good())
-    {
-        stringstream ss;
-        string line;
-        string key;
-        string val; 
-        while (getline(file, line))
-        {
-            ss << line;
-            ss >> val;
-            ss >> key;
-            this->mime[key] = val;
-            ss.clear();
-        }
-        map<string, string>::iterator it;
-        it = this->mime.find(extention);
-        if (it != this->mime.end())
-            this->_contentType = it->second;
-    }
+    map<string, string>::iterator it = req.directives.types.find(extention);
+    if (it != req.directives.types.end())
+        this->_contentType = it->second;
 }
 
 string Response::toSting(long long mun)

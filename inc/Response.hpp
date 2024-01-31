@@ -66,7 +66,7 @@ class Response
         void DELETE(string path);
     private:
         void SendHeader();
-        void findeContentType();
+        void findeContentType(Request &req);
         void saveStatus();
         int is_adir(string &path);
         void checkAutoInedx(Request &request);
