@@ -509,7 +509,7 @@ void Response::SendHeader()
             this->_header += this->_cgiHeader;
         this->_header += "connection: close\r\n\r\n";
     }
-    cout << "Header: " << this->_header << endl;
+    // cout << "Header: " << this->_header << endl;
     int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
     if (n < -1)
         return;

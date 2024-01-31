@@ -138,10 +138,7 @@ void Webserver::start()
                 {
                     _resp[ep.events[i].data.fd].sendResponse(_req[ep.events[i].data.fd], ep.events[i].data.fd);
                     if (_resp[ep.events[i].data.fd].getIsFinished() == true)
-                    {
                         closeConnection(_req, _resp, ep.events[i].data.fd);
-                        // exit(12);
-                    }
                 }
             }
         }
