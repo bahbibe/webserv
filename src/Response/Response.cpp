@@ -242,32 +242,32 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    // else if ((!this->_flag && request.directives.isCgiAllowed)
-    //     && (this->_path.rfind(".php") != string::npos
-    //     || this->_path.rfind(".py") != string::npos))
-    // {
-    //     ifstream file;
-    //     file.open(this->_path.c_str(), ios::binary);
-    //     cout << "CGI: " << this->_path << endl;
-    //     if (file.is_open())
-    //     {
-    //         cout << GREEN"========CGI======" RESET << endl;
-    //         file.close();
-    //         if (this->_path.rfind(".php") != string::npos)
-    //             this->_cgiPath = "/usr/bin/php-cgi";
-    //         else
-    //             this->_cgiPath = "/usr/bin/python3";
-    //         CGI(request);
-    //     }
-    //     else
-    //     {
-    //         this->_isErrorCode = true;
-    //         this->_statusCode = 404;
-    //         checkErrors(request);
-    //         if (!this->_defaultError)
-    //             GET(request);
-    //     }
-    // }
+    else if ((!this->_flag && request.directives.isCgiAllowed)
+        && (this->_path.rfind(".php") != string::npos
+        || this->_path.rfind(".py") != string::npos))
+    {
+        ifstream file;
+        file.open(this->_path.c_str(), ios::binary);
+        cout << "CGI: " << this->_path << endl;
+        if (file.is_open())
+        {
+            cout << GREEN"========CGI======" RESET << endl;
+            file.close();
+            if (this->_path.rfind(".php") != string::npos)
+                this->_cgiPath = "/usr/bin/php-cgi";
+            else
+                this->_cgiPath = "/usr/bin/python3";
+            CGI(request);
+        }
+        else
+        {
+            this->_isErrorCode = true;
+            this->_statusCode = 404;
+            checkErrors(request);
+            if (!this->_defaultError)
+                GET(request);
+        }
+    }
     else if (this->_method == "GET" && !this->_isErrorCode)
     {
         if (!this->_flag)
