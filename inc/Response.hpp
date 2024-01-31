@@ -25,6 +25,7 @@ class Response
         bool _defaultError;
         bool _isErrorCode;
         bool _isCGI;
+        bool _cgiAutoIndex;
 
         int _fdSocket;
         int _statusCode;
