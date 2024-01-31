@@ -29,6 +29,7 @@ struct Directives {
     string contentType;
     string boundary;
     size_t contentLength;
+    map<string, string> types;
 };
 
 class Request {

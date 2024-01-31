@@ -211,6 +211,7 @@ void Request::setServer()
         directives.requestTarget = this->_requestTarget;
     findServer();
     this->_mimeTypes = _server->getExtensions();
+    directives.types = _server->getTypes();
     setDefaultDirectives();
     _location = this->findLocation();
     if (_location == NULL)
