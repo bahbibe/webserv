@@ -52,6 +52,12 @@ map<string, vector<string> > Server::getExtensions() const
 {
     return _extensions;
 }
+
+map<string, string> Server::getTypes() const
+{
+    return _types;
+}
+
 int Server::getSocket() const
 {
     return _socket;
