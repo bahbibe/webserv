@@ -35,10 +35,10 @@ double Response::fileSize(string path)
 void Response::CGI(Request &req)
 {
     int status ;
-    cout << this->_isCGI <<  endl;
+    cout << RED"=========================" << this->_isCGI <<"=============="<< RESET <<  endl;
     if (this->_isCGI == false)
     {
-        cout << RED "CGI executing" << RESET << endl;
+        cout << RED "****************************CGI executing**************8888888" << RESET << endl;
         this->_isCGI = true;
         this->start = clock();
         srand(time(NULL));
@@ -72,14 +72,8 @@ void Response::CGI(Request &req)
     double time = (double)(end - this->start) / (double)CLOCKS_PER_SEC;
     cout << "Time: " << time << endl;
     cout << "WAITPID: " <<  wPid << endl;
-    // exit(0);
-    //  if (!this->_flag)
-    //     SendHeader();
-    // exit(0);
-    this->_path = this->_randPath;
     if (wPid == -1  || wPid > 0 || time > 5)
     {
-        cout << "geggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg" << endl;
         char buffer[1024];
         unsigned long pos;
         string str;
@@ -88,6 +82,7 @@ void Response::CGI(Request &req)
         cout << "Status: " << status << endl;
         kill(pid, SIGTERM);
         this->_cgiAutoIndex = false;
+        this->_path = this->_randPath;
         this->file.open(this->_path.c_str(), ios::in | ios::binary);
         this->_flag = true;
         this->_isCGI = true;
@@ -97,7 +92,7 @@ void Response::CGI(Request &req)
             if (status != 0)
                 this->_statusCode = 500;
             else
-                this->_statusCode = 408;
+                this->_statusCode = 504;
             file.close();
             checkErrors(req);
         }
@@ -256,7 +251,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         cout << "CGI: " << this->_path << endl;
         if (file.is_open())
         {
-            cout << RED"========CGI======" RESET << endl;
+            cout << GREEN"========CGI======" RESET << endl;
             file.close();
             if (this->_path.rfind(".php") != string::npos)
                 this->_cgiPath = "/usr/bin/php-cgi";
@@ -488,6 +483,7 @@ void Response::saveStatus()
     this->status[414] = "414 URI Too Long";
     this->status[500] = "500 Internal Server Error";
     this->status[501] = "501 Not Implemented";
+    this->status[504] = "504 Gateway Timeout";
     this->status[505] = "505 HTTP Version Not Supported";
 }
 
@@ -616,6 +612,8 @@ Response &Response::operator=(const Response &other)
         this->pid = other.pid;
         this->env = other.env;
         this->_cgiAutoIndex = other._cgiAutoIndex;
+        this->start = other.start;
+        this->_randPath = other._randPath;
     }
     return *this;
 }
