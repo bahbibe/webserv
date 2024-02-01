@@ -30,6 +30,7 @@ struct Directives {
     string boundary;
     size_t contentLength;
     map<string, string> types;
+    bool isCGI;
 };
 
 class Request {
