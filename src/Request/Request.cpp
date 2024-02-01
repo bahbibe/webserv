@@ -231,11 +231,13 @@ void Request::setServer()
     directives.returnRedirect = _location->getReturn();
     directives.autoindex = _location->getAutoindex();
     directives.serverRoot = _location->getRoot();
-    if (_location->getIndexs().size() > 0)
-        directives.indexs = _location->getIndexs();
+    directives.indexs = _location->getIndexs();
     if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
-    
+    if (directives.uploadPath[directives.uploadPath.length() - 1] != '/')
+        directives.uploadPath += "/";
+    if (directives.cgiUploadPath[directives.cgiUploadPath.length() - 1] != '/')
+        directives.cgiUploadPath += "/";
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
     if (!directives.returnRedirect.empty())
         setStatusCode(301, "Moved Permanently");
@@ -259,6 +261,7 @@ void Request::validateRequest()
     map<string, string>::iterator it = _headers.find("host");
     if (it == _headers.end() || it->second.length() == 0)
         setStatusCode(400, "No Host Header");
+    directives.contentType = _headers["content-type"];
     if (_headers.find("content-type") != _headers.end() && _headers["content-type"].find("multipart/form-data") != string::npos)
     {
         if (_headers.find("transfer-encoding") != _headers.end())
@@ -266,7 +269,6 @@ void Request::validateRequest()
         _isBodyBoundary = true;
         _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
         _boundaries.setMimeTypes(_mimeTypes);
-        directives.contentType = _headers["content-type"];
         directives.boundary = _boundary;
     }
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
@@ -298,21 +300,17 @@ string Request::getExtension(string contentType)
 
 void Request::createOutfile()
 {
-    bool isCgiExtension = _requestTarget.find(".php") != string::npos || _requestTarget.find(".py") != string::npos;
-    if (directives.isCgiAllowed)
+    if (directives.isCgiAllowed && Helpers::isCGI(directives.requestedFile, directives.indexs))
     {
-        if (isCgiExtension)
-        {
-            this->_isCgi = true;
-            string randomFileName = Helpers::generateFileName();
-            this->_filePath = directives.cgiUploadPath + randomFileName + ".cgi";
-            directives.cgiFileName = this->_filePath;
-            this->_outfile.open(this->_filePath.c_str(), ios::out | ios::binary);
-            if (!this->_outfile.is_open())
-                setStatusCode(500, "Failed to create file");
-            this->_outfileIsCreated = true;
-            return;
-        }
+        this->_isCgi = directives.isCGI = true;
+        string randomFileName = Helpers::generateFileName();
+        this->_filePath = directives.cgiUploadPath + randomFileName + ".cgi";
+        directives.cgiFileName = this->_filePath;
+        this->_outfile.open(this->_filePath.c_str(), ios::out | ios::binary);
+        if (!this->_outfile.is_open())
+            setStatusCode(500, "Failed to create file");
+        this->_outfileIsCreated = true;
+        return;
     }
     if (!directives.isUploadAllowed)
         setStatusCode(403, "upload is not allowed");
@@ -428,6 +426,7 @@ void Request::printRequest()
     cout << "Is Upload Allowed: " << directives.isUploadAllowed << endl;
     cout << "Upload Path: " << directives.uploadPath << endl;
     cout << "Is Cgi Allowed: " << directives.isCgiAllowed << endl;
+    cout << "Cgi upload Path: " << directives.cgiUploadPath << endl;
     cout << "Return Redirect: " << directives.returnRedirect << endl;
     cout << "requestTarget: " << directives.requestTarget << endl;
     cout << "queryString: " << directives.queryString << endl;
@@ -437,6 +436,7 @@ void Request::printRequest()
     cout << "Content Type: " << directives.contentType << endl;
     cout << "Boundary: " << directives.boundary << endl;
     cout << "Content Length: " << directives.contentLength << endl;
+    cout << "Is CGI: " << directives.isCGI << endl;
     cout << BLUE "=====================Directives=================" RESET << endl;
     cout << GREEN "=====================Request=================" RESET << endl;
 }
