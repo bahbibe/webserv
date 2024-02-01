@@ -147,6 +147,7 @@ void Response::GET(Request &request)
         {
             freeEnv(this->env);
             remove(this->_path.c_str());
+            remove(request.directives.cgiFileName.c_str());
         }
         this->_isCGI = false;
         cout << GREEN "=====>end<====\n" RESET;
@@ -264,13 +265,24 @@ void Response::sendResponse(Request &request, int fdSocket)
             checks(request);
         if (this->_cgiAutoIndex)
             CGI(request);
-        else
+        else if (!this->_defaultError)
             GET(request);
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
     {
-        checkErrors(request);
-        if (!this->_defaultError)
+        cout << "POST CGI " << request.directives.isCGI << endl;
+        cout << "post path" << this->_path << endl;
+        cout << "post is dir: " << is_adir(this->_path) << endl;
+        if (is_adir(this->_path) && request.directives.isCGI == true)
+        {
+            cout << "TEST\n";
+            checkAutoInedx(request);
+        }
+        else
+            checkErrors(request);
+        if (this->_cgiAutoIndex)
+            CGI(request);
+        else if (!this->_defaultError)
             GET(request);
     }
     else if (this->_method == "DELETE" && !this->_isErrorCode)
@@ -326,6 +338,7 @@ void Response::checks(Request &request)
 
 void Response::checkAutoInedx(Request &request)
 {
+    cout << RED"========AUTOINDEX======"  << endl;
         for (size_t i = 0; i < request.directives.indexs.size(); i++)
         {
             string index = this->_path + request._location->getIndexs()[i];
