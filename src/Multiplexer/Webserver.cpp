@@ -122,7 +122,14 @@ void Webserver::start()
             if (matchServer(_req, ep.events[i].data.fd))
                 continue;
             if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP)
+            {
+                if(_resp[ep.events[i].data.fd]._isCGI ==true)
+                {
+                    kill(_resp[ep.events[i].data.fd].pid,SIGKILL);
+                    waitpid(_resp[ep.events[i].data.fd].pid, 0, 0);
+                }
                 closeConnection(_req, _resp, ep.events[i].data.fd);
+            }
             if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
                 closeConnection(_req, _resp, ep.events[i].data.fd);
             else

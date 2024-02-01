@@ -24,14 +24,12 @@ class Response
         bool _isfinished;
         bool _defaultError;
         bool _isErrorCode;
-        bool _isCGI;
         bool _cgiAutoIndex;
 
         int _fdSocket;
         int _statusCode;
         int fd[2];
 
-        pid_t pid;
 
         string _method;
         string _path;
@@ -64,6 +62,9 @@ class Response
         bool getIsFinished() const;
         void GET(Request &request);
         void DELETE(string path);
+        pid_t pid;
+        bool _isCGI;
+
     private:
         void SendHeader();
         void findeContentType(Request &req);
@@ -80,5 +81,6 @@ class Response
         int fillEnv(Request &req);
         double fileSize(string path);
         void freeEnv(char **env);
+
 
 };

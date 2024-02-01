@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_isCGI(false),_cgiAutoIndex(false) ,_fdSocket(0), _statusCode(0)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false) ,_fdSocket(0), _statusCode(0),_isCGI(false)
 {
     saveStatus();
 }
@@ -34,19 +34,13 @@ double Response::fileSize(string path)
 
 void Response::CGI(Request &req)
 {
-    int status ;
-    cout << RED"=========================" << this->_isCGI <<"=============="<< RESET <<  endl;
     if (this->_isCGI == false)
     {
-        cout << RED "****************************CGI executing**************8888888" << RESET << endl;
         this->_isCGI = true;
         this->start = clock();
         srand(time(NULL));
-        this->_randPath = "CGI/" + toSting(rand());
-        cout << "AbsPth: " << this->_absPath << endl;
-        cout << "pathCGI: " << this->_path << endl;
+        this->_randPath = "/tmp/" + toSting(rand());
         fillEnv(req);
-        cout << this->_cgiPath << endl;
         pipe(fd);
         this->pid = fork();
         if (this->pid == 0)
@@ -64,14 +58,10 @@ void Response::CGI(Request &req)
             exit(127);
         }
     }
-
+    int status;
     pid_t wPid = waitpid(pid, &status, WNOHANG);
     clock_t end = clock();
-    cout << "Start: " << this->start << endl;
-    cout << "End: " << end << endl;
     double time = (double)(end - this->start) / (double)CLOCKS_PER_SEC;
-    cout << "Time: " << time << endl;
-    cout << "WAITPID: " <<  wPid << endl;
     if (wPid == -1  || wPid > 0 || time > 5)
     {
         char buffer[1024];
@@ -80,7 +70,6 @@ void Response::CGI(Request &req)
         stringstream ss;
 
         cout << "Status: " << status << endl;
-        kill(pid, SIGTERM);
         this->_cgiAutoIndex = false;
         this->_path = this->_randPath;
         this->file.open(this->_path.c_str(), ios::in | ios::binary);
@@ -92,7 +81,11 @@ void Response::CGI(Request &req)
             if (status != 0)
                 this->_statusCode = 500;
             else
+            {
+                kill(this->pid, SIGKILL);
+                waitpid(pid, 0, 0);
                 this->_statusCode = 504;
+            }
             file.close();
             checkErrors(req);
         }
@@ -150,11 +143,12 @@ void Response::GET(Request &request)
         file.close();
         this->_flag = false;
         this->_isfinished = true;
-        // if (this->_isCGI == true)
-        // {
-        //     freeEnv(this->env);
-        //     remove(this->_path.c_str());
-        // }
+        if (this->_isCGI == true)
+        {
+            freeEnv(this->env);
+            remove(this->_path.c_str());
+            remove(request.directives.cgiFileName.c_str());
+        }
         this->_isCGI = false;
         cout << GREEN "=====>end<====\n" RESET;
     }
@@ -232,8 +226,6 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_absPath = request.directives.requestedFile;
         // this->_isCGI = false;
     }
-    // cout << "Target: " << this->_target << endl;
-    // cout << "Is Error: " << this->_isErrorCode  << endl;
     cout << "Path: " << this->_path << endl;
     cout << "Method: " << this->_method << endl;
     if (this->_isErrorCode == true)
@@ -248,7 +240,6 @@ void Response::sendResponse(Request &request, int fdSocket)
     {
         ifstream file;
         file.open(this->_path.c_str(), ios::binary);
-        cout << "CGI: " << this->_path << endl;
         if (file.is_open())
         {
             cout << GREEN"========CGI======" RESET << endl;
@@ -274,13 +265,24 @@ void Response::sendResponse(Request &request, int fdSocket)
             checks(request);
         if (this->_cgiAutoIndex)
             CGI(request);
-        else
+        else if (!this->_defaultError)
             GET(request);
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
     {
-        checkErrors(request);
-        if (!this->_defaultError)
+        cout << "POST CGI " << request.directives.isCGI << endl;
+        cout << "post path" << this->_path << endl;
+        cout << "post is dir: " << is_adir(this->_path) << endl;
+        if (is_adir(this->_path) && request.directives.isCGI == true)
+        {
+            cout << "TEST\n";
+            checkAutoInedx(request);
+        }
+        else
+            checkErrors(request);
+        if (this->_cgiAutoIndex)
+            CGI(request);
+        else if (!this->_defaultError)
             GET(request);
     }
     else if (this->_method == "DELETE" && !this->_isErrorCode)
@@ -296,8 +298,7 @@ void Response::sendResponse(Request &request, int fdSocket)
 void Response::checks(Request &request)
 {
     if (this->_target.empty())
-        this->_target = "/";
-    
+        this->_target = "/";   
     if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
         cout << RED"========REDIRECTION======"  << endl;
@@ -337,23 +338,16 @@ void Response::checks(Request &request)
 
 void Response::checkAutoInedx(Request &request)
 {
-    cout << "checkAutoInedx: " << request.directives.autoindex << endl;
+    cout << RED"========AUTOINDEX======"  << endl;
         for (size_t i = 0; i < request.directives.indexs.size(); i++)
         {
             string index = this->_path + request._location->getIndexs()[i];
-            cout << "index: " << index << endl;
             this->file.open(index.c_str(), ios::in | ios::binary);
             if (file.is_open())
             {
-                // exit(0);
                 this->_path = index;
-                cout << "==============>INDEX Path: " << this->_path << endl;
-                cout << "is auto index: " << request.directives.isCgiAllowed << endl;
-                cout << "is auto find Cghi extention: " << this->_path.rfind(".php") << endl;
-
                 if (request.directives.isCgiAllowed && (this->_path.rfind(".php") != string::npos || this->_path.rfind(".py") != string::npos))
                 {
-                    cout << "CGI with index\n";
                     this->_absPath = this->_path;
                     file.close();
                     if (this->_path.rfind(".php") != string::npos)
@@ -373,11 +367,7 @@ void Response::checkAutoInedx(Request &request)
             }
         }
     if (request.directives.autoindex)
-    {
-        cout << "tree_dir\n";
         tree_dir();
-
-    }
     else
     {
         request.isErrorCode = 1;
@@ -505,7 +495,6 @@ void Response::SendHeader()
             this->_header += this->_cgiHeader;
         this->_header += "connection: close\r\n\r\n";
     }
-    // cout << "Header: " << this->_header << endl;
     int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
     if (n < -1)
         return;
