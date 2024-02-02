@@ -72,20 +72,21 @@ void Webserver::brackets(string const &file)
         throw ServerException(ERR "Invalid brackets");
 }
 
-void Webserver::newConnection(map<int, Request> &req, Server &server)
+void Webserver::newConnection(map<int, Request> &req, Server& server)
 {
+    (void) req;
     int clientSock;
     struct sockaddr_in clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
-    // cout << "New connection\n";
+    cout << "New connection\n";
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP ;
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
-    req.insert(make_pair(clientSock, Request(&server, clientSock)));
-    req[clientSock]._start = clock();
+    // req.insert(make_pair(clientSock, Request(servers, clientSock)));
+    // req[clientSock]._start = clock();
 }
 
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
@@ -96,17 +97,25 @@ void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp
     close(sock);
 }
 
-bool Webserver::matchServer(map<int, Request> &req, int sock)
+void Webserver::matchServer(map<int, Request> &req, int sock)
 {
+    vector<Server*> multServers;
+    // iterator
     for (size_t j = 0; j < _servers.size(); j++)
     {
         if (sock == _servers[j].getSocket())
-        {
-            newConnection(req, _servers[j]);
-            return true;
-        }
+            multServers.push_back(&(_servers[j]));
+            // multServers.insert(make_pair(sock,&(_servers[j])));
+        // else
+        //     return false;
     }
-    return false;
+    // cout << RED "size: " RESET << multServers.size() << endl;
+    // exit(0);
+    // vector<Server*>::iterator it = multServers.begin();
+    // while (it != multServers.end())
+    // {
+        // newConnection(req, **it);
+    // }
 }
 
 
@@ -118,10 +127,11 @@ void Webserver::start()
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
         for (int i = 0; i < evCount; i++)
         {
-            
-            if (matchServer(_req, ep.events[i].data.fd))
-                continue;
-            if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP)
+            cout << BLUE "sjkasas" RESET << endl;
+            matchServer(_req, ep.events[i].data.fd);
+            // if (matchServer(_req, ep.events[i].data.fd))
+            //     continue;
+            if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
             {
                 if(_resp[ep.events[i].data.fd]._isCGI ==true)
                 {
@@ -129,9 +139,13 @@ void Webserver::start()
                     waitpid(_resp[ep.events[i].data.fd].pid, 0, 0);
                 }
                 closeConnection(_req, _resp, ep.events[i].data.fd);
+                cout << BLUE "here" RESET << endl;
             }
             if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
+            {
                 closeConnection(_req, _resp, ep.events[i].data.fd);
+                cout << BLUE "here 2" RESET << endl;
+            }
             else
             {
                 if (ep.events[i].events & EPOLLIN)

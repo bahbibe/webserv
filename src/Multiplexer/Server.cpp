@@ -101,7 +101,7 @@ void Server::print()
     cout << "host: " + _host << "\n";
     cout << "port: " + _port << "\n";
     cout << "server_names: "
-         << "\n";
+            << "\n";
     for (vector<string>::iterator it = _server_names.begin(); it != _server_names.end(); it++)
         cout << "\t" << *it << "\n";
     cout << "indexs: \n";
@@ -109,10 +109,10 @@ void Server::print()
         cout << "\t" << *it << "\n";
     cout << "server_root: " + _server_root << "\n";
     cout << "error_pages: "
-         << "\n";
+            << "\n";
     for (map<string, string>::iterator it = _error_pages.begin(); it != _error_pages.end(); it++)
         cout << "\t" << it->first << " " << it->second << " "
-             << "\n";
+                << "\n";
     cout << "client_max_body_size: " << _client_max_body_size << "\n";
     cout << "autoindex: " << _autoindex << "\n";
     cout << "==================LOCATIONS==================\n";
