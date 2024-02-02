@@ -1,5 +1,6 @@
 #include "inc/Server.hpp"
 t_events ep;
+map<string, int> socketMap;
 int main(int argc, char const *argv[])
 {
     try

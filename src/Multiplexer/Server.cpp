@@ -125,6 +125,12 @@ void Server::print()
 
 void Server::setupSocket()
 {
+    map<string, int>::iterator it = socketMap.find(_host + ":" + _port);
+    if (it != socketMap.end())
+    {
+        _socket = it->second;
+        return;
+    }
     int sockOpt = 1;
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
@@ -139,6 +145,7 @@ void Server::setupSocket()
         throw ServerException(ERR "Failed to bind socket");
     if (listen(_socket, 1))
         throw ServerException(ERR "Failed to listen on socket");
+    socketMap[_host + ":" + _port] = _socket;
     cout << LISTENING << _host + ":" + _port + "\n";
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;

@@ -65,6 +65,7 @@ typedef struct s_events
 } t_events;
 
 extern t_events ep;
+extern map<string, int> socketMap;
 
 class Webserver
 {
