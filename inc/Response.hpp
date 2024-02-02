@@ -66,6 +66,7 @@ class Response
         bool _isCGI;
 
     private:
+        void initVars(Request &request, int fdSocket);
         void SendHeader();
         void findeContentType(Request &req);
         void saveStatus();

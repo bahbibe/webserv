@@ -5,26 +5,6 @@ Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErr
     saveStatus();
 }
 
-// Response::Response(Request request, int fdSocket)
-// {
-//     this->_flag = false;
-//     this->_isfinished = false;
-//     this->_isErrorCode = false;
-//     this->_defaultError = false;
-//     this->_fdSocket = fdSocket;
-//     this->_path = request.getRequestTarget();
-//     this->_statusCode = request.getStatusCode();
-//     this->_path = request.directives.requestedFile;
-//     this->_method = request.getMethod();
-//     this->_target = request.directives.requestTarget;
-//     this->_isErrorCode = request.isErrorCode;
-//     saveStatus();
-//     cout << "***Target: " << this->_target << endl;
-//     cout << "***Method: " << this->_method << endl;
-//     cout << "***Is Error: " << this->_isErrorCode  << endl;
-//     cout << "***Path: " << this->_path << endl;
-// }
-
 double Response::fileSize(string path)
 {
     struct stat metadata;
@@ -69,7 +49,6 @@ void Response::CGI(Request &req)
         string str;
         stringstream ss;
 
-        cout << "Status: " << status << endl;
         this->_cgiAutoIndex = false;
         this->_path = this->_randPath;
         this->file.open(this->_path.c_str(), ios::in | ios::binary);
@@ -87,6 +66,12 @@ void Response::CGI(Request &req)
                 this->_statusCode = 504;
             }
             file.close();
+            if (this->_isCGI == true)
+            {
+                freeEnv(this->env);
+                remove(this->_path.c_str());
+                remove(req.directives.cgiFileName.c_str());
+            }
             checkErrors(req);
         }
         else if (file.is_open())
@@ -119,22 +104,19 @@ void Response::CGI(Request &req)
 
 void Response::GET(Request &request)
 {
-    (void)request;
     signal(SIGPIPE, SIG_IGN);
     char _body1[BUFFERSIZE] = {0};
     file.read(_body1, 1023);
     if (file.gcount() > 0)
     {
-        cout << GREEN "====>start reading<====\n" RESET;
         stringstream ss;
         ss << hex << file.gcount();
         this->_body = ss.str() + "\r\n";
         this->_body.append(_body1, file.gcount());
         this->_body.append("\r\n", 2);
         int n = write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
-        perror("ERROR");
         if (n == -1)
-            cout << "write failed...!!!!\n";
+            cerr << "write failed...!!!!" << endl;
     }
     else if (file.gcount() == 0)
     {
@@ -150,16 +132,13 @@ void Response::GET(Request &request)
             remove(request.directives.cgiFileName.c_str());
         }
         this->_isCGI = false;
-        cout << GREEN "=====>end<====\n" RESET;
     }
 }
 
 void Response::DELETE(string path)
 {
-    cout << RED "======DELETE=======" RESET << endl; 
     if (is_adir(path))
     {
-        cout << RED "======DELETE DIRECTORY=======" RESET << endl; 
         DIR *dir = opendir(path.c_str());
         if (dir)
         {
@@ -191,9 +170,7 @@ void Response::DELETE(string path)
     }
     else if (access(path.c_str(), F_OK) != -1)
     {
-        cout << RED "======DELETE FILE=======" RESET << endl; 
         ifstream file;
-        cout << "Pth: " << path << endl;
         file.open(path.c_str(), ios::binary);
         if (file.is_open())
             remove(path.c_str());
@@ -211,9 +188,8 @@ void Response::DELETE(string path)
     }
 }
 
-void Response::sendResponse(Request &request, int fdSocket)
+void Response::initVars(Request &request, int fdSocket)
 {
-    cout << BLUE"======================RESPONSE===========================\n" RESET;
     if (!this->_flag)
     {
         this->_fdSocket = fdSocket;
@@ -224,10 +200,11 @@ void Response::sendResponse(Request &request, int fdSocket)
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
         this->_absPath = request.directives.requestedFile;
-        // this->_isCGI = false;
     }
-    cout << "Path: " << this->_path << endl;
-    cout << "Method: " << this->_method << endl;
+}
+void Response::sendResponse(Request &request, int fdSocket)
+{
+    initVars(request, fdSocket);
     if (this->_isErrorCode == true)
     {   if (!this->_flag)
             checkErrors(request);
@@ -242,7 +219,6 @@ void Response::sendResponse(Request &request, int fdSocket)
         file.open(this->_path.c_str(), ios::binary);
         if (file.is_open())
         {
-            cout << GREEN"========CGI======" RESET << endl;
             file.close();
             if (this->_path.rfind(".php") != string::npos)
                 this->_cgiPath = "/usr/bin/php-cgi";
@@ -270,14 +246,8 @@ void Response::sendResponse(Request &request, int fdSocket)
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
     {
-        cout << "POST CGI " << request.directives.isCGI << endl;
-        cout << "post path" << this->_path << endl;
-        cout << "post is dir: " << is_adir(this->_path) << endl;
         if (is_adir(this->_path) && request.directives.isCGI == true)
-        {
-            cout << "TEST\n";
             checkAutoInedx(request);
-        }
         else
             checkErrors(request);
         if (this->_cgiAutoIndex)
@@ -292,7 +262,6 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_defaultError)
             GET(request);
     }
-    cout << BLUE"======================RESPONSE===========================\n" RESET;
 }
 
 void Response::checks(Request &request)
@@ -301,8 +270,6 @@ void Response::checks(Request &request)
         this->_target = "/";   
     if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
-        cout << RED"========REDIRECTION======"  << endl;
-        cout << "Target: " << this->_target << RESET<< endl;
         if (this->_statusCode == 301)
             this->_path = request.directives.returnRedirect;
         else
@@ -338,7 +305,6 @@ void Response::checks(Request &request)
 
 void Response::checkAutoInedx(Request &request)
 {
-    cout << RED"========AUTOINDEX======"  << endl;
         for (size_t i = 0; i < request.directives.indexs.size(); i++)
         {
             string index = this->_path + request._location->getIndexs()[i];
@@ -406,7 +372,6 @@ void Response::tree_dir()
 
 string Response::getErrorPage(Request &request, int statusCode)
 {
-    cout << "getErrorPage\n";
     map<string, string>::iterator it;
     it = request.directives.errorPages.find(toSting(statusCode));
     if (it != request.directives.errorPages.end())
@@ -416,11 +381,7 @@ string Response::getErrorPage(Request &request, int statusCode)
 
 void Response::checkErrors(Request &request)
 {
-    cout << RED "ERRORS HANDLER\n" RESET;
-    cout << RED "Status code: "<< this->_statusCode << RESET << endl;
-
     this->_path = getErrorPage(request, this->_statusCode);
-    cout << "error Path: " << this->_path << endl;
     if (!this->_flag)
         file.open(this->_path.c_str(), ios::in | ios::binary);
     if (!file.is_open() || this->_path == "default")
@@ -439,7 +400,6 @@ void Response::checkErrors(Request &request)
         write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
         this->_defaultError = true;
         this->_isfinished = true;
-        cout << "END DEFAULT\n" << endl;
     }
     else if (file.good() && !this->_flag)
     {
@@ -594,8 +554,4 @@ bool Response::getIsFinished() const
     return this->_isfinished;
 }
 
-Response::~Response()
-{
-    cout << "Response destructor\n";
-    // close(this->_fdSocket);
-}
+Response::~Response(){}
