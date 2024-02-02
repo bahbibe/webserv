@@ -4,3 +4,4 @@ upload
 CGI/
 *.json
 upload_*
+cgi/upload_*
