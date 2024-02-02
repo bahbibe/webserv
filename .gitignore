@@ -1,6 +1,6 @@
 *.o
 webserv
 upload
-uploads/
 CGI/
 *.json
+upload_*

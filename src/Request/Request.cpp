@@ -46,6 +46,7 @@ Request &Request::operator=(const Request &other)
         this->bufferSize = other.bufferSize;
 
         this->_isCgi = other._isCgi;
+        this->servers = other.servers;
     }
     return *this;
 }
@@ -59,18 +60,21 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
     this->_start = 0;
+    cout << RED "ddssd 1" RESET << endl;
 }
 
-Request::Request(Server *server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
+Request::Request(vector<Server*>& servers, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false), _ready(false)
 {
-    this->_server = server;
+    this->servers = servers;
+    this->_server = NULL;
     this->_readBytes = 0;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
     this->_start = 0;
+    cout << RED "ddssd 2" RESET << endl;
 }
 
 void Request::readRequest()
@@ -145,6 +149,8 @@ void Request::parseHeaders()
             directives.httpCookie = headerValue;
         if (headerName == "accept")
             directives.httpAccept = headerValue;
+        if (headerName == "host")
+            _host = headerValue;
         ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
         if (ret.second == false)
             setStatusCode(400, "Duplicate Header");
@@ -195,8 +201,23 @@ void Request::setDefaultDirectives()
 
 void Request::findServer()
 {
-    //! TODO: first find the server according to the host header
-    
+    vector<Server*>::iterator it = servers.begin();
+    while (it != servers.end())
+    {
+        vector<string> serversNames = (*it)->getServerNames();
+        vector<string>::iterator its = serversNames.begin();
+        while (its != serversNames.end())
+        {
+            if (_host == *its)
+            {
+                this->_server = *it;
+                return;
+            }
+            its++;
+        }
+        it++;
+    }
+    this->_server = servers.front();
 }
 
 void Request::setServer()
@@ -300,6 +321,7 @@ string Request::getExtension(string contentType)
 
 void Request::createOutfile()
 {
+    directives.isCGI = false;
     if (directives.isCgiAllowed && Helpers::isCGI(directives.requestedFile, directives.indexs))
     {
         this->_isCgi = directives.isCGI = true;

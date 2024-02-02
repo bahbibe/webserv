@@ -59,6 +59,7 @@ private:
     size_t _bodyLength;
     bool _isReadingBody;
     size_t _contentLength;
+    string _host;
 
     bool _isBodyBoundary;
     string _boundary;
@@ -101,8 +102,9 @@ public:
     bool isErrorCode;
     clock_t _start;
     bool _ready;
+    vector<Server*> servers;
 
-    Request(Server* server, int socketFd);
+    Request(vector<Server*>& servers, int socketFd);
     ~Request();
     Request();
     Request(Request const &other);

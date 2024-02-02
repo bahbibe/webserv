@@ -26,7 +26,7 @@
 #define DEFAULT_CONF "conf/default.conf"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
-#define TIMEOUT 10
+#define TIMEOUT 13
 #define CLOCKWORK(x) double(clock() - x) / CLOCKS_PER_SEC
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
@@ -82,8 +82,8 @@ public:
     void start();
     void newConnection(map<int, Request> &req ,Server &server);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
-    bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
-    bool matchServer(map<int, Request> &req, int sock);
+    // bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
+    void matchServer(map<int, Request> &req, int sock);
     class ServerException : public exception
     {
     private:
