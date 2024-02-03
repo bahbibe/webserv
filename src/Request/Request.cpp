@@ -62,7 +62,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     this->_start = 0;
 }
 
-Request::Request(Server* server, int socketFd, const vector<Server>& servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
+Request::Request(Server* server, int socketFd, vector<Server> servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false), _ready(false)
 {
@@ -85,7 +85,7 @@ void Request::readRequest()
         this->parseRequest();
     } catch (int statusCode)
     {
-        std::cerr << this->getStatusMessage() << '\n';
+        // std::cerr << this->getStatusMessage() << '\n';
         return;
     }
 }
@@ -397,7 +397,7 @@ void Request::parseBodyWithChunked()
 
 void Request::setStatusCode(int statusCode, string statusMessage)
 {
-    this->printRequest();
+    // this->printRequest();
     this->_statusCode = statusCode;
     this->_isRequestFinished = true;
     stringstream ss;
@@ -410,11 +410,11 @@ void Request::setStatusCode(int statusCode, string statusMessage)
 
 void Request::setTimeout()
 {
-    this->printRequest();
+    // this->printRequest();
     this->_statusCode = 408;
     this->_isRequestFinished = true;
     this->isErrorCode = true;
-    this->_statusMessage = RED "Request Timeout: 408" RESET;
+    // this->_statusMessage = RED "Request Timeout: 408" RESET;
 }
 
 void Request::printRequest()

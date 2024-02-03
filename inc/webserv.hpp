@@ -76,6 +76,7 @@ private:
     int _serverCount;
     vector<Server> _servers;
 public:
+    vector<Server> _servers;
     Webserver();
     ~Webserver();
     void brackets(string const &file);

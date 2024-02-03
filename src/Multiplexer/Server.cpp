@@ -17,6 +17,7 @@ Server &Server::operator=(Server const &src)
 {
     if (this != &src)
     {
+        // _locations = src._locations;
         map<string, Location *>::const_iterator it = src._locations.begin();
         for (; it != src._locations.end(); it++)
         {
@@ -100,7 +101,7 @@ Server::~Server()
         if(it->second)
             delete it->second;
     }
-    close(_socket);
+    // close(_socket);
 }
 
 size_t Server::getClientMaxBodySize() const
