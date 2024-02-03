@@ -62,7 +62,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     this->_start = 0;
 }
 
-Request::Request(Server* server, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
+Request::Request(Server* server, int socketFd, const vector<Server>& servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false), _ready(false)
 {
@@ -199,28 +199,13 @@ void Request::setDefaultDirectives()
 
 void Request::findServer()
 {
-    // vector<Server>::iterator it = servers.begin();
-    // while (it++ != servers.end())
-    // {
-    //     cout << RED "server: " RESET << it->getHost() << endl;
-    // }
-    // vector<Server*>::iterator it = servers.begin();
-    // while (it != servers.end())
-    // {
-    //     vector<string> serversNames = (*it)->getServerNames();
-    //     vector<string>::iterator its = serversNames.begin();
-    //     while (its != serversNames.end())
-    //     {
-    //         if (_host == *its)
-    //         {
-    //             this->_server = *it;
-    //             return;
-    //         }
-    //         its++;
-    //     }
-    //     it++;
-    // }
-    // this->_server = servers.front();
+    vector<Server>::iterator it = servers.begin();
+    while (it != servers.end())
+    {
+        cout << RED "server: " RESET << it->getPort() << endl;
+        cout << RED "server root: " RESET << it->getRoot() << endl;
+        it++;
+    }
 }
 
 void Request::setServer()

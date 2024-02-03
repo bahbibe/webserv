@@ -104,7 +104,7 @@ public:
     bool _ready;
     vector<Server> servers;
 
-    Request(Server* server, int socketFd);
+    Request(Server* server, int socketFd, const vector<Server>& servers);
     ~Request();
     Request();
     Request(Request const &other);

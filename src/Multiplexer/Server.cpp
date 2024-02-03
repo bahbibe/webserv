@@ -17,7 +17,11 @@ Server &Server::operator=(Server const &src)
 {
     if (this != &src)
     {
-        _locations = src._locations;
+        map<string, Location *>::const_iterator it = src._locations.begin();
+        for (; it != src._locations.end(); it++)
+        {
+            _locations[it->first] = new Location(*it->second);
+        }
         _error_pages = src._error_pages;
         _extensions = src._extensions;
         _types = src._types;

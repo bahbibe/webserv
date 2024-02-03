@@ -78,11 +78,13 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     // cout << "New connection\n";
+    _clientPort = ntohs(clientAddr.sin_port);
+    // cout << RED "client port: " RESET << _clientPort << endl;
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP ;
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
-    req.insert(make_pair(clientSock, Request(&server, clientSock)));
+    req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = clock();
 }
 
