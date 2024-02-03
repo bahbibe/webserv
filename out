@@ -1,0 +1,60 @@
+##START##
+==================SERVER==================
+host: 127.0.0.1
+port: 8080
+server_names: 
+	test331.com
+indexs: 
+	index.html
+	index.php
+server_root: /home/kali/Desktop/webserv/WWW/foodie/
+error_pages: 
+	400 ./WWW/err/400.html 
+	403 ./WWW/err/403.html 
+	404 ./WWW/err/404.html 
+	405 ./WWW/err/405.html 
+	500 ./WWW/err/500.html 
+	501 ./WWW/err/501.html 
+client_max_body_size: 0
+autoindex: 0
+==================LOCATIONS==================
+Location: /
+    indexs: index.html index.php 
+    root: /home/kali/Desktop/webserv/WWW/foodie/
+    autoindex: 1
+    upload: 1
+    cgi: 1
+    upload_path: /home/kali/Desktop/webserv/WWW/foodie/uploads/
+    return: 
+    methods: GET POST DELETE 
+#END#
+##START##
+==================SERVER==================
+host: 127.0.0.1
+port: 8080
+server_names: 
+	test.com
+indexs: 
+	index.html
+	index.php
+server_root: /home/kali/Desktop/webserv/WWW/test/
+error_pages: 
+	400 ./WWW/err/400.html 
+	403 ./WWW/err/403.html 
+	404 ./WWW/err/404.html 
+	405 ./WWW/err/405.html 
+	500 ./WWW/err/500.html 
+	501 ./WWW/err/501.html 
+client_max_body_size: 0
+autoindex: 0
+==================LOCATIONS==================
+Location: /
+    indexs: index.html index.php 
+    root: /home/kali/Desktop/webserv/WWW/test/
+    autoindex: 1
+    upload: 1
+    cgi: 1
+    upload_path: /home/kali/Desktop/webserv/WWW/foodie/uploads/
+    return: 
+    methods: GET POST DELETE 
+#END#

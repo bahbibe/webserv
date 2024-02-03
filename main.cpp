@@ -17,9 +17,12 @@ int main(int argc, char const *argv[])
             for (size_t i = 0; i < server.serverCount(); i++)
             {
                 server[i].parseServer(buff);
-                // server[i].print();
+                cout << "#START#\n";
+                server[i].print();
+                cout << "#END#\n";
                 server[i].setupSocket();
             }
+                // exit(0);
             server.start();
         }
         else

@@ -119,26 +119,39 @@ void Server::mimeTypes()
     else
         throw Server::ServerException(ERR "Unable to open mime file");
 }
+string toStr(int i)
+{
+    stringstream ss;
+    ss << i;
+    return ss.str();
+}
 void Server::parseServer(string const &file)
 {
     mimeTypes();
     stringstream ss(file);
-    ss.seekg(Server::_pos);
+    ss.seekg(_pos);
     string buff;
-    ss >> buff ;
+    t_dir dir;
+    memset(&dir, 0, sizeof(t_dir));
     while (getline(ss, buff))
-    {
+    {   
+        // cout << "buff: SERV" << buff << endl;
+        trim(buff);
         if (isBrackets(buff) && buff.find("}") != string::npos)
             break;
-        if (buff.empty() || isWhitespace(buff) || isComment(buff) || isBrackets(buff))
+        if (buff.empty() || isWhitespace(buff) || isComment(buff) )
             continue;
         stringstream line(buff);
         line >> buff;
+        if (buff == "server" || buff == "}")
+            continue;
+        else if (!allowedConfig(buff))
+            throw ServerException(ERR "Invalid config " + buff);
         if (isServerDir(buff))
         {
             if (buff == "host")
             {
-                _dir.host++;
+                dir.host++;
                 line >> _host;
                 if (_host == "localhost")
                     _host = "127.0.0.1";
@@ -147,7 +160,7 @@ void Server::parseServer(string const &file)
             }
             else if (buff == "listen")
             {
-                _dir.listen++;
+                dir.listen++;
                 line >> _port;
                 if (_port.empty())
                     _port = DEFAULT_PORT;
@@ -156,7 +169,7 @@ void Server::parseServer(string const &file)
             }
             else if (buff == "server_name")
             {
-                _dir.server_name++;
+                dir.server_name++;
                 while (line >> buff)
                     _server_names.push_back(buff);
             }
@@ -169,18 +182,18 @@ void Server::parseServer(string const &file)
             }
             else if (buff == "index")
             {
-                _dir.index++;
+                dir.index++;
                 while (line >> buff)
                     _indexs.push_back(buff);
             }
             else if (buff == "root")
             {
-                _dir.root++;
+                dir.root++;
                 line >> _server_root;
             }
             else if (buff == "autoindex")
             {
-                _dir.autoindex++;
+                dir.autoindex++;
                 line >> buff;
                 if (buff == "on")
                     _autoindex = true;
@@ -191,7 +204,7 @@ void Server::parseServer(string const &file)
             }
             else if (buff == "client_max_body_size")
             {
-                _dir.client_max_body_size++;
+                dir.client_max_body_size++;
                 line >> _client_max_body_size;
                 if (!isNumber(_client_max_body_size))
                     throw ServerException(ERR "Invalid client_max_body_size");
@@ -203,9 +216,11 @@ void Server::parseServer(string const &file)
             }
         }
         else
+        {
             throw ServerException(ERR "Invalid directive");
+        }
     }
-    if (duplicateDirective(_dir))
+    if (duplicateDirective(dir))
         throw ServerException(ERR "Duplicate directive");
     Server::_pos = ss.tellg();
 }

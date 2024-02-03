@@ -24,6 +24,8 @@ private:
 public:
     Server();
     ~Server();
+    Server(Server const &src);
+    Server &operator=(Server const &src);
     void parseServer(string const &);
     void mimeTypes();
     Location *parseLocation(stringstream &ss);

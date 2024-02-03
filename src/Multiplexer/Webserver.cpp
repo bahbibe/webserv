@@ -3,10 +3,9 @@
 #include "../../inc/Request.hpp"
 #include "../../inc/Response.hpp"
 
-
 Webserver::Webserver()
 {
-    if((ep.epollFd = epoll_create(1) ) == -1 )
+    if ((ep.epollFd = epoll_create(1)) == -1)
         throw ServerException(ERR "Failed to create epoll");
 }
 
@@ -22,7 +21,6 @@ Server &Webserver::operator[](size_t index)
 
 Webserver::~Webserver()
 {
-    
 }
 
 void Webserver::brackets(string const &file)
@@ -53,7 +51,7 @@ void Webserver::brackets(string const &file)
         else if (tmp == "location")
         {
             line >> tmp >> tmp;
-            if (tmp != "{" )
+            if (tmp != "{")
                 throw ServerException(ERR "Invalid brackets");
             if (line.get() != EOF)
                 throw ServerException(ERR "Invalid brackets");
@@ -72,13 +70,12 @@ void Webserver::brackets(string const &file)
         throw ServerException(ERR "Invalid brackets");
 }
 
-void Webserver::newConnection(map<int, Request> &req, Server& server)
+void Webserver::newConnection(int sock)
 {
-    (void) req;
     int clientSock;
     struct sockaddr_in clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
-    if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
+    if ((clientSock = accept(sock, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     cout << "New connection\n";
     ep.event.data.fd = clientSock;
@@ -97,27 +94,23 @@ void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp
     close(sock);
 }
 
-void Webserver::matchServer(map<int, Request> &req, int sock)
+bool Webserver::matchServer(int sock)
 {
-    vector<Server*> multServers;
-    // iterator
-    for (size_t j = 0; j < _servers.size(); j++)
+    vector<Server>::iterator it = _servers.begin();
+    bool match = false;
+    while (it != _servers.end())
     {
-        if (sock == _servers[j].getSocket())
-            multServers.push_back(&(_servers[j]));
-            // multServers.insert(make_pair(sock,&(_servers[j])));
-        // else
-        //     return false;
+        if (it->getSocket() == sock && !match)
+        {
+            newConnection(it->getSocket());
+            match = true;
+            it++;
+        }
+        else if (it->getSocket() == sock && match)
+            continue;
     }
-    // cout << RED "size: " RESET << multServers.size() << endl;
-    // exit(0);
-    // vector<Server*>::iterator it = multServers.begin();
-    // while (it != multServers.end())
-    // {
-        // newConnection(req, **it);
-    // }
+    return true;
 }
-
 
 void Webserver::start()
 {
@@ -127,30 +120,25 @@ void Webserver::start()
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
         for (int i = 0; i < evCount; i++)
         {
-            cout << BLUE "sjkasas" RESET << endl;
-            matchServer(_req, ep.events[i].data.fd);
-            // if (matchServer(_req, ep.events[i].data.fd))
-            //     continue;
+            // matchServer(_req, ep.events[i].data.fd);
+            if (matchServer(ep.events[i].data.fd))
+                continue;
             if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
             {
-                if(_resp[ep.events[i].data.fd]._isCGI ==true)
+                if (_resp[ep.events[i].data.fd]._isCGI == true)
                 {
-                    kill(_resp[ep.events[i].data.fd].pid,SIGKILL);
+                    kill(_resp[ep.events[i].data.fd].pid, SIGKILL);
                     waitpid(_resp[ep.events[i].data.fd].pid, 0, 0);
                 }
                 closeConnection(_req, _resp, ep.events[i].data.fd);
-                cout << BLUE "here" RESET << endl;
             }
             if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
-            {
                 closeConnection(_req, _resp, ep.events[i].data.fd);
-                cout << BLUE "here 2" RESET << endl;
-            }
             else
             {
                 if (ep.events[i].events & EPOLLIN)
                 {
-                    _req[ep.events[i].data.fd]._start = clock();    
+                    _req[ep.events[i].data.fd]._start = clock();
                     _req[ep.events[i].data.fd].readRequest();
                     if (_req[ep.events[i].data.fd].getIsRequestFinished())
                         _resp.insert(make_pair(ep.events[i].data.fd, Response()));

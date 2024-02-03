@@ -8,6 +8,31 @@ Server::Server() : _autoindex(false)
 }
 
 
+Server::Server(Server const &src)
+{
+    *this = src;
+}
+
+Server &Server::operator=(Server const &src)
+{
+    if (this != &src)
+    {
+        _locations = src._locations;
+        _error_pages = src._error_pages;
+        _extensions = src._extensions;
+        _types = src._types;
+        _server_names = src._server_names;
+        _indexs = src._indexs;
+        _host = src._host;
+        _port = src._port;
+        _server_root = src._server_root;
+        _client_max_body_size = src._client_max_body_size;
+        _autoindex = src._autoindex;
+        _socket = src._socket;
+    }
+    return *this;
+}
+
 map<string, Location *> Server::getLocations() const
 {
     return _locations;

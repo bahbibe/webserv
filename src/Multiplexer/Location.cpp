@@ -2,6 +2,29 @@
 #include "../../inc/Location.hpp"
 #include "../../inc/Server.hpp"
 
+
+Location::Location(Location const &src)
+{
+    *this = src;
+}
+
+Location &Location::operator=(Location const &src)
+{
+    if (this != &src)
+    {
+        _autoindex = src._autoindex;
+        _cgi = src._cgi;
+        _upload = src._upload;
+        _methods = src._methods;
+        _indexs = src._indexs;
+        _root = src._root;
+        _upload_path = src._upload_path;
+        _cgi_upload_path = src._cgi_upload_path;
+        _return = src._return;
+    }
+    return *this;
+}
+
 Location::Location() : _autoindex(false), _cgi(false), _upload(false)
 {
     memset(&_dir, 0, sizeof(_dir));

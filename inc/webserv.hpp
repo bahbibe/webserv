@@ -80,10 +80,10 @@ public:
     size_t serverCount();
     Server &operator[](size_t index);
     void start();
-    void newConnection(map<int, Request> &req ,Server &server);
+    void newConnection(int sock);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
     // bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
-    void matchServer(map<int, Request> &req, int sock);
+    bool matchServer(int sock);
     class ServerException : public exception
     {
     private:

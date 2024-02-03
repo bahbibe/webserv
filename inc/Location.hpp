@@ -18,6 +18,8 @@ public:
     t_dir _dir;
     Location();
     ~Location();
+    Location(Location const &src);
+    Location &operator=(Location const &src);
     void setMethods(string const &);
     void setIndexs(string const &);
     void setRoot(string const &);
