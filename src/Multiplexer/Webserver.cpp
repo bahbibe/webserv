@@ -80,11 +80,10 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
         throw ServerException(ERR "Accept failed");
     // cout << "New connection\n";
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP ;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
-    pair <int, Request> p = make_pair(clientSock, Request(&server, clientSock, _servers));
-    req.insert(p);
+    req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = clock();
 }
 

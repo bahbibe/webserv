@@ -199,13 +199,28 @@ void Request::setDefaultDirectives()
 
 void Request::findServer()
 {
-    vector<Server>::iterator it = servers.begin();
-    while (it != servers.end())
-    {
-        cout << RED "server: " RESET << it->getPort() << endl;
-        cout << RED "server root: " RESET << it->getRoot() << endl;
-        it++;
-    }
+    // vector<Server>::iterator it = servers.begin();
+    // while (it++ != servers.end())
+    // {
+    //     cout << RED "server: " RESET << it->getHost() << endl;
+    // }
+    // vector<Server*>::iterator it = servers.begin();
+    // while (it != servers.end())
+    // {
+    //     vector<string> serversNames = (*it)->getServerNames();
+    //     vector<string>::iterator its = serversNames.begin();
+    //     while (its != serversNames.end())
+    //     {
+    //         if (_host == *its)
+    //         {
+    //             this->_server = *it;
+    //             return;
+    //         }
+    //         its++;
+    //     }
+    //     it++;
+    // }
+    // this->_server = servers.front();
 }
 
 void Request::setServer()

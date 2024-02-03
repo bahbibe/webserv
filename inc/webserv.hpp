@@ -73,8 +73,7 @@ class Webserver
 private:
     map<int, Request> _req;
     map<int, Response> _resp;
-    int _serverCount;
-    vector<Server> _servers;
+    int _clientPort;
 public:
     vector<Server> _servers;
     Webserver();
@@ -83,7 +82,7 @@ public:
     size_t serverCount();
     Server &operator[](size_t index);
     void start();
-    void newConnection(map<int, Request> &req, Server &server); 
+    void newConnection(map<int, Request> &req, Server &server);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
     // bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
     bool matchServer(map<int, Request> &req, int sock);
