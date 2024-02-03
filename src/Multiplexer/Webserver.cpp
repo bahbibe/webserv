@@ -77,6 +77,7 @@ void Webserver::newConnection(int sock)
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(sock, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
+    _clientPort = ntohs(clientAddr.sin_port);
     cout << "New connection\n";
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
