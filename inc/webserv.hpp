@@ -73,7 +73,7 @@ private:
     vector<Server> _servers;
     map<int, Request> _req;
     map<int, Response> _resp;
-    int _clientPort;
+    in_port_t _clientPort;
 public:
     Webserver();
     ~Webserver();
@@ -81,10 +81,10 @@ public:
     size_t serverCount();
     Server &operator[](size_t index);
     void start();
-    void newConnection(int sock);
+    void newConnection(map<int, Request> &req, Server &server); 
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
     // bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
-    bool matchServer(int sock);
+    bool matchServer(map<int, Request> &req, int sock);
     class ServerException : public exception
     {
     private:

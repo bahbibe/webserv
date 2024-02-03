@@ -70,21 +70,22 @@ void Webserver::brackets(string const &file)
         throw ServerException(ERR "Invalid brackets");
 }
 
-void Webserver::newConnection(int sock)
+void Webserver::newConnection(map<int, Request> &req, Server &server)
 {
     int clientSock;
     struct sockaddr_in clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
-    if ((clientSock = accept(sock, (struct sockaddr *)&clientAddr, &addrLen)) == -1)
+    if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
+    // cout << "New connection\n";
     _clientPort = ntohs(clientAddr.sin_port);
-    cout << "New connection\n";
+    // cout << RED "client port: " RESET << _clientPort << endl;
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
-    // req.insert(make_pair(clientSock, Request(servers, clientSock)));
-    // req[clientSock]._start = clock();
+    req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
+    req[clientSock]._start = clock();
 }
 
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
@@ -95,22 +96,17 @@ void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp
     close(sock);
 }
 
-bool Webserver::matchServer(int sock)
+bool Webserver::matchServer(map<int, Request> &req, int sock)
 {
-    vector<Server>::iterator it = _servers.begin();
-    bool match = false;
-    while (it != _servers.end())
+    for (size_t j = 0; j < _servers.size(); j++)
     {
-        if (it->getSocket() == sock && !match)
+        if (sock == _servers[j].getSocket())
         {
-            newConnection(it->getSocket());
-            match = true;
-            it++;
+            newConnection(req, _servers[j]);
+            return true;
         }
-        else if (it->getSocket() == sock && match)
-            continue;
     }
-    return true;
+    return false;
 }
 
 void Webserver::start()
@@ -121,8 +117,7 @@ void Webserver::start()
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
         for (int i = 0; i < evCount; i++)
         {
-            // matchServer(_req, ep.events[i].data.fd);
-            if (matchServer(ep.events[i].data.fd))
+            if (matchServer(_req, ep.events[i].data.fd))
                 continue;
             if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
             {

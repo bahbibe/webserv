@@ -102,9 +102,9 @@ public:
     bool isErrorCode;
     clock_t _start;
     bool _ready;
-    vector<Server*> servers;
+    vector<Server> servers;
 
-    Request(vector<Server*>& servers, int socketFd);
+    Request(Server* server, int socketFd, const vector<Server>& servers);
     ~Request();
     Request();
     Request(Request const &other);

@@ -60,21 +60,19 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
     this->_start = 0;
-    cout << RED "ddssd 1" RESET << endl;
 }
 
-Request::Request(vector<Server*>& servers, int socketFd) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
+Request::Request(Server* server, int socketFd, const vector<Server>& servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false), _ready(false)
 {
     this->servers = servers;
-    this->_server = NULL;
+    this->_server = server;
     this->_readBytes = 0;
     this->_location = NULL;
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
     this->_start = 0;
-    cout << RED "ddssd 2" RESET << endl;
 }
 
 void Request::readRequest()
@@ -201,23 +199,13 @@ void Request::setDefaultDirectives()
 
 void Request::findServer()
 {
-    vector<Server*>::iterator it = servers.begin();
+    vector<Server>::iterator it = servers.begin();
     while (it != servers.end())
     {
-        vector<string> serversNames = (*it)->getServerNames();
-        vector<string>::iterator its = serversNames.begin();
-        while (its != serversNames.end())
-        {
-            if (_host == *its)
-            {
-                this->_server = *it;
-                return;
-            }
-            its++;
-        }
+        cout << RED "server: " RESET << it->getPort() << endl;
+        cout << RED "server root: " RESET << it->getRoot() << endl;
         it++;
     }
-    this->_server = servers.front();
 }
 
 void Request::setServer()
@@ -289,7 +277,9 @@ void Request::validateRequest()
             setStatusCode(501, "multipart/form-data and Transfer-Encoding are present");
         _isBodyBoundary = true;
         _boundary = "--" + _headers["content-type"].substr(_headers["content-type"].find("boundary=") + 9);
+        setContentLength(_headers["content-length"]);
         _boundaries.setMimeTypes(_mimeTypes);
+        _boundaries.setBoundaries(_boundary, directives.uploadPath, _contentLength);
         directives.boundary = _boundary;
     }
     if (_headers.find("transfer-encoding") != _headers.end() && _headers["transfer-encoding"] != "chunked")
@@ -353,7 +343,7 @@ void Request::createOutfile()
 void Request::parseBodyWithBoundaries()
 {
     try {
-        _boundaries.parseBoundary(_requestBuffer, _boundary, _readBytes, directives.uploadPath);
+        _boundaries.parseBoundary(_requestBuffer, _readBytes);
     } catch (int statusCode)
     {
         setStatusCode(statusCode, "Boundaris Status Code");

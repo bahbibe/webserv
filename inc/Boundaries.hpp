@@ -24,6 +24,8 @@ class Boundaries {
         string _rest;
         size_t _filesCounter;
         map<string, vector<string> > _mimeTypes;
+        size_t _contentLength;
+        size_t _writedContent;
 
     public:
         Boundaries();
@@ -31,13 +33,14 @@ class Boundaries {
         // Boundaries& operator=(const Boundaries& rhs);
         ~Boundaries();
 
-        void parseBoundary(const string& buffer, const string& boundary, int readBytes, const string& uploadPath);
+        void parseBoundary(const string& buffer, int readBytes);
         void checkFirstBoundary();
         void handleBoundaries();
-        void writeContent();
+        void writeContent(string& buffer);
         string getExtension();
         void createFile();
         void throwException(int code);
         void closeOutFile();
         void setMimeTypes(map<string, vector<string> > mimeTypes);
+        void setBoundaries(const string& boundary, const string& uploadPath, size_t contentLength);
 };
