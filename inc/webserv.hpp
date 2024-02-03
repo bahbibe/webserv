@@ -66,14 +66,15 @@ typedef struct s_events
 
 extern t_events ep;
 extern map<string, int> socketMap;
+extern vector<Server> _servers;
 
 class Webserver
 {
 private:
-    vector<Server> _servers;
     map<int, Request> _req;
     map<int, Response> _resp;
-    in_port_t _clientPort;
+    int _serverCount;
+    vector<Server> _servers;
 public:
     Webserver();
     ~Webserver();

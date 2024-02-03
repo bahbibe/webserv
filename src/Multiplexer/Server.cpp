@@ -158,6 +158,7 @@ void Server::setupSocket()
     if (it != socketMap.end())
     {
         _socket = it->second;
+        cout << "hamnid" << endl;
         return;
     }
     int sockOpt = 1;

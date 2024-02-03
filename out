@@ -1,4 +1,88 @@
-##START##
+[0;32mListening on [0m127.0.0.1:5500
+[0;32mListening on [0m127.0.0.1:8080
+==================SERVER==================
+host: 127.0.0.1
+port: 5500
+server_names: 
+	example.com
+	fghdhd.com
+indexs: 
+	index.html
+	index.php
+server_root: /home/kali/42_webserv/WWW
+error_pages: 
+	400 ./WWW/err/400.html 
+	403 ./WWW/err/403.html 
+	404 ./WWW/err/404.html 
+	405 ./WWW/err/405.html 
+	500 ./WWW/err/500.html 
+	501 ./WWW/err/501.html 
+client_max_body_size: 0
+autoindex: 0
+==================LOCATIONS==================
+Location: /
+    indexs: 400.html _index.html index.php 
+    root: /home/kali/Desktop/webserv/WWW
+    autoindex: 1
+    upload: 1
+    cgi: 1
+    upload_path: /home/kali/Desktop/webserv/WWW/uploads
+    return: 
+    methods: GET POST DELETE 
+Location: /b
+    indexs: index.html index.php 
+    root: ./WWW/test/
+    autoindex: 1
+    upload: 1
+    cgi: 0
+    upload_path: ./WWW/b/
+    return: 
+    methods: GET POST DELETE 
+Location: /chunks
+    indexs: 
+    root: ./WWW/test/chunks/
+    autoindex: 1
+    upload: 1
+    cgi: 0
+    upload_path: ./WWW/chunks/uploads/
+    return: 
+    methods: GET POST DELETE 
+Location: /foodie
+    indexs: index.html index.php 
+    root: /home/kali/Desktop/webserv/WWW/foodie/
+    autoindex: 1
+    upload: 1
+    cgi: 1
+    upload_path: /home/kali/Desktop/webserv/WWW/foodie/uploads/
+    return: 
+    methods: GET POST DELETE 
+Location: /images
+    indexs: test.html _logo.png index.php 
+    root: ./WWW/images
+    autoindex: 1
+    upload: 0
+    cgi: 0
+    upload_path: 
+    return: 
+    methods: GET DELETE 
+Location: /php_upload_
+    indexs: index.html 
+    root: /home/kali/Desktop/webserv/WWW/uploads
+    autoindex: 1
+    upload: 1
+    cgi: 1
+    upload_path: /home/kali/Desktop/webserv/WWW/uploads
+    return: 
+    methods: GET DELETE POST 
+Location: /website
+    indexs: index.html index.php 
+    root: /home/kali/Desktop/webserv/WWW/website/
+    autoindex: 1
+    upload: 0
+    cgi: 0
+    upload_path: 
+    return: 
+    methods: GET DELETE 
 ==================SERVER==================
 host: 127.0.0.1
 port: 8080
@@ -27,8 +111,6 @@ Location: /
     upload_path: /home/kali/Desktop/webserv/WWW/foodie/uploads/
     return: 
     methods: GET POST DELETE 
-#END#
-##START##
 ==================SERVER==================
 host: 127.0.0.1
 port: 8080
@@ -57,4 +139,3 @@ Location: /
     upload_path: /home/kali/Desktop/webserv/WWW/foodie/uploads/
     return: 
     methods: GET POST DELETE 
-#END#

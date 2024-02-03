@@ -1,6 +1,7 @@
 #include "inc/Server.hpp"
 t_events ep;
 map<string, int> socketMap;
+vector<Server> servers;
 int main(int argc, char const *argv[])
 {
     try
@@ -16,13 +17,18 @@ int main(int argc, char const *argv[])
             server.brackets(buff);
             for (size_t i = 0; i < server.serverCount(); i++)
             {
-                server[i].parseServer(buff);
-                // cout << "#START#\n";
-                // server[i].print();
-                // cout << "#END#\n";
-                server[i].setupSocket();
+                Server tmp;
+                tmp.parseServer(buff);
+                tmp.setupSocket();
+                servers.push_back(tmp);
             }
-            server.start();
+            map<string, int>::iterator it = socketMap.begin();
+            while (it != socketMap.end())
+            {
+                cout << RED << it->first << " " << GREEN <<  it->second <<RESET<< endl;
+                it++;
+            }
+            // server.start();
         }
         else
             throw Server::ServerException(ERR "Unable to open file");

@@ -3,15 +3,16 @@
 #include "../../inc/Request.hpp"
 #include "../../inc/Response.hpp"
 
-Webserver::Webserver()
+Webserver::Webserver() : _serverCount(0)
 {
     if ((ep.epollFd = epoll_create(1)) == -1)
         throw ServerException(ERR "Failed to create epoll");
 }
 
+
 size_t Webserver::serverCount()
 {
-    return _servers.size();
+    return _serverCount;
 }
 
 Server &Webserver::operator[](size_t index)
@@ -38,7 +39,7 @@ void Webserver::brackets(string const &file)
         line >> tmp;
         if (tmp == "server")
         {
-            _servers.push_back(Server());
+            _serverCount++;
             if (!lim.empty())
                 throw ServerException(ERR "Invalid brackets");
             line >> tmp;
@@ -78,7 +79,6 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     // cout << "New connection\n";
-    _clientPort = ntohs(clientAddr.sin_port);
     // cout << RED "client port: " RESET << _clientPort << endl;
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
