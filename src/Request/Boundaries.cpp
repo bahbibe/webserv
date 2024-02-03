@@ -1,6 +1,6 @@
 #include "../../inc/Boundaries.hpp"
 
-Boundaries::Boundaries() : _isFileCreated(false), _outfile(NULL), _state(BD_START), _filesCounter(0) { };
+Boundaries::Boundaries() : _isFileCreated(false), _outfile(NULL), _state(BD_START), _filesCounter(0), _contentLength(0), _writedContent(0) { };
 
 Boundaries::~Boundaries() { };
 
@@ -26,6 +26,14 @@ Boundaries::~Boundaries() { };
 //     }
 //     return *this;
 // }
+
+void Boundaries::setBoundaries(const string& boundary, const string& uploadPath, size_t contentLength)
+{
+    this->_boundary = boundary;
+    this->_endBoundary = this->_boundary + "--";
+    this->_uploadPath = uploadPath;
+    this->_contentLength = contentLength;
+}
 
 void Boundaries::setMimeTypes(map<string, vector<string> > mimeTypes)
 {
@@ -105,11 +113,20 @@ void Boundaries::checkFirstBoundary()
     handleBoundaries();
 }
 
-void Boundaries::writeContent()
+void Boundaries::writeContent(string& buffer)
 {
-    _outfile->write(_buffer.c_str(), _buffer.length());
+    if (_contentLength < buffer.length())
+    {
+        _outfile->write(buffer.c_str(), _contentLength);
+        _outfile->flush();
+        buffer.clear();
+        throwException(201);
+    }
+    _outfile->write(buffer.c_str(), buffer.length());
     _outfile->flush();
-    _buffer.clear();
+    buffer.clear();
+    _writedContent += buffer.length();
+    _contentLength -= buffer.length();
 }
 
 void Boundaries::closeOutFile()
@@ -137,14 +154,13 @@ void Boundaries::handleBoundaries()
             _rest = _buffer.substr(0, _buffer.length());
             _buffer.clear();
         }
-        writeContent();
+        writeContent(_buffer);
     }
     else if (midBoundaryPos != string::npos && endBoundaryPos != string::npos && midBoundaryPos < endBoundaryPos)
     {
         string content = _buffer.substr(0, midBoundaryPos);
         _buffer.erase(0, midBoundaryPos);
-        _outfile->write(content.c_str(), content.length());
-        _outfile->flush();
+        writeContent(content);
         closeOutFile();
         while (1)
         {
@@ -157,14 +173,14 @@ void Boundaries::handleBoundaries()
                 if (midBoundaryPos != string::npos && midBoundaryPos < endBoundaryPos)
                 {
                     string content = _buffer.substr(0, midBoundaryPos);
-                    _outfile->write(content.c_str(), content.length());
-                    _outfile->flush();
+                    // _outfile->write(content.c_str(), content.length());
+                    // _outfile->flush();
+                    writeContent(content);
                     _buffer.erase(0, midBoundaryPos);
                     closeOutFile();
                 } else {
                     string content = _buffer.substr(0, endBoundaryPos);
-                    _outfile->write(content.c_str(), content.length());
-                    _outfile->flush();
+                    writeContent(content);
                     _buffer.erase(0, endBoundaryPos);
                     closeOutFile();
                     throwException(201);
@@ -175,7 +191,7 @@ void Boundaries::handleBoundaries()
     else if (endBoundaryPos != string::npos)
     {
         _buffer.erase(endBoundaryPos);
-        writeContent();
+        writeContent(_buffer);
         closeOutFile();
         throwException(201);
     }
@@ -183,19 +199,16 @@ void Boundaries::handleBoundaries()
     {
         _rest = _buffer.substr(midBoundaryPos);
         _buffer.erase(_buffer.length() - (_buffer.length() - midBoundaryPos));
-        writeContent();
+        writeContent(_buffer);
         closeOutFile();
     }
 }
 
-void Boundaries::parseBoundary(const string& buffer, const string& boundary, int readBytes, const string& uploadPath)
+void Boundaries::parseBoundary(const string& buffer, int readBytes)
 {
-    this->_boundary = boundary;
-    this->_endBoundary = this->_boundary + "--";
     this->_buffer = "";
     this->_buffer.append(_rest);
     this->_buffer.append(buffer, 0, readBytes);
-    this->_uploadPath = uploadPath;
     if (!_isFileCreated)
         createFile();
     if (_state == BD_START)
