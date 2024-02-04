@@ -415,7 +415,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     if (statusCode >= 400)
         this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
-    cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+    // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
     throw  statusCode;
 }
 
@@ -430,7 +430,7 @@ void Request::setTimeout()
         this->_outfile.close();
     }
     this->_statusMessage = RED "Request Timeout: 408" RESET;
-    cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+    // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
 }
 
 void Request::printRequest()
