@@ -198,6 +198,8 @@ void Response::initVars(Request &request, int fdSocket)
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
         this->_absPath = request.directives.requestedFile;
+        if (this->_target.empty())
+            this->_target = "/";
     }
 }
 void Response::sendResponse(Request &request, int fdSocket)
@@ -208,6 +210,18 @@ void Response::sendResponse(Request &request, int fdSocket)
             checkErrors(request);
         if (!this->_defaultError)
             GET(request);
+    }
+    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
+    {
+        if (this->_statusCode == 301)
+            this->_path = request.directives.returnRedirect;
+        else
+        {
+            this->_path = this->_target + "/";
+            this->_statusCode = 301;
+        }
+        SendHeader();
+        this->_isfinished = true;
     }
     else if ((!this->_flag && request.directives.isCgiAllowed)
         && (this->_path.rfind(".php") != string::npos
@@ -263,22 +277,8 @@ void Response::sendResponse(Request &request, int fdSocket)
 }
 
 void Response::checks(Request &request)
-{
-    if (this->_target.empty())
-        this->_target = "/";   
-    if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
-    {
-        if (this->_statusCode == 301)
-            this->_path = request.directives.returnRedirect;
-        else
-        {
-            this->_path = this->_target + "/";
-            this->_statusCode = 301;
-        }
-        SendHeader();
-        this->_isfinished = true;
-    }
-    else if (is_adir(this->_path) && !this->_flag)
+{ 
+    if (is_adir(this->_path) && !this->_flag)
         checkAutoInedx(request);
     else if (!this->_flag)
     {
