@@ -17,6 +17,7 @@ Server &Webserver::operator[](size_t index)
 
 Webserver::~Webserver()
 {
+    
 }
 
 void Webserver::brackets(string const &file)
@@ -74,7 +75,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP ;
+    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
@@ -83,6 +84,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
 
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
 {
+    epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);     
     req.erase(sock);
     resp.erase(sock);
     close(sock);
@@ -119,6 +121,7 @@ void Webserver::start()
                     waitpid(_resp[ep.events[i].data.fd].pid, 0, 0);
                 }
                 closeConnection(_req, _resp, ep.events[i].data.fd);
+                continue;
             }
             if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
                 _req[ep.events[i].data.fd].setTimeout();
@@ -127,6 +130,7 @@ void Webserver::start()
                 if (ep.events[i].events & EPOLLIN)
                 {
                     _req[ep.events[i].data.fd]._start = clock();
+                    
                     _req[ep.events[i].data.fd].readRequest();
                     if (_req[ep.events[i].data.fd].getIsRequestFinished())
                         _resp.insert(make_pair(ep.events[i].data.fd, Response()));
