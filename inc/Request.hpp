@@ -51,6 +51,7 @@ private:
 
     string _method;
     string _requestTarget;
+    string _tmpRequestTarget;
     string _httpVersion;
     map<string, string> _headers;
     string _filePath;
