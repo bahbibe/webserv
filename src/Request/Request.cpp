@@ -80,6 +80,7 @@ void Request::readRequest()
     try {
         _requestBuffer.clear();
         _start = clock();
+        cerr << "ss = "<<_socketFd << endl;
         _readBytes = read(_socketFd, _buffer, bufferSize);
         _buffer[_readBytes] = '\0';
         this->parseRequest();

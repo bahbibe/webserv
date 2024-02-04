@@ -33,6 +33,8 @@ Location *Server::parseLocation(stringstream &ss)
             {
                 location->_dir.root++;
                 line >> tmp;
+                if (access(tmp.c_str(), F_OK) == -1)
+                    location->setRoot(_server_root);
                 location->setRoot(tmp);
             }
             else if (tmp == "autoindex")
@@ -189,6 +191,8 @@ void Server::parseServer(string const &file)
             {
                 dir.root++;
                 line >> _server_root;
+                if (access(_server_root.c_str(), F_OK) == -1)
+                    throw ServerException(ERR + _server_root + ": No such file or directory");
             }
             else if (buff == "autoindex")
             {
@@ -222,4 +226,5 @@ void Server::parseServer(string const &file)
     if (duplicateDirective(dir))
         throw ServerException(ERR "Duplicate directive");
     Server::_pos = ss.tellg();
+    setupSocket();
 }
