@@ -114,9 +114,7 @@ void Response::GET(Request &request)
         this->_body = ss.str() + "\r\n";
         this->_body.append(_body1, file.gcount());
         this->_body.append("\r\n", 2);
-        int n = write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
-        if (n == -1)
-            cerr << "write failed...!!!!" << endl;
+        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
     }
     else if (file.gcount() == 0)
     {
@@ -455,9 +453,7 @@ void Response::SendHeader()
             this->_header += this->_cgiHeader;
         this->_header += "connection: close\r\n\r\n";
     }
-    int n = write(this->_fdSocket, this->_header.c_str(), this->_header.length());
-    if (n < -1)
-        return;
+    write(this->_fdSocket, this->_header.c_str(), this->_header.length());
 }
 
 string Response::templateError(string errorType)
