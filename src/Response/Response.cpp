@@ -305,7 +305,7 @@ void Response::checkAutoInedx(Request &request)
 {
         for (size_t i = 0; i < request.directives.indexs.size(); i++)
         {
-            string index = this->_path + request._location->getIndexs()[i];
+            string index = this->_path + request.directives.indexs[i];
             this->file.open(index.c_str(), ios::in | ios::binary);
             if (file.is_open())
             {

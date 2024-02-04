@@ -5,3 +5,4 @@ CGI/
 *.json
 upload_*
 cgi/upload_*
+m.conf

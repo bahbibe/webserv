@@ -233,9 +233,18 @@ void Request::setServer()
     this->_mimeTypes = _server->getExtensions();
     directives.types = _server->getTypes();
     setDefaultDirectives();
+    map<string, Location *> locations = this->_server->getLocations();
+    Location defaultLocation;
     _location = this->findLocation();
+    // if (_location == NULL && locations.size() > 0)
+    //     setStatusCode(404, "Not Found");
+    // else 
     if (_location == NULL)
-        setStatusCode(404, "Not Found");
+    {
+        defaultLocation.setMethods("GET");
+        defaultLocation.setRoot(_server->getRoot());
+        _location = &defaultLocation;
+    }
     vector<string> locationMethods = _location->getMethods();
     if (locationMethods.size() > 0)
     {
@@ -252,11 +261,13 @@ void Request::setServer()
     directives.autoindex = _location->getAutoindex();
     directives.serverRoot = _location->getRoot();
     directives.indexs = _location->getIndexs();
-    if (directives.serverRoot[directives.serverRoot.length() - 1] != '/')
+    if (directives.indexs.empty())
+        directives.indexs = _server->getIndexs();
+    if (!directives.serverRoot.empty() && directives.serverRoot[directives.serverRoot.length() - 1] != '/')
         directives.serverRoot += "/";
-    if (directives.uploadPath[directives.uploadPath.length() - 1] != '/')
+    if (!directives.uploadPath.empty() && directives.uploadPath[directives.uploadPath.length() - 1] != '/')
         directives.uploadPath += "/";
-    if (directives.cgiUploadPath[directives.cgiUploadPath.length() - 1] != '/')
+    if (!directives.cgiUploadPath.empty() && directives.cgiUploadPath[directives.cgiUploadPath.length() - 1] != '/')
         directives.cgiUploadPath += "/";
     directives.requestedFile = directives.serverRoot + this->_requestTarget;
     if (!directives.returnRedirect.empty())
@@ -408,6 +419,7 @@ void Request::parseBodyWithChunked()
 
 void Request::setStatusCode(int statusCode, string statusMessage)
 {
+    // this->printRequest();
     this->_statusCode = statusCode;
     this->_isRequestFinished = true;
     stringstream ss;
