@@ -199,28 +199,24 @@ void Request::setDefaultDirectives()
 
 void Request::findServer()
 {
-    // vector<Server>::iterator it = servers.begin();
-    // while (it++ != servers.end())
-    // {
-    //     cout << RED "server: " RESET << it->getHost() << endl;
-    // }
-    // vector<Server*>::iterator it = servers.begin();
-    // while (it != servers.end())
-    // {
-    //     vector<string> serversNames = (*it)->getServerNames();
-    //     vector<string>::iterator its = serversNames.begin();
-    //     while (its != serversNames.end())
-    //     {
-    //         if (_host == *its)
-    //         {
-    //             this->_server = *it;
-    //             return;
-    //         }
-    //         its++;
-    //     }
-    //     it++;
-    // }
-    // this->_server = servers.front();
+    string hostName = _server->getHost() + ":" + _server->getPort();
+    vector<Server>::iterator itb = servers.begin();
+    for (; itb != servers.end(); itb++)
+    {
+        if (hostName == itb->getHost() + ":" + itb->getPort())
+        {
+            vector<string> serverNames = itb->getServerNames();
+            vector<string>::iterator it = serverNames.begin();
+            for (; it != serverNames.end(); it++)
+            {
+                if (*it == _host)
+                {
+                    _server = &(*itb);
+                    return;
+                }
+            }
+        }
+    }
 }
 
 void Request::setServer()
@@ -233,6 +229,7 @@ void Request::setServer()
     }
     else
         directives.requestTarget = this->_requestTarget;
+    _tmpRequestTarget = _requestTarget;
     findServer();
     this->_mimeTypes = _server->getExtensions();
     directives.types = _server->getTypes();
@@ -420,6 +417,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     if (statusCode >= 400)
         this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
+    cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
     throw  statusCode;
 }
 
@@ -429,7 +427,13 @@ void Request::setTimeout()
     this->_statusCode = 408;
     this->_isRequestFinished = true;
     this->isErrorCode = true;
-    // this->_statusMessage = RED "Request Timeout: 408" RESET;
+    if (this->_outfileIsCreated)
+    {
+        remove(this->_filePath.c_str());
+        this->_outfile.close();
+    }
+    this->_statusMessage = RED "Request Timeout: 408" RESET;
+    cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
 }
 
 void Request::printRequest()
