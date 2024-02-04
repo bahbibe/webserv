@@ -29,7 +29,6 @@ Request &Request::operator=(const Request &other)
         this->_statusCode = other._statusCode;
         this->_isRequestFinished = other._isRequestFinished;
         this->_isFoundCRLF = other._isFoundCRLF;
-        // this->_outfile = other._outfile;
         this->_outfileIsCreated = other._outfileIsCreated;
         this->_bodyLength = other._bodyLength;
         this->_isReadingBody = other._isReadingBody;
@@ -428,7 +427,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     if (statusCode >= 400)
         this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
-    // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+    cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
     throw  statusCode;
 }
 
