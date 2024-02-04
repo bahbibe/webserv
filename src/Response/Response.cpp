@@ -205,7 +205,13 @@ void Response::initVars(Request &request, int fdSocket)
 void Response::sendResponse(Request &request, int fdSocket)
 {
     initVars(request, fdSocket);
-    if (this->_isErrorCode == true)
+    if (this->_method == "HEAD")
+    {
+        cout << GREEN"HEAD" << RESET << endl;
+        SendHeader();
+        this->_isfinished = true;
+    }
+    else if (this->_isErrorCode == true)
     {   if (!this->_flag)
             checkErrors(request);
         if (!this->_defaultError)
@@ -269,6 +275,7 @@ void Response::sendResponse(Request &request, int fdSocket)
     }
     else if (this->_method == "DELETE" && !this->_isErrorCode)
     {
+        this->_statusCode = 204;
         DELETE(this->_path);
         checkErrors(request);
         if (!this->_defaultError)
@@ -310,6 +317,7 @@ void Response::checkAutoInedx(Request &request)
             if (file.is_open())
             {
                 this->_path = index;
+                cout << "path: " << this->_path << endl;
                 if (request.directives.isCgiAllowed && (this->_path.rfind(".php") != string::npos || this->_path.rfind(".py") != string::npos))
                 {
                     this->_absPath = this->_path;
@@ -437,6 +445,7 @@ void Response::saveStatus()
 
 void Response::SendHeader() 
 {
+    cout << "status code: " << this->_statusCode << endl;
     map<int,string>::iterator it;
     it = this->status.find(this->_statusCode);
     this->_header = "HTTP/1.1 " + it->second +"\r\n";
