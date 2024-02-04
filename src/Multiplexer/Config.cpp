@@ -135,7 +135,6 @@ void Server::parseServer(string const &file)
     memset(&dir, 0, sizeof(t_dir));
     while (getline(ss, buff))
     {   
-        // cout << "buff: SERV" << buff << endl;
         trim(buff);
         if (isBrackets(buff) && buff.find("}") != string::npos)
             break;

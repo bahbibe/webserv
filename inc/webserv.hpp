@@ -10,8 +10,6 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
-// #include <sys/stat.h>
-// #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -30,9 +28,6 @@
 #define CLOCKWORK(x) double(clock() - x) / CLOCKS_PER_SEC
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
-// #include "Request.hpp"
-// #include "Response.hpp"
-// #include "Server.hpp"
 using namespace std;
 
 
@@ -66,25 +61,21 @@ typedef struct s_events
 
 extern t_events ep;
 extern map<string, int> socketMap;
-extern vector<Server> _servers;
 
 class Webserver
 {
 private:
     map<int, Request> _req;
     map<int, Response> _resp;
-    int _clientPort;
 public:
     vector<Server> _servers;
     Webserver();
     ~Webserver();
     void brackets(string const &file);
-    size_t serverCount();
     Server &operator[](size_t index);
     void start();
     void newConnection(map<int, Request> &req, Server &server);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
-    // bool timeoutAndErrors(map<int, Request> &req, map<int, Response> &resp, int sock);
     bool matchServer(map<int, Request> &req, int sock);
     class ServerException : public exception
     {

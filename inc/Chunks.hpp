@@ -27,7 +27,6 @@ class Chunks {
 
         void setChunks(fstream *outfile, const string& filePath, size_t clientMaxBodySize);
         int parse(const string& buffer, int readBytes);
-        // int parse(const string& buffer, fstream *outfile, const string& filePath, int readBytes);
         void checkHexSize(const string& size);
         void setFirstSize();
         void setSize();

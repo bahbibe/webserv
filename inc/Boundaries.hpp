@@ -29,8 +29,6 @@ class Boundaries {
 
     public:
         Boundaries();
-        // Boundaries(const Boundaries& other);
-        // Boundaries& operator=(const Boundaries& rhs);
         ~Boundaries();
 
         void parseBoundary(const string& buffer, int readBytes);

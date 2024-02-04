@@ -4,28 +4,6 @@ Boundaries::Boundaries() : _isFileCreated(false), _outfile(NULL), _state(BD_STAR
 
 Boundaries::~Boundaries() { };
 
-// Boundaries::Boundaries(const Boundaries& other)
-// {
-//     *this = other;
-// }
-
-// Boundaries& Boundaries::operator=(const Boundaries& rhs)
-// {
-//     if (this != &rhs)
-//     {
-//         this->_buffer = rhs._buffer;
-//         this->_boundary = rhs._boundary;
-//         this->_endBoundary = rhs._endBoundary;
-//         this->_isFileCreated = rhs._isFileCreated;
-//         this->_outfile = rhs._outfile;
-//         this->_uploadPath = rhs._uploadPath;
-//         this->_state = rhs._state;
-//         this->_bd_start = rhs._bd_start;
-//         this->_rest = rhs._rest;
-//         this->_filesCounter = rhs._filesCounter;
-//     }
-//     return *this;
-// }
 
 void Boundaries::setBoundaries(const string& boundary, const string& uploadPath, size_t contentLength)
 {
@@ -173,8 +151,6 @@ void Boundaries::handleBoundaries()
                 if (midBoundaryPos != string::npos && midBoundaryPos < endBoundaryPos)
                 {
                     string content = _buffer.substr(0, midBoundaryPos);
-                    // _outfile->write(content.c_str(), content.length());
-                    // _outfile->flush();
                     writeContent(content);
                     _buffer.erase(0, midBoundaryPos);
                     closeOutFile();

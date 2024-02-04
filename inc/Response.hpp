@@ -1,6 +1,5 @@
 #pragma once
 
-// #include "Server.hpp"
 #include "Location.hpp"
 #include "Request.hpp"
 #include <map>
@@ -19,7 +18,6 @@ using namespace std;
 class Response
 {
     private:
-        // char _body1[BUFFERSIZE];
         bool _flag;
         bool _isfinished;
         bool _defaultError;
@@ -54,7 +52,6 @@ class Response
 
     public:
         Response();
-        // Response(Request request, int fdSocket);
         ~Response();
         void sendResponse(Request &request, int fdSocket);
         Response(const Response &other);

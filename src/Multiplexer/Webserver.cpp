@@ -10,11 +10,6 @@ Webserver::Webserver()
 }
 
 
-// size_t Webserver::serverCount()
-// {
-//     return _serverCount;
-// }
-
 Server &Webserver::operator[](size_t index)
 {
     return _servers[index];
@@ -39,7 +34,6 @@ void Webserver::brackets(string const &file)
         line >> tmp;
         if (tmp == "server")
         {
-            // _serverCount++;
             _servers.push_back(Server());
             if (!lim.empty())
                 throw ServerException(ERR "Invalid brackets");
@@ -79,7 +73,6 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
-    // cout << "New connection\n";
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP ;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
@@ -90,7 +83,6 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
 
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
 {
-    cout << YELLOW "Connection closed\n" RESET;
     req.erase(sock);
     resp.erase(sock);
     close(sock);
@@ -130,7 +122,6 @@ void Webserver::start()
             }
             if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
                 _req[ep.events[i].data.fd].setTimeout();
-                // closeConnection(_req, _resp, ep.events[i].data.fd);
             else
             {
                 if (ep.events[i].events & EPOLLIN)

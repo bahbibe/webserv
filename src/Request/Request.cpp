@@ -85,7 +85,6 @@ void Request::readRequest()
         this->parseRequest();
     } catch (int statusCode)
     {
-        // std::cerr << this->getStatusMessage() << '\n';
         return;
     }
 }
@@ -409,7 +408,6 @@ void Request::parseBodyWithChunked()
 
 void Request::setStatusCode(int statusCode, string statusMessage)
 {
-    // this->printRequest();
     this->_statusCode = statusCode;
     this->_isRequestFinished = true;
     stringstream ss;
@@ -423,7 +421,6 @@ void Request::setStatusCode(int statusCode, string statusMessage)
 
 void Request::setTimeout()
 {
-    // this->printRequest();
     this->_statusCode = 408;
     this->_isRequestFinished = true;
     this->isErrorCode = true;
