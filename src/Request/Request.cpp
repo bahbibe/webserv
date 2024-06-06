@@ -77,9 +77,8 @@ Request::Request(Server* server, int socketFd, vector<Server> servers) : _socket
 void Request::readRequest()
 {
     try {
-        _requestBuffer.clear();
         _start = clock();
-        cerr << "ss = "<<_socketFd << endl;
+        _requestBuffer.clear();
         _readBytes = read(_socketFd, _buffer, bufferSize);
         _buffer[_readBytes] = '\0';
         this->parseRequest();
@@ -119,7 +118,7 @@ void Request::parseRequestLine()
     this->_requestTarget = tokens[1];
     this->_httpVersion = tokens[2];
     if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
-        setStatusCode(400, "Invalid Method");
+        setStatusCode(501, "Invalid Method");
     if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
         setStatusCode(400, "Invalid Request Target");
     if (this->_requestTarget.length() > 1024)
@@ -427,7 +426,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     if (statusCode >= 400)
         this->isErrorCode = true;
     this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
-    cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+    // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
     throw  statusCode;
 }
 
