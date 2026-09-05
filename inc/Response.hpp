@@ -23,6 +23,7 @@ class Response
         bool _defaultError;
         bool _isErrorCode;
         bool _cgiAutoIndex;
+        bool _isHead;
 
         int _fdSocket;
         int _statusCode;

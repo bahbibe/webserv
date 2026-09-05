@@ -119,7 +119,7 @@ void Request::parseRequestLine()
     this->_method = tokens[0];
     this->_requestTarget = tokens[1];
     this->_httpVersion = tokens[2];
-    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE")
+    if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE" && this->_method != "HEAD")
         setStatusCode(501, "Invalid Method");
     if (this->_requestTarget.empty() || !Helpers::checkURICharSet(this->_requestTarget))
         setStatusCode(400, "Invalid Request Target");
@@ -251,7 +251,8 @@ void Request::setServer()
     {
         vector<string>::iterator itb = locationMethods.begin();
         vector<string>::iterator ite = locationMethods.end();
-        if (find(itb, ite, _method) == ite)
+        string methodToCheck = (_method == "HEAD") ? "GET" : _method;
+        if (find(itb, ite, methodToCheck) == ite)
             setStatusCode(405, "Method Not Allowed");
     }
     directives.isUploadAllowed = _location->getUpload();
