@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
+#include <csignal>
 #define RED "\033[0;31m"
 #define GREEN "\033[0;32m"
 #define YELLOW "\033[0;33m"
@@ -25,6 +26,7 @@
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
 #define TIMEOUT 10
+#define SHUTDOWN_GRACE 5
 #define CLOCKWORK(x) double(time(NULL) - (x))
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
@@ -62,12 +64,15 @@ typedef struct s_events
 extern t_events ep;
 extern map<string, int> socketMap;
 extern string confDir;
+extern volatile sig_atomic_t g_shutdown;
+void handleShutdownSignal(int signum);
 
 class Webserver
 {
 private:
     map<int, Request> _req;
     map<int, Response> _resp;
+    void stopListening();
 public:
     vector<Server> _servers;
     Webserver();

@@ -3,6 +3,12 @@
 t_events ep;
 map<string, int> socketMap;
 string confDir;
+volatile sig_atomic_t g_shutdown = 0;
+
+void handleShutdownSignal(int)
+{
+    g_shutdown = 1;
+}
 
 static void resolveConfDir()
 {

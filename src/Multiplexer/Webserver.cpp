@@ -103,12 +103,41 @@ bool Webserver::matchServer(map<int, Request> &req, int sock)
     return false;
 }
 
+void Webserver::stopListening()
+{
+    for (map<string, int>::iterator it = socketMap.begin(); it != socketMap.end(); ++it)
+    {
+        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->second, NULL);
+        close(it->second);
+    }
+}
+
 void Webserver::start()
 {
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, handleShutdownSignal);
+    signal(SIGTERM, handleShutdownSignal);
+    time_t shutdownStarted = 0;
     while (1)
     {
+        if (g_shutdown && shutdownStarted == 0)
+        {
+            shutdownStarted = time(NULL);
+            stopListening();
+            cout << "\n" YELLOW "Shutting down, waiting for " << _req.size()
+                 << " in-flight connection(s)..." RESET "\n";
+        }
+        if (g_shutdown && _req.empty())
+            break;
+        if (g_shutdown && shutdownStarted && CLOCKWORK(shutdownStarted) > SHUTDOWN_GRACE)
+        {
+            cout << YELLOW "Shutdown grace period elapsed, closing " << _req.size()
+                 << " remaining connection(s)." RESET "\n";
+            break;
+        }
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, 1000);
+        if (evCount == -1)
+            continue;
         for (int i = 0; i < evCount; i++)
         {
             if (matchServer(_req, ep.events[i].data.fd))
@@ -155,4 +184,17 @@ void Webserver::start()
             }
         }
     }
+    for (map<int, Request>::iterator it = _req.begin(); it != _req.end(); ++it)
+    {
+        map<int, Response>::iterator respIt = _resp.find(it->first);
+        if (respIt != _resp.end() && respIt->second._isCGI == true)
+        {
+            kill(respIt->second.pid, SIGKILL);
+            waitpid(respIt->second.pid, 0, 0);
+        }
+        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->first, NULL);
+        close(it->first);
+    }
+    close(ep.epollFd);
+    cout << YELLOW "Shutdown complete." RESET "\n";
 }
