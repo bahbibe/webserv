@@ -18,11 +18,26 @@ SERVER_PID=""
 PASS=0
 FAIL=0
 
+# The server writes access.log next to its own binary, i.e. inside
+# ROOT_DIR - not inside WORK_DIR. Back up/restore so a test run never
+# leaves the repo's working tree dirty.
+ACCESS_LOG="$ROOT_DIR/access.log"
+ACCESS_LOG_BACKUP=""
+if [ -f "$ACCESS_LOG" ]; then
+    ACCESS_LOG_BACKUP=$(mktemp)
+    cp "$ACCESS_LOG" "$ACCESS_LOG_BACKUP"
+fi
+
 cleanup()
 {
     if [ -n "$SERVER_PID" ]; then
         kill "$SERVER_PID" >/dev/null 2>&1
         wait "$SERVER_PID" 2>/dev/null
+    fi
+    if [ -n "$ACCESS_LOG_BACKUP" ]; then
+        mv "$ACCESS_LOG_BACKUP" "$ACCESS_LOG"
+    else
+        rm -f "$ACCESS_LOG"
     fi
     rm -rf "$WORK_DIR"
 }
@@ -151,6 +166,14 @@ assert_status "HEAD /missing.html -> 404" 404 -X HEAD "$BASE_URL/missing.html"
 assert_empty_body "HEAD /missing.html has no body" -X HEAD "$BASE_URL/missing.html"
 assert_status "HEAD on GET-only location -> 200, not 405" 200 -X HEAD "$BASE_URL/readonly/index.html"
 
+if [ -f "$ACCESS_LOG" ] \
+    && grep -Eq '^\[.*\] 127\.0\.0\.1 GET / 200 [0-9]+ [0-9]+ms$' "$ACCESS_LOG" \
+    && grep -Eq '^\[.*\] 127\.0\.0\.1 HEAD / 200 0 [0-9]+ms$' "$ACCESS_LOG"; then
+    pass "access.log records requests with correct format (HEAD shows 0 bytes)"
+else
+    fail "access.log missing expected entries: $(cat "$ACCESS_LOG" 2>/dev/null || echo 'file not found')"
+fi
+
 assert_status "path traversal outside root -> 403" 403 \
     --path-as-is "$BASE_URL/../../../../../../../../etc/passwd"
 
@@ -181,6 +204,67 @@ if [ -n "$uploaded" ]; then
     rel=${uploaded#"$WORK_DIR/WWW"}
     assert_status "DELETE uploaded file -> 204" 204 -X DELETE "$BASE_URL$rel"
     assert_status "GET deleted file -> 404" 404 "$BASE_URL$rel"
+fi
+
+
+# --- graceful shutdown (own server instance: this test kills it) ---
+
+SHUTDOWN_PORT=8766
+cat > "$WORK_DIR/slow.py" <<'PYEOF'
+#!/usr/bin/env python3
+import time
+time.sleep(1)
+print("Content-Type: text/plain\r\n\r\nslow cgi done")
+PYEOF
+chmod +x "$WORK_DIR/slow.py"
+cp "$WORK_DIR/slow.py" "$WORK_DIR/WWW/slow.py"
+mkdir -p "$WORK_DIR/cgi"
+
+cat > "$WORK_DIR/shutdown.conf" <<EOF
+server {
+    host 127.0.0.1
+    listen $SHUTDOWN_PORT
+    root $WORK_DIR/WWW
+    index index.html
+    location / {
+        root $WORK_DIR/WWW
+        allow GET
+        cgi on
+        cgi_upload_path $WORK_DIR/cgi
+    }
+}
+EOF
+
+"$ROOT_DIR/webserv" "$WORK_DIR/shutdown.conf" >"$WORK_DIR/shutdown_server.log" 2>&1 &
+SHUTDOWN_PID=$!
+i=0
+until curl -s -o /dev/null "http://127.0.0.1:$SHUTDOWN_PORT/" 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -gt 50 ]; then
+        fail "graceful shutdown server never came up"
+        break
+    fi
+    sleep 0.1
+done
+
+curl -s -o "$WORK_DIR/shutdown_body.txt" -w '%{http_code}' \
+    "http://127.0.0.1:$SHUTDOWN_PORT/slow.py" >"$WORK_DIR/shutdown_code.txt" &
+sleep 0.2
+kill -TERM "$SHUTDOWN_PID" 2>/dev/null
+wait "$SHUTDOWN_PID" 2>/dev/null
+
+code=$(cat "$WORK_DIR/shutdown_code.txt" 2>/dev/null)
+body=$(cat "$WORK_DIR/shutdown_body.txt" 2>/dev/null)
+if [ "$code" = "200" ] && [ "$body" = "slow cgi done" ]; then
+    pass "graceful shutdown waits for in-flight CGI request to finish"
+else
+    fail "graceful shutdown waits for in-flight CGI request (code='$code' body='$body')"
+fi
+if kill -0 "$SHUTDOWN_PID" 2>/dev/null; then
+    fail "server process still running after graceful shutdown"
+    kill -9 "$SHUTDOWN_PID" 2>/dev/null
+else
+    pass "server process exited after graceful shutdown"
 fi
 
 echo ""

@@ -27,6 +27,7 @@ class Response
 
         int _fdSocket;
         int _statusCode;
+        size_t _bytesSent;
 
 
         string _method;
@@ -57,6 +58,8 @@ class Response
         Response(const Response &other);
         Response &operator=(const Response &other);
         bool getIsFinished() const;
+        size_t getBytesSent() const;
+        int getStatusCode() const;
         void GET(Request &request);
         void DELETE(string path);
         pid_t pid;

@@ -3,11 +3,19 @@
 t_events ep;
 map<string, int> socketMap;
 string confDir;
+string accessLogPath;
+volatile sig_atomic_t g_shutdown = 0;
+
+void handleShutdownSignal(int)
+{
+    g_shutdown = 1;
+}
 
 static void resolveConfDir()
 {
     char exePath[PATH_MAX];
     ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+    string execDir = "./";
     confDir = "conf/";
     if (len != -1)
     {
@@ -15,8 +23,10 @@ static void resolveConfDir()
         string path(exePath);
         size_t slash = path.find_last_of('/');
         if (slash != string::npos)
-            confDir = path.substr(0, slash + 1) + "conf/";
+            execDir = path.substr(0, slash + 1);
+        confDir = execDir + "conf/";
     }
+    accessLogPath = execDir + "access.log";
 }
 
 int main(int argc, char const *argv[])

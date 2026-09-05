@@ -33,6 +33,28 @@ files stay in a `conf/` folder next to the binary.
 
 If no config file is given, `conf/default.conf` is used.
 
+## Access log
+
+Every completed or aborted connection is appended (one line, flushed
+immediately) to `access.log` next to the binary:
+
+```
+[2026-09-05 05:54:38] 127.0.0.1 GET / 200 11 0ms
+[2026-09-05 05:54:38] 127.0.0.1 GET /missing.html 404 127 0ms
+[2026-09-05 05:54:38] 127.0.0.1 HEAD / 200 0 0ms
+[2026-09-05 05:54:51] 127.0.0.1 - - - 0 300ms
+```
+
+Fields: timestamp, client IP, method, path, status code, response
+body size in bytes (headers and chunk framing excluded; always 0 for
+`HEAD`), and total connection duration. A connection that closed
+before a request could be parsed (e.g. an idle client that just
+disconnects) logs `-` for method/path/status.
+
+If the log file can't be opened (e.g. no write permission next to the
+binary), the server prints a warning and keeps serving without
+logging - it doesn't fail to start over this.
+
 ## Config file
 
 Config files use an nginx-like block syntax:
@@ -112,6 +134,10 @@ requests under that path. Additional directives:
 - `DELETE` removes files and, recursively, directories.
 - Path traversal outside a location's configured root is rejected
   with `403`.
+- `SIGINT`/`SIGTERM` (e.g. Ctrl-C) trigger a graceful shutdown: the
+  server stops accepting new connections immediately, finishes any
+  requests already in flight (up to a 5 second grace period, after
+  which remaining connections are force-closed), then exits.
 
 ## Known limitations
 
