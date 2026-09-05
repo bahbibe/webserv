@@ -18,9 +18,10 @@ make leaks  # build and run under valgrind (leak-check=full)
 
 Requires a C++98 compiler (`c++`) and Linux (uses `epoll`).
 
-**Run from the project root.** The server reads `conf/mime.types` and
-the default config at `conf/default.conf` using paths relative to the
-current working directory.
+The server reads `conf/mime.types` and the default config at
+`conf/default.conf` relative to the `webserv` binary's own location,
+so it can be run from any working directory as long as those two
+files stay in a `conf/` folder next to the binary.
 
 ## Usage
 
