@@ -59,6 +59,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
     this->_start = 0;
+    memset(&_startTv, 0, sizeof(_startTv));
 }
 
 Request::Request(Server* server, int socketFd, vector<Server> servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
@@ -72,6 +73,7 @@ Request::Request(Server* server, int socketFd, vector<Server> servers) : _socket
     memset(_buffer, 0, BUFFER_SIZE);
     this->bufferSize = BUFFER_SIZE;
     this->_start = 0;
+    memset(&_startTv, 0, sizeof(_startTv));
 }
 
 void Request::readRequest()

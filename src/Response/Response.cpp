@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false) ,_fdSocket(0), _statusCode(0), env(NULL), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), env(NULL), pid(0), _isCGI(false)
 {
     saveStatus();
 }
@@ -129,6 +129,7 @@ void Response::GET(Request &request)
         this->_body.append(_body1, file.gcount());
         this->_body.append("\r\n", 2);
         write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+        this->_bytesSent += file.gcount();
     }
     else if (file.gcount() == 0)
     {
@@ -379,7 +380,10 @@ void Response::tree_dir()
         this->_body += body + "\r\n";
         this->_body += "0\r\n\r\n";
         if (!this->_isHead)
+        {
             write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+            this->_bytesSent += body.length();
+        }
         this->_defaultError = true;
         this->_isfinished = true;
         this->_flag = false;
@@ -414,7 +418,10 @@ void Response::checkErrors(Request &request)
         this->_body += error + "\r\n";
         this->_body += "0\r\n\r\n";
         if (!this->_isHead)
+        {
             write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+            this->_bytesSent += error.length();
+        }
         this->_defaultError = true;
         this->_isfinished = true;
     }
@@ -558,6 +565,7 @@ Response &Response::operator=(const Response &other)
         this->_isHead = other._isHead;
         this->_fdSocket = other._fdSocket;
         this->_statusCode = other._statusCode;
+        this->_bytesSent = other._bytesSent;
         this->_method = other._method;
         this->_path = other._path;
         this->_contentType = other._contentType;
@@ -584,6 +592,16 @@ Response &Response::operator=(const Response &other)
 bool Response::getIsFinished() const
 {
     return this->_isfinished;
+}
+
+size_t Response::getBytesSent() const
+{
+    return this->_bytesSent;
+}
+
+int Response::getStatusCode() const
+{
+    return this->_statusCode;
 }
 
 Response::~Response()

@@ -7,3 +7,4 @@ upload_*
 cgi/upload_*
 m.conf
 TODO.md
+access.log

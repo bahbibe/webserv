@@ -7,6 +7,9 @@ Webserver::Webserver()
 {
     if ((ep.epollFd = epoll_create(1)) == -1)
         throw ServerException(ERR "Failed to create epoll");
+    _accessLog.open(accessLogPath.c_str(), ios::app);
+    if (!_accessLog.is_open())
+        cerr << ERR "Unable to open access log at " << accessLogPath << ", continuing without it\n";
 }
 
 
@@ -80,11 +83,49 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = time(NULL);
+    gettimeofday(&req[clientSock]._startTv, NULL);
+    req[clientSock]._clientIp = inet_ntoa(clientAddr.sin_addr);
+}
+
+void Webserver::logAccess(Request &req, Response *resp)
+{
+    if (!_accessLog.is_open())
+        return;
+    time_t now = time(NULL);
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    struct timeval nowTv;
+    gettimeofday(&nowTv, NULL);
+    long durationMs = (nowTv.tv_sec - req._startTv.tv_sec) * 1000
+                     + (nowTv.tv_usec - req._startTv.tv_usec) / 1000;
+
+    string clientIp = req._clientIp.empty() ? "-" : req._clientIp;
+    string method = req.getMethod().empty() ? "-" : req.getMethod();
+    string target = !req.directives.requestTarget.empty() ? req.directives.requestTarget
+                    : !req.getRequestTarget().empty() ? req.getRequestTarget() : "-";
+    if (!req.directives.queryString.empty())
+        target += "?" + req.directives.queryString;
+
+    string status = "-";
+    size_t bytes = 0;
+    if (req.getIsRequestFinished())
+    {
+        stringstream ss;
+        ss << (resp ? resp->getStatusCode() : req.getStatusCode());
+        status = ss.str();
+        if (resp)
+            bytes = resp->getBytesSent();
+    }
+    _accessLog << "[" << timestamp << "] " << clientIp << " " << method << " " << target
+               << " " << status << " " << bytes << " " << durationMs << "ms\n";
+    _accessLog.flush();
 }
 
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
 {
-    epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);     
+    map<int, Response>::iterator respIt = resp.find(sock);
+    logAccess(req[sock], respIt != resp.end() ? &respIt->second : NULL);
+    epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
     req.erase(sock);
     resp.erase(sock);
     close(sock);
@@ -192,6 +233,7 @@ void Webserver::start()
             kill(respIt->second.pid, SIGKILL);
             waitpid(respIt->second.pid, 0, 0);
         }
+        logAccess(it->second, respIt != _resp.end() ? &respIt->second : NULL);
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->first, NULL);
         close(it->first);
     }

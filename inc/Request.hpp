@@ -5,6 +5,7 @@
 #include "Boundaries.hpp"
 #include "Chunks.hpp"
 #include <climits>
+#include <sys/time.h>
 
 struct Directives {
     string host;
@@ -102,6 +103,8 @@ public:
     Location *_location;
     bool isErrorCode;
     time_t _start;
+    struct timeval _startTv;
+    string _clientIp;
     bool _ready;
     vector<Server> servers;
 

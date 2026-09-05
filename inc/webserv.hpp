@@ -64,6 +64,7 @@ typedef struct s_events
 extern t_events ep;
 extern map<string, int> socketMap;
 extern string confDir;
+extern string accessLogPath;
 extern volatile sig_atomic_t g_shutdown;
 void handleShutdownSignal(int signum);
 
@@ -72,7 +73,9 @@ class Webserver
 private:
     map<int, Request> _req;
     map<int, Response> _resp;
+    ofstream _accessLog;
     void stopListening();
+    void logAccess(Request &req, Response *resp);
 public:
     vector<Server> _servers;
     Webserver();
