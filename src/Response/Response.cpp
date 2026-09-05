@@ -20,6 +20,7 @@ void Response::CGI(Request &req)
         this->start = clock();
         this->_randPath = "/tmp/" + toSting(rand());
         fillEnv(req);
+        cout.flush();
         this->pid = fork();
         if (this->pid == 0)
         {
@@ -40,7 +41,7 @@ void Response::CGI(Request &req)
     double time = (double)(end - this->start) / (double)CLOCKS_PER_SEC;
     if (wPid == -1  || wPid > 0 || time > 5)
     {
-        char buffer[1024];
+        char buffer[1024] = {0};
         unsigned long pos;
         string str;
         stringstream ss;
