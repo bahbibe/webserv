@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false) ,_fdSocket(0), _statusCode(0), env(NULL), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false) ,_fdSocket(0), _statusCode(0), env(NULL), pid(0), _isCGI(false)
 {
     saveStatus();
 }
@@ -102,6 +102,22 @@ void Response::CGI(Request &req)
 void Response::GET(Request &request)
 {
     signal(SIGPIPE, SIG_IGN);
+    if (this->_isHead)
+    {
+        if (file.is_open())
+            file.close();
+        this->_flag = false;
+        this->_isfinished = true;
+        if (this->_isCGI == true)
+        {
+            freeEnv(this->env);
+            this->env = NULL;
+            remove(this->_path.c_str());
+            remove(request.directives.cgiFileName.c_str());
+        }
+        this->_isCGI = false;
+        return;
+    }
     char _body1[BUFFERSIZE] = {0};
     file.read(_body1, 1023);
     if (file.gcount() > 0)
@@ -193,6 +209,7 @@ void Response::initVars(Request &request, int fdSocket)
         this->_statusCode = request.getStatusCode();
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
+        this->_isHead = (this->_method == "HEAD");
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
         this->_absPath = request.directives.requestedFile;
@@ -203,12 +220,7 @@ void Response::initVars(Request &request, int fdSocket)
 void Response::sendResponse(Request &request, int fdSocket)
 {
     initVars(request, fdSocket);
-    if (this->_method == "HEAD")
-    {
-        SendHeader();
-        this->_isfinished = true;
-    }
-    else if (this->_isErrorCode == true)
+    if (this->_isErrorCode == true)
     {   if (!this->_flag)
             checkErrors(request);
         if (!this->_defaultError)
@@ -250,7 +262,7 @@ void Response::sendResponse(Request &request, int fdSocket)
                 GET(request);
         }
     }
-    else if (this->_method == "GET" && !this->_isErrorCode)
+    else if ((this->_method == "GET" || this->_method == "HEAD") && !this->_isErrorCode)
     {
         if (!this->_flag)
             checks(request);
@@ -365,7 +377,8 @@ void Response::tree_dir()
         this->_body += ss.str() + "\r\n";
         this->_body += body + "\r\n";
         this->_body += "0\r\n\r\n";
-        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+        if (!this->_isHead)
+            write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
         this->_defaultError = true;
         this->_isfinished = true;
         this->_flag = false;
@@ -399,7 +412,8 @@ void Response::checkErrors(Request &request)
         this->_body = ss.str() + "\r\n";
         this->_body += error + "\r\n";
         this->_body += "0\r\n\r\n";
-        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
+        if (!this->_isHead)
+            write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
         this->_defaultError = true;
         this->_isfinished = true;
     }
@@ -494,7 +508,7 @@ int Response::fillEnv(Request &req)
     env[3] = strdup(("PATH_INFO=" + this->_absPath).c_str());
     env[4] = strdup(("SCRIPT_FILENAME=" + this->_absPath).c_str());
     env[5] = strdup(("CONTENT_TYPE=" + req.directives.contentType).c_str());
-    if (this->_method == "GET")
+    if (this->_method == "GET" || this->_method == "HEAD")
         env[6] = strdup("CONTENT_LENGTH=0");
     else
     {
@@ -540,6 +554,7 @@ Response &Response::operator=(const Response &other)
         this->_isfinished = other._isfinished;
         this->_defaultError = other._defaultError;
         this->_isErrorCode = other._isErrorCode;
+        this->_isHead = other._isHead;
         this->_fdSocket = other._fdSocket;
         this->_statusCode = other._statusCode;
         this->_method = other._method;
