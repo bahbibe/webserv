@@ -102,9 +102,15 @@ void Boundaries::writeContent(string& buffer)
     }
     _outfile->write(buffer.c_str(), buffer.length());
     _outfile->flush();
-    buffer.clear();
     _writedContent += buffer.length();
     _contentLength -= buffer.length();
+    buffer.clear();
+}
+
+void Boundaries::trimTrailingCRLF(string &content)
+{
+    if (content.length() >= 2 && content[content.length() - 2] == '\r' && content[content.length() - 1] == '\n')
+        content.erase(content.length() - 2);
 }
 
 void Boundaries::closeOutFile()
@@ -138,12 +144,21 @@ void Boundaries::handleBoundaries()
     {
         string content = _buffer.substr(0, midBoundaryPos);
         _buffer.erase(0, midBoundaryPos);
+        trimTrailingCRLF(content);
         writeContent(content);
         closeOutFile();
         while (1)
         {
             if (!_isFileCreated)
+            {
                 createFile();
+                if (!_isFileCreated)
+                {
+                    _rest = _buffer;
+                    _buffer.clear();
+                    return;
+                }
+            }
             else
             {
                 midBoundaryPos = _buffer.find(_boundary);
@@ -151,15 +166,32 @@ void Boundaries::handleBoundaries()
                 if (midBoundaryPos != string::npos && midBoundaryPos < endBoundaryPos)
                 {
                     string content = _buffer.substr(0, midBoundaryPos);
+                    trimTrailingCRLF(content);
                     writeContent(content);
                     _buffer.erase(0, midBoundaryPos);
                     closeOutFile();
-                } else {
+                }
+                else if (endBoundaryPos != string::npos)
+                {
                     string content = _buffer.substr(0, endBoundaryPos);
+                    trimTrailingCRLF(content);
                     writeContent(content);
                     _buffer.erase(0, endBoundaryPos);
                     closeOutFile();
                     throwException(201);
+                }
+                else
+                {
+                    if (_buffer.length() > _boundary.length())
+                    {
+                        string content = _buffer.substr(0, _buffer.length() - _boundary.length());
+                        _rest = _buffer.substr(_buffer.length() - _boundary.length());
+                        writeContent(content);
+                    }
+                    else
+                        _rest = _buffer;
+                    _buffer.clear();
+                    return;
                 }
             }
         }
@@ -167,6 +199,7 @@ void Boundaries::handleBoundaries()
     else if (endBoundaryPos != string::npos)
     {
         _buffer.erase(endBoundaryPos);
+        trimTrailingCRLF(_buffer);
         writeContent(_buffer);
         closeOutFile();
         throwException(201);
@@ -175,6 +208,7 @@ void Boundaries::handleBoundaries()
     {
         _rest = _buffer.substr(midBoundaryPos);
         _buffer.erase(_buffer.length() - (_buffer.length() - midBoundaryPos));
+        trimTrailingCRLF(_buffer);
         writeContent(_buffer);
         closeOutFile();
     }
@@ -185,8 +219,17 @@ void Boundaries::parseBoundary(const string& buffer, int readBytes)
     this->_buffer = "";
     this->_buffer.append(_rest);
     this->_buffer.append(buffer, 0, readBytes);
+    _rest.clear();
     if (!_isFileCreated)
+    {
         createFile();
+        if (!_isFileCreated && _state != BD_START)
+        {
+            _rest = _buffer;
+            _buffer.clear();
+            return;
+        }
+    }
     if (_state == BD_START)
         checkFirstBoundary();
     else 

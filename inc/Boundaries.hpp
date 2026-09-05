@@ -38,6 +38,7 @@ class Boundaries {
         string getExtension();
         void createFile();
         void throwException(int code);
+        void trimTrailingCRLF(string &content);
         void closeOutFile();
         void setMimeTypes(map<string, vector<string> > mimeTypes);
         void setBoundaries(const string& boundary, const string& uploadPath, size_t contentLength);
