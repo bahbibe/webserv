@@ -18,11 +18,26 @@ SERVER_PID=""
 PASS=0
 FAIL=0
 
+# The server writes access.log next to its own binary, i.e. inside
+# ROOT_DIR - not inside WORK_DIR. Back up/restore so a test run never
+# leaves the repo's working tree dirty.
+ACCESS_LOG="$ROOT_DIR/access.log"
+ACCESS_LOG_BACKUP=""
+if [ -f "$ACCESS_LOG" ]; then
+    ACCESS_LOG_BACKUP=$(mktemp)
+    cp "$ACCESS_LOG" "$ACCESS_LOG_BACKUP"
+fi
+
 cleanup()
 {
     if [ -n "$SERVER_PID" ]; then
         kill "$SERVER_PID" >/dev/null 2>&1
         wait "$SERVER_PID" 2>/dev/null
+    fi
+    if [ -n "$ACCESS_LOG_BACKUP" ]; then
+        mv "$ACCESS_LOG_BACKUP" "$ACCESS_LOG"
+    else
+        rm -f "$ACCESS_LOG"
     fi
     rm -rf "$WORK_DIR"
 }
@@ -150,6 +165,14 @@ assert_empty_body "HEAD / has no body" -X HEAD "$BASE_URL/"
 assert_status "HEAD /missing.html -> 404" 404 -X HEAD "$BASE_URL/missing.html"
 assert_empty_body "HEAD /missing.html has no body" -X HEAD "$BASE_URL/missing.html"
 assert_status "HEAD on GET-only location -> 200, not 405" 200 -X HEAD "$BASE_URL/readonly/index.html"
+
+if [ -f "$ACCESS_LOG" ] \
+    && grep -Eq '^\[.*\] 127\.0\.0\.1 GET / 200 [0-9]+ [0-9]+ms$' "$ACCESS_LOG" \
+    && grep -Eq '^\[.*\] 127\.0\.0\.1 HEAD / 200 0 [0-9]+ms$' "$ACCESS_LOG"; then
+    pass "access.log records requests with correct format (HEAD shows 0 bytes)"
+else
+    fail "access.log missing expected entries: $(cat "$ACCESS_LOG" 2>/dev/null || echo 'file not found')"
+fi
 
 assert_status "path traversal outside root -> 403" 403 \
     --path-as-is "$BASE_URL/../../../../../../../../etc/passwd"
