@@ -8,8 +8,11 @@ SRC = main.cpp src/Multiplexer/Server.cpp src/Multiplexer/Location.cpp \
 OBJ = $(SRC:.cpp=.o)
 NAME = webserv
 
-%.o: %.cpp 
+%.o: %.cpp
 	$(CC) $(CPPFLAGS) -c $< -o $@
+
+.PHONY: all run clean fclean re leaks
+
 all:$(NAME)
 	
 run:all
