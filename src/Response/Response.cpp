@@ -65,6 +65,7 @@ void Response::CGI(Request &req)
             if (this->_isCGI == true)
             {
                 freeEnv(this->env);
+                this->env = NULL;
                 remove(this->_path.c_str());
                 remove(req.directives.cgiFileName.c_str());
             }
@@ -122,6 +123,7 @@ void Response::GET(Request &request)
         if (this->_isCGI == true)
         {
             freeEnv(this->env);
+            this->env = NULL;
             remove(this->_path.c_str());
             remove(request.directives.cgiFileName.c_str());
         }
@@ -511,7 +513,21 @@ void Response::freeEnv(char **env)
     delete[] env;
 }
 
-Response::Response(const Response &other)
+char **Response::dupEnv(char * const *env) const
+{
+    if (!env)
+        return NULL;
+    int n = 0;
+    while (env[n])
+        n++;
+    char **copy = new char *[n + 1];
+    for (int i = 0; i < n; i++)
+        copy[i] = strdup(env[i]);
+    copy[n] = NULL;
+    return copy;
+}
+
+Response::Response(const Response &other) : env(NULL)
 {
     *this = other;
 }
@@ -539,7 +555,9 @@ Response &Response::operator=(const Response &other)
         this->_cgiPath = other._cgiPath;
         this->_cgiHeader = other._cgiHeader;
         this->pid = other.pid;
-        this->env = other.env;
+        if (this->env)
+            freeEnv(this->env);
+        this->env = dupEnv(other.env);
         this->_cgiAutoIndex = other._cgiAutoIndex;
         this->start = other.start;
         this->_randPath = other._randPath;
@@ -552,4 +570,8 @@ bool Response::getIsFinished() const
     return this->_isfinished;
 }
 
-Response::~Response(){}
+Response::~Response()
+{
+    if (this->env)
+        freeEnv(this->env);
+}

@@ -78,6 +78,7 @@ class Response
         int fillEnv(Request &req);
         double fileSize(string path);
         void freeEnv(char **env);
+        char **dupEnv(char * const *env) const;
 
 
 };
