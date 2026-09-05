@@ -1,0 +1,116 @@
+# webserv
+
+A HTTP/1.1 server written in C++98, built around a single-threaded
+`epoll` event loop. Handles static file serving, directory listings,
+file uploads (`multipart/form-data`, chunked and Content-Length
+bodies), CGI (PHP/Python), and an nginx-style config file.
+
+## Build
+
+```
+make        # build ./webserv
+make re     # rebuild from scratch
+make clean  # remove object files
+make fclean # remove object files and the binary
+make run    # build, run with the default config, then clean
+make leaks  # build and run under valgrind (leak-check=full)
+```
+
+Requires a C++98 compiler (`c++`) and Linux (uses `epoll`).
+
+**Run from the project root.** The server reads `conf/mime.types` and
+the default config at `conf/default.conf` using paths relative to the
+current working directory.
+
+## Usage
+
+```
+./webserv [config_file]
+```
+
+If no config file is given, `conf/default.conf` is used.
+
+## Config file
+
+Config files use an nginx-like block syntax:
+
+```
+server {
+    host 127.0.0.1
+    listen 8080
+    server_name example.com
+
+    root /path/to/site
+    index index.html
+    error_page 404 /path/to/404.html
+    client_max_body_size 1000000
+    autoindex off
+
+    location /uploads {
+        root /path/to/site/uploads
+        allow GET POST DELETE
+        upload on
+        upload_path /path/to/site/uploads
+        cgi on
+        cgi_upload_path /path/to/site/uploads/cgi
+        autoindex on
+    }
+}
+```
+
+Multiple `server` blocks are supported (virtual hosting by
+`server_name` on a shared `host:port`, and independent listeners on
+different ports).
+
+### Server-level directives
+
+| Directive | Meaning |
+|---|---|
+| `host` | IP to bind (`localhost` is normalized to `127.0.0.1`) |
+| `listen` | Port to bind (defaults to 80 if empty) |
+| `server_name` | One or more virtual host names |
+| `root` | Filesystem root for this server; must exist |
+| `index` | Default file(s) served for a directory request |
+| `error_page <code> <path>` | Custom page for a status code (repeatable) |
+| `client_max_body_size` | Max request body size in bytes (0 = unlimited) |
+| `autoindex` | `on`/`off`, directory listing when no index file is found |
+| `location <path> { ... }` | Per-path overrides, see below |
+
+### Location-level directives
+
+`root`, `index`, `autoindex` override the server-level value for
+requests under that path. Additional directives:
+
+| Directive | Meaning |
+|---|---|
+| `allow` | Space-separated list of allowed methods (`GET`, `POST`, `DELETE`) |
+| `upload on\|off` | Allow file uploads for `POST` requests |
+| `upload_path` | Where uploaded files are written |
+| `cgi on\|off` | Enable CGI execution (`.php` via `/usr/bin/php-cgi`, `.py` via `/usr/bin/python3`) |
+| `cgi_upload_path` | Where CGI-received request bodies are staged |
+| `return <url>` | Issue a 301 redirect to `<url>` |
+
+## Supported HTTP behavior
+
+- Methods: `GET`, `POST`, `DELETE`.
+- HTTP/1.1 only (`505` on any other version).
+- Request bodies via `Content-Length`, `Transfer-Encoding: chunked`,
+  or `multipart/form-data`.
+- Status codes returned: 200, 201, 204, 301, 400, 403, 404, 405, 408,
+  409, 411, 413, 414, 500, 501, 504, 505.
+- Idle connections are dropped with a `408` after 10 seconds without a
+  complete request.
+- Directory requests without a trailing slash are redirected (301);
+  directory requests are served from `index`, or an autoindex listing
+  if `autoindex on` and no index file is found.
+- `DELETE` removes files and, recursively, directories.
+- Path traversal outside a location's configured root is rejected
+  with `403`.
+
+## Known limitations
+
+- Single-process, single-threaded: CGI scripts fork a child but the
+  parent event loop blocks on each `epoll_wait` cycle while polling
+  CGI completion, and a CGI process is killed after 5 seconds.
+- No HTTPS/TLS.
+- No HTTP/1.0 or HTTP/2 support.
