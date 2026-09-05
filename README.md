@@ -14,9 +14,11 @@ make clean  # remove object files
 make fclean # remove object files and the binary
 make run    # build, run with the default config, then clean
 make leaks  # build and run under valgrind (leak-check=full)
+make test   # build, then run tests/run_tests.sh (end-to-end, needs curl)
 ```
 
-Requires a C++98 compiler (`c++`) and Linux (uses `epoll`).
+Requires a C++98 compiler (`c++`) and Linux (uses `epoll`). `make test`
+additionally needs `curl` and `python3` on `PATH`.
 
 The server reads `conf/mime.types` and the default config at
 `conf/default.conf` relative to the `webserv` binary's own location,
