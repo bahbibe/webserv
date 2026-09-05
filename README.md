@@ -95,7 +95,10 @@ requests under that path. Additional directives:
 
 ## Supported HTTP behavior
 
-- Methods: `GET`, `POST`, `DELETE`.
+- Methods: `GET`, `HEAD`, `POST`, `DELETE`. `HEAD` behaves exactly like
+  `GET` (same status, same headers) but never sends a body; it's
+  permitted anywhere `GET` is, so `allow` directives don't need to
+  list it separately.
 - HTTP/1.1 only (`505` on any other version).
 - Request bodies via `Content-Length`, `Transfer-Encoding: chunked`,
   or `multipart/form-data`.
