@@ -11,7 +11,7 @@ NAME = webserv
 %.o: %.cpp
 	$(CC) $(CPPFLAGS) -c $< -o $@
 
-.PHONY: all run clean fclean re leaks
+.PHONY: all run clean fclean re leaks test
 
 all:$(NAME)
 	
@@ -27,3 +27,5 @@ fclean:clean
 re:fclean all
 leaks:all
 	valgrind --leak-check=full --show-leak-kinds=all ./$(NAME) 2>&1 | grep total
+test:
+	@./tests/run_tests.sh
