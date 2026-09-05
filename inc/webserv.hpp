@@ -21,7 +21,7 @@
 #define RESET "\033[0m"
 #define USAGE YELLOW "Usage: ./webserv [config_file] DEFAULT=NONE" RESET
 #define ERR RED "Error: " RESET
-#define DEFAULT_CONF "conf/default.conf"
+#define DEFAULT_CONF "default.conf"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
 #define TIMEOUT 10
@@ -61,6 +61,7 @@ typedef struct s_events
 
 extern t_events ep;
 extern map<string, int> socketMap;
+extern string confDir;
 
 class Webserver
 {

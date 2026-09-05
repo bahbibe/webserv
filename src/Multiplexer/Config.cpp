@@ -103,7 +103,7 @@ void Server::mimeTypes()
     if (!loaded)
     {
         ifstream mime;
-        mime.open("conf/mime.types");
+        mime.open((confDir + "mime.types").c_str());
         if (mime.is_open())
         {
             string buff;
