@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false) ,_fdSocket(0), _statusCode(0),_isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false) ,_fdSocket(0), _statusCode(0), env(NULL), pid(0), _isCGI(false)
 {
     saveStatus();
 }
