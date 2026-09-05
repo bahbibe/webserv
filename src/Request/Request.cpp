@@ -278,10 +278,13 @@ void Request::setServer()
 void Request::validatePath()
 {
     char realPath[PATH_MAX];
-    if (realpath(directives.requestedFile.c_str(), realPath) != NULL)
+    char realRoot[PATH_MAX];
+    if (realpath(directives.requestedFile.c_str(), realPath) != NULL
+        && realpath(directives.serverRoot.c_str(), realRoot) != NULL)
     {
         string realPathStr = realPath;
-        if (realPathStr.find("WWW") == string::npos)
+        string realRootStr = realRoot;
+        if (realPathStr.compare(0, realRootStr.length(), realRootStr) != 0)
             setStatusCode(403, "Forbidden");
     }
 }
