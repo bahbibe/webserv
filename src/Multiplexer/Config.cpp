@@ -97,30 +97,39 @@ Location *Server::parseLocation(stringstream &ss)
 }
 void Server::mimeTypes()
 {
-    ifstream mime;
-    mime.open("conf/mime.types");
-    if (mime.is_open())
+    static map<string, vector<string> > cachedExtensions;
+    static map<string, string> cachedTypes;
+    static bool loaded = false;
+    if (!loaded)
     {
-        string buff;
-        stringstream ss;
-        string type, ext;
-        while (getline(mime, buff))
+        ifstream mime;
+        mime.open("conf/mime.types");
+        if (mime.is_open())
         {
-            if (buff.empty() || isWhitespace(buff) || isComment(buff))
-                continue;
-            ss << buff;
-            ss >> type;
-            while (ss >> ext)
+            string buff;
+            stringstream ss;
+            string type, ext;
+            while (getline(mime, buff))
             {
-                _extensions[type].push_back(ext);
-                _types[ext] = type;
+                if (buff.empty() || isWhitespace(buff) || isComment(buff))
+                    continue;
+                ss << buff;
+                ss >> type;
+                while (ss >> ext)
+                {
+                    cachedExtensions[type].push_back(ext);
+                    cachedTypes[ext] = type;
+                }
+                ss.clear();
             }
-            ss.clear();
+            mime.close();
+            loaded = true;
         }
-        mime.close();
+        else
+            throw Server::ServerException(ERR "Unable to open mime file");
     }
-    else
-        throw Server::ServerException(ERR "Unable to open mime file");
+    _extensions = cachedExtensions;
+    _types = cachedTypes;
 }
 string toStr(int i)
 {
