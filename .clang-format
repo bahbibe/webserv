@@ -1,0 +1,26 @@
+---
+# Matches this codebase's existing style. Not yet applied to existing
+# files (that would be a large, purely cosmetic diff) - use it to keep
+# new/edited code consistent, and reformat file-by-file when you're
+# already touching that file for something else.
+Language: Cpp
+Standard: Cpp03
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 0
+BreakBeforeBraces: Allman
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortBlocksOnASingleLine: Empty
+IndentCaseLabels: true
+AccessModifierOffset: -4
+PointerAlignment: Right
+ReferenceAlignment: Right
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpaceAfterCStyleCast: false
+NamespaceIndentation: All
+SortIncludes: false
