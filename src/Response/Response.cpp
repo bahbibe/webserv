@@ -392,7 +392,7 @@ void Response::checkErrors(Request &request)
         this->_contentType = "text/html";
         SendHeader();
         it = this->status.find(this->_statusCode);
-        error = templateError(it->second);
+        error = templateError(it != this->status.end() ? it->second : "500 Internal Server Error");
         ss << hex << error.length();
         this->_body = ss.str() + "\r\n";
         this->_body += error + "\r\n";
@@ -441,7 +441,7 @@ void Response::SendHeader()
 {
     map<int,string>::iterator it;
     it = this->status.find(this->_statusCode);
-    this->_header = "HTTP/1.1 " + it->second +"\r\n";
+    this->_header = "HTTP/1.1 " + (it != this->status.end() ? it->second : "500 Internal Server Error") +"\r\n";
     if(_statusCode == 301)
         this->_header += "Location: " + this->_path +"\r\n\r\n";
     else
