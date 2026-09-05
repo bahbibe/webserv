@@ -112,6 +112,10 @@ requests under that path. Additional directives:
 - `DELETE` removes files and, recursively, directories.
 - Path traversal outside a location's configured root is rejected
   with `403`.
+- `SIGINT`/`SIGTERM` (e.g. Ctrl-C) trigger a graceful shutdown: the
+  server stops accepting new connections immediately, finishes any
+  requests already in flight (up to a 5 second grace period, after
+  which remaining connections are force-closed), then exits.
 
 ## Known limitations
 
