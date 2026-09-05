@@ -77,9 +77,11 @@ Request::Request(Server* server, int socketFd, vector<Server> servers) : _socket
 void Request::readRequest()
 {
     try {
-        _start = clock();
+        _start = time(NULL);
         _requestBuffer.clear();
         _readBytes = read(_socketFd, _buffer, bufferSize);
+        if (_readBytes <= 0)
+            return;
         _buffer[_readBytes] = '\0';
         this->parseRequest();
     } catch (int statusCode)

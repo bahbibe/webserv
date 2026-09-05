@@ -101,7 +101,7 @@ public:
     Directives directives;
     Location *_location;
     bool isErrorCode;
-    clock_t _start;
+    time_t _start;
     bool _ready;
     vector<Server> servers;
 

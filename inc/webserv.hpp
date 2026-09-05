@@ -25,7 +25,7 @@
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
 #define TIMEOUT 10
-#define CLOCKWORK(x) double(clock() - x) / CLOCKS_PER_SEC
+#define CLOCKWORK(x) double(time(NULL) - (x))
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
 using namespace std;

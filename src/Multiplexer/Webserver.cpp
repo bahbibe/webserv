@@ -75,11 +75,11 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
         throw ServerException(ERR "Failed to add client to epoll");
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
-    req[clientSock]._start = clock();
+    req[clientSock]._start = time(NULL);
 }
 
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
@@ -108,7 +108,7 @@ void Webserver::start()
     signal(SIGPIPE, SIG_IGN);
     while (1)
     {
-        int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, -1);
+        int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, 1000);
         for (int i = 0; i < evCount; i++)
         {
             if (matchServer(_req, ep.events[i].data.fd))
@@ -123,24 +123,35 @@ void Webserver::start()
                 closeConnection(_req, _resp, ep.events[i].data.fd);
                 continue;
             }
-            if (!_req[ep.events[i].data.fd].getIsRequestFinished() && CLOCKWORK(_req[ep.events[i].data.fd]._start) > TIMEOUT)
-                _req[ep.events[i].data.fd].setTimeout();
-            else
+            if (ep.events[i].events & EPOLLIN)
             {
-                if (ep.events[i].events & EPOLLIN)
+                _req[ep.events[i].data.fd]._start = time(NULL);
+
+                _req[ep.events[i].data.fd].readRequest();
+                if (_req[ep.events[i].data.fd].getIsRequestFinished())
                 {
-                    _req[ep.events[i].data.fd]._start = clock();
-                    
-                    _req[ep.events[i].data.fd].readRequest();
-                    if (_req[ep.events[i].data.fd].getIsRequestFinished())
-                        _resp.insert(make_pair(ep.events[i].data.fd, Response()));
+                    _resp.insert(make_pair(ep.events[i].data.fd, Response()));
+                    ep.event.data.fd = ep.events[i].data.fd;
+                    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                    epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, ep.events[i].data.fd, &ep.event);
                 }
-                if (ep.events[i].events & EPOLLOUT && _req[ep.events[i].data.fd].getIsRequestFinished())
-                {
-                    _resp[ep.events[i].data.fd].sendResponse(_req[ep.events[i].data.fd], ep.events[i].data.fd);
-                    if (_resp[ep.events[i].data.fd].getIsFinished() == true)
-                        closeConnection(_req, _resp, ep.events[i].data.fd);
-                }
+            }
+            if (ep.events[i].events & EPOLLOUT && _req[ep.events[i].data.fd].getIsRequestFinished())
+            {
+                _resp[ep.events[i].data.fd].sendResponse(_req[ep.events[i].data.fd], ep.events[i].data.fd);
+                if (_resp[ep.events[i].data.fd].getIsFinished() == true)
+                    closeConnection(_req, _resp, ep.events[i].data.fd);
+            }
+        }
+        for (map<int, Request>::iterator it = _req.begin(); it != _req.end(); ++it)
+        {
+            if (!it->second.getIsRequestFinished() && CLOCKWORK(it->second._start) > TIMEOUT)
+            {
+                it->second.setTimeout();
+                _resp.insert(make_pair(it->first, Response()));
+                ep.event.data.fd = it->first;
+                ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, it->first, &ep.event);
             }
         }
     }
