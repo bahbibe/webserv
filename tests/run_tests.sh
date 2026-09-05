@@ -183,6 +183,67 @@ if [ -n "$uploaded" ]; then
     assert_status "GET deleted file -> 404" 404 "$BASE_URL$rel"
 fi
 
+
+# --- graceful shutdown (own server instance: this test kills it) ---
+
+SHUTDOWN_PORT=8766
+cat > "$WORK_DIR/slow.py" <<'PYEOF'
+#!/usr/bin/env python3
+import time
+time.sleep(1)
+print("Content-Type: text/plain\r\n\r\nslow cgi done")
+PYEOF
+chmod +x "$WORK_DIR/slow.py"
+cp "$WORK_DIR/slow.py" "$WORK_DIR/WWW/slow.py"
+mkdir -p "$WORK_DIR/cgi"
+
+cat > "$WORK_DIR/shutdown.conf" <<EOF
+server {
+    host 127.0.0.1
+    listen $SHUTDOWN_PORT
+    root $WORK_DIR/WWW
+    index index.html
+    location / {
+        root $WORK_DIR/WWW
+        allow GET
+        cgi on
+        cgi_upload_path $WORK_DIR/cgi
+    }
+}
+EOF
+
+"$ROOT_DIR/webserv" "$WORK_DIR/shutdown.conf" >"$WORK_DIR/shutdown_server.log" 2>&1 &
+SHUTDOWN_PID=$!
+i=0
+until curl -s -o /dev/null "http://127.0.0.1:$SHUTDOWN_PORT/" 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -gt 50 ]; then
+        fail "graceful shutdown server never came up"
+        break
+    fi
+    sleep 0.1
+done
+
+curl -s -o "$WORK_DIR/shutdown_body.txt" -w '%{http_code}' \
+    "http://127.0.0.1:$SHUTDOWN_PORT/slow.py" >"$WORK_DIR/shutdown_code.txt" &
+sleep 0.2
+kill -TERM "$SHUTDOWN_PID" 2>/dev/null
+wait "$SHUTDOWN_PID" 2>/dev/null
+
+code=$(cat "$WORK_DIR/shutdown_code.txt" 2>/dev/null)
+body=$(cat "$WORK_DIR/shutdown_body.txt" 2>/dev/null)
+if [ "$code" = "200" ] && [ "$body" = "slow cgi done" ]; then
+    pass "graceful shutdown waits for in-flight CGI request to finish"
+else
+    fail "graceful shutdown waits for in-flight CGI request (code='$code' body='$body')"
+fi
+if kill -0 "$SHUTDOWN_PID" 2>/dev/null; then
+    fail "server process still running after graceful shutdown"
+    kill -9 "$SHUTDOWN_PID" 2>/dev/null
+else
+    pass "server process exited after graceful shutdown"
+fi
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
