@@ -5,6 +5,7 @@ int main(int argc, char const *argv[])
 {
     try
     {
+        srand(time(NULL));
         ifstream conf;
         (argc == 1) ? conf.open(DEFAULT_CONF) : (argc == 2) ? conf.open(argv[1])
                                                                      : throw Server::ServerException(USAGE);

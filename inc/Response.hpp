@@ -26,7 +26,6 @@ class Response
 
         int _fdSocket;
         int _statusCode;
-        int fd[2];
 
 
         string _method;

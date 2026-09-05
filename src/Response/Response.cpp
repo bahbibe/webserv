@@ -18,16 +18,12 @@ void Response::CGI(Request &req)
     {
         this->_isCGI = true;
         this->start = clock();
-        srand(time(NULL));
         this->_randPath = "/tmp/" + toSting(rand());
         fillEnv(req);
-        pipe(fd);
         this->pid = fork();
         if (this->pid == 0)
         {
             const char *argv[] = {this->_cgiPath.c_str(), this->_absPath.c_str() ,NULL};
-            close(fd[0]);
-            close(fd[1]);
             freopen(this->_randPath.c_str(), "w", stdout);
             if (this->_method == "GET")
                 close(0);
