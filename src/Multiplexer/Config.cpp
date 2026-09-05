@@ -35,7 +35,8 @@ Location *Server::parseLocation(stringstream &ss)
                 line >> tmp;
                 if (access(tmp.c_str(), F_OK) == -1)
                     location->setRoot(_server_root);
-                location->setRoot(tmp);
+                else
+                    location->setRoot(tmp);
             }
             else if (tmp == "autoindex")
             {
