@@ -66,6 +66,18 @@ assert_header_contains()
     esac
 }
 
+assert_empty_body()
+{
+    name=$1
+    shift
+    size=$(curl -s "$@" | wc -c)
+    if [ "$size" -eq 0 ]; then
+        pass "$name (0 body bytes)"
+    else
+        fail "$name (expected 0 body bytes, got $size)"
+    fi
+}
+
 # --- build ---
 
 make -s -C "$ROOT_DIR" re >"$WORK_DIR/build.log" 2>&1
@@ -132,6 +144,12 @@ done
 
 assert_status "GET / -> 200" 200 "$BASE_URL/"
 assert_status "GET /missing.html -> 404" 404 "$BASE_URL/missing.html"
+
+assert_status "HEAD / -> 200" 200 -X HEAD "$BASE_URL/"
+assert_empty_body "HEAD / has no body" -X HEAD "$BASE_URL/"
+assert_status "HEAD /missing.html -> 404" 404 -X HEAD "$BASE_URL/missing.html"
+assert_empty_body "HEAD /missing.html has no body" -X HEAD "$BASE_URL/missing.html"
+assert_status "HEAD on GET-only location -> 200, not 405" 200 -X HEAD "$BASE_URL/readonly/index.html"
 
 assert_status "path traversal outside root -> 403" 403 \
     --path-as-is "$BASE_URL/../../../../../../../../etc/passwd"
