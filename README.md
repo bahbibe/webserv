@@ -111,8 +111,9 @@ requests under that path. Additional directives:
 | `allow` | Space-separated list of allowed methods (`GET`, `POST`, `DELETE`) |
 | `upload on\|off` | Allow file uploads for `POST` requests |
 | `upload_path` | Where uploaded files are written |
-| `cgi on\|off` | Enable CGI execution (`.php` via `/usr/bin/php-cgi`, `.py` via `/usr/bin/python3`) |
+| `cgi on\|off` | Enable CGI execution (`.php` via `/usr/bin/php-cgi`, `.py` via `/usr/bin/python3` by default - see `cgi_path`) |
 | `cgi_upload_path` | Where CGI-received request bodies are staged |
+| `cgi_path <ext> <interpreter>` | Override the interpreter for an extension, e.g. `cgi_path py /usr/local/bin/python3.12`. Repeatable, one line per extension. |
 | `return <url>` | Issue a 301 redirect to `<url>` |
 
 ## Supported HTTP behavior

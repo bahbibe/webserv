@@ -83,6 +83,14 @@ Location *Server::parseLocation(stringstream &ss)
                 line >> tmp;
                 location->setReturn(tmp);
             }
+            else if (tmp == "cgi_path")
+            {
+                string ext, interpreter;
+                line >> ext >> interpreter;
+                if (ext.empty() || interpreter.empty())
+                    throw ServerException(ERR "Invalid cgi_path");
+                location->setCgiPath(ext, interpreter);
+            }
         }
         else
             throw ServerException(ERR "Invalid directive");

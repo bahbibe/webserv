@@ -17,6 +17,10 @@ Server &Server::operator=(Server const &src)
 {
     if (this != &src)
     {
+        map<string, Location *>::iterator oldIt = _locations.begin();
+        for (; oldIt != _locations.end(); oldIt++)
+            delete oldIt->second;
+        _locations.clear();
         map<string, Location *>::const_iterator it = src._locations.begin();
         for (; it != src._locations.end(); it++)
         {

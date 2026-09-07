@@ -80,6 +80,7 @@ class Response
         string getErrorPage(Request &request, int statusCode);
         string templateError(string errorType);
         void checks(Request &request);
+        string resolveCgiPath(Request &request) const;
         void CGI(Request &req);
         int fillEnv(Request &req);
         double fileSize(string path);

@@ -13,6 +13,7 @@ private:
     string _upload_path;
     string _cgi_upload_path;
     string _return;
+    map<string, string> _cgiPaths;
 
 public:
     t_dir _dir;
@@ -29,6 +30,7 @@ public:
     void setUploadPath(string const &);
     void setCgiUploadPath(string const &);
     void setReturn(string const &);
+    void setCgiPath(string const &ext, string const &interpreter);
     void print();
 
     string getReturn() const;
@@ -40,4 +42,5 @@ public:
     string getUploadPath() const;
     string getCgiUploadPath() const;
     vector<string> getIndexs() const;
+    map<string, string> getCgiPaths() const;
 };

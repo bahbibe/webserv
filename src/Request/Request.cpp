@@ -270,6 +270,7 @@ void Request::setServer()
     directives.uploadPath = _location->getUploadPath();
     directives.isCgiAllowed = _location->getCgi();
     directives.cgiUploadPath = _location->getCgiUploadPath();
+    directives.cgiPaths = _location->getCgiPaths();
     directives.returnRedirect = _location->getReturn();
     directives.autoindex = _location->getAutoindex();
     directives.serverRoot = _location->getRoot();

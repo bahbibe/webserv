@@ -105,10 +105,19 @@ fi
 
 # --- fixtures ---
 
-mkdir -p "$WORK_DIR/WWW/uploads" "$WORK_DIR/WWW/readonly"
+mkdir -p "$WORK_DIR/WWW/uploads" "$WORK_DIR/WWW/readonly" "$WORK_DIR/WWW/cgi_out"
 echo "test index" > "$WORK_DIR/WWW/index.html"
 echo "readonly content" > "$WORK_DIR/WWW/readonly/index.html"
 python3 -c "print('X' * 3000)" > "$WORK_DIR/upload_source.txt"
+
+echo "this file is never actually run - cgi_path below points at the fake interpreter" \
+    > "$WORK_DIR/WWW/hello.py"
+chmod +x "$WORK_DIR/WWW/hello.py"
+cat > "$WORK_DIR/fake_interp.sh" <<'PYEOF'
+#!/bin/sh
+printf 'Content-Type: text/plain\r\n\r\nCUSTOM INTERPRETER WAS USED'
+PYEOF
+chmod +x "$WORK_DIR/fake_interp.sh"
 
 cat > "$WORK_DIR/test.conf" <<EOF
 server {
@@ -135,6 +144,9 @@ server {
         allow GET POST DELETE
         upload on
         upload_path $WORK_DIR/WWW/uploads
+        cgi on
+        cgi_upload_path $WORK_DIR/WWW/cgi_out
+        cgi_path py $WORK_DIR/fake_interp.sh
     }
 }
 EOF
@@ -165,6 +177,13 @@ assert_empty_body "HEAD / has no body" -X HEAD "$BASE_URL/"
 assert_status "HEAD /missing.html -> 404" 404 -X HEAD "$BASE_URL/missing.html"
 assert_empty_body "HEAD /missing.html has no body" -X HEAD "$BASE_URL/missing.html"
 assert_status "HEAD on GET-only location -> 200, not 405" 200 -X HEAD "$BASE_URL/readonly/index.html"
+
+cgi_body=$(curl -s "$BASE_URL/hello.py")
+if [ "$cgi_body" = "CUSTOM INTERPRETER WAS USED" ]; then
+    pass "cgi_path directive overrides the default interpreter"
+else
+    fail "cgi_path directive not honored (got: '$cgi_body')"
+fi
 
 if [ -f "$ACCESS_LOG" ] \
     && grep -Eq '^\[.*\] 127\.0\.0\.1 GET / 200 [0-9]+ [0-9]+ms$' "$ACCESS_LOG" \
