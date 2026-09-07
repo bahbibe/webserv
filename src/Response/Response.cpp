@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), env(NULL), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), env(NULL), pid(0), _isCGI(false)
 {
     saveStatus();
 }
@@ -212,6 +212,7 @@ void Response::initVars(Request &request, int fdSocket)
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
         this->_isHead = (this->_method == "HEAD");
+        this->_keepAlive = (this->_method != "POST") && !request.getWantsClose() && (this->_statusCode != 408);
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
         this->_absPath = request.directives.requestedFile;
@@ -467,7 +468,10 @@ void Response::SendHeader()
     it = this->status.find(this->_statusCode);
     this->_header = "HTTP/1.1 " + (it != this->status.end() ? it->second : "500 Internal Server Error") +"\r\n";
     if(_statusCode == 301)
-        this->_header += "Location: " + this->_path +"\r\n\r\n";
+    {
+        this->_header += "Location: " + this->_path +"\r\n";
+        this->_header += this->_keepAlive ? "connection: keep-alive\r\n\r\n" : "connection: close\r\n\r\n";
+    }
     else
     {
         if (this->_contentType.empty())
@@ -477,7 +481,7 @@ void Response::SendHeader()
         this->_header += "Transfer-Encoding: chunked\r\n";
         if (this->_isCGI == true)
             this->_header += this->_cgiHeader;
-        this->_header += "connection: close\r\n\r\n";
+        this->_header += this->_keepAlive ? "connection: keep-alive\r\n\r\n" : "connection: close\r\n\r\n";
     }
     write(this->_fdSocket, this->_header.c_str(), this->_header.length());
 }
@@ -563,6 +567,7 @@ Response &Response::operator=(const Response &other)
         this->_defaultError = other._defaultError;
         this->_isErrorCode = other._isErrorCode;
         this->_isHead = other._isHead;
+        this->_keepAlive = other._keepAlive;
         this->_fdSocket = other._fdSocket;
         this->_statusCode = other._statusCode;
         this->_bytesSent = other._bytesSent;
@@ -592,6 +597,11 @@ Response &Response::operator=(const Response &other)
 bool Response::getIsFinished() const
 {
     return this->_isfinished;
+}
+
+bool Response::getKeepAlive() const
+{
+    return this->_keepAlive;
 }
 
 size_t Response::getBytesSent() const

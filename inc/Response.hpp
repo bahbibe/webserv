@@ -24,6 +24,7 @@ class Response
         bool _isErrorCode;
         bool _cgiAutoIndex;
         bool _isHead;
+        bool _keepAlive;
 
         int _fdSocket;
         int _statusCode;
@@ -58,6 +59,7 @@ class Response
         Response(const Response &other);
         Response &operator=(const Response &other);
         bool getIsFinished() const;
+        bool getKeepAlive() const;
         size_t getBytesSent() const;
         int getStatusCode() const;
         void GET(Request &request);

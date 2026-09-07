@@ -35,9 +35,14 @@ Request &Request::operator=(const Request &other)
         this->_contentLength = other._contentLength;
         this->isErrorCode = other.isErrorCode;
         this->_isBodyBoundary = other._isBodyBoundary;
+        this->_boundary = other._boundary;
+        this->_wantsClose = other._wantsClose;
 
         this->_headersBuffer = other._headersBuffer;
+        this->_requestBuffer = other._requestBuffer;
         this->_rest = other._rest;
+        this->_tmpRequestTarget = other._tmpRequestTarget;
+        this->_host = other._host;
 
         this->_boundaries = other._boundaries;
         this->_chunks = other._chunks;
@@ -46,13 +51,15 @@ Request &Request::operator=(const Request &other)
 
         this->_isCgi = other._isCgi;
         this->servers = other.servers;
+        this->directives = other.directives;
+        this->_ready = other._ready;
     }
     return *this;
 }
 
 Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false) , _ready(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false), _isCgi(false), isErrorCode(false) , _ready(false)
 {
     this->_readBytes = 0;
     this->_location = NULL;
@@ -64,7 +71,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
 
 Request::Request(Server* server, int socketFd, vector<Server> servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _isCgi(false), isErrorCode(false), _ready(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false), _isCgi(false), isErrorCode(false), _ready(false)
 {
     this->servers = servers;
     this->_server = server;
@@ -151,6 +158,8 @@ void Request::parseHeaders()
             directives.httpAccept = headerValue;
         if (headerName == "host")
             _host = headerValue;
+        if (headerName == "connection")
+            _wantsClose = (toLowerCase(headerValue) == "close");
         ret_type ret = this->_headers.insert(pair<string, string>(headerName, headerValue));
         if (ret.second == false)
             setStatusCode(400, "Duplicate Header");
@@ -450,6 +459,16 @@ void Request::setTimeout()
     }
     this->_statusMessage = RED "Request Timeout: 408" RESET;
     // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+}
+
+bool Request::getWantsClose() const
+{
+    return this->_wantsClose;
+}
+
+Server *Request::getServer() const
+{
+    return this->_server;
 }
 
 void Request::printRequest()

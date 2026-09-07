@@ -122,6 +122,11 @@ requests under that path. Additional directives:
   permitted anywhere `GET` is, so `allow` directives don't need to
   list it separately.
 - HTTP/1.1 only (`505` on any other version).
+- Keep-alive: `GET`/`HEAD`/`DELETE` responses reuse the connection for
+  the next request unless the client sends `Connection: close` (no
+  pipelining - the client must read each response before sending the
+  next request). `POST` always closes the connection after
+  responding, regardless of status.
 - Request bodies via `Content-Length`, `Transfer-Encoding: chunked`,
   or `multipart/form-data`.
 - Status codes returned: 200, 201, 204, 301, 400, 403, 404, 405, 408,
