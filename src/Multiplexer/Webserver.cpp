@@ -208,9 +208,27 @@ void Webserver::start()
             }
             if (ep.events[i].events & EPOLLOUT && _req[ep.events[i].data.fd].getIsRequestFinished())
             {
-                _resp[ep.events[i].data.fd].sendResponse(_req[ep.events[i].data.fd], ep.events[i].data.fd);
-                if (_resp[ep.events[i].data.fd].getIsFinished() == true)
-                    closeConnection(_req, _resp, ep.events[i].data.fd);
+                int fd = ep.events[i].data.fd;
+                _resp[fd].sendResponse(_req[fd], fd);
+                if (_resp[fd].getIsFinished() == true)
+                {
+                    if (_resp[fd].getKeepAlive())
+                    {
+                        logAccess(_req[fd], &_resp[fd]);
+                        Server *srv = _req[fd].getServer();
+                        string clientIp = _req[fd]._clientIp;
+                        _req[fd] = Request(srv, fd, _servers);
+                        _req[fd]._clientIp = clientIp;
+                        _req[fd]._start = time(NULL);
+                        gettimeofday(&_req[fd]._startTv, NULL);
+                        _resp.erase(fd);
+                        ep.event.data.fd = fd;
+                        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                        epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, fd, &ep.event);
+                    }
+                    else
+                        closeConnection(_req, _resp, fd);
+                }
             }
         }
         for (map<int, Request>::iterator it = _req.begin(); it != _req.end(); ++it)

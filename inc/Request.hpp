@@ -65,6 +65,7 @@ private:
 
     bool _isBodyBoundary;
     string _boundary;
+    bool _wantsClose;
 
     Boundaries _boundaries;
     Chunks _chunks;
@@ -128,4 +129,6 @@ public:
     map<string, string> getHeaders() const;
     Location* getLocation() const;
     void setTimeout();
+    bool getWantsClose() const;
+    Server* getServer() const;
 };
