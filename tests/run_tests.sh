@@ -183,6 +183,34 @@ assert_status "DELETE on GET-only location -> 405" 405 -X DELETE "$BASE_URL/read
 assert_status "return directive -> 301" 301 "$BASE_URL/old"
 assert_header_contains "301 Location header" "Location" "example.com/new" "$BASE_URL/old"
 
+# --- keep-alive ---
+
+ka_trace=$(curl -s -v -o /dev/null "$BASE_URL/" "$BASE_URL/" 2>&1)
+if echo "$ka_trace" | grep -qi "Re-using existing connection"; then
+    pass "two GETs reuse the same connection (keep-alive)"
+else
+    fail "two GETs did not reuse the connection"
+fi
+if echo "$ka_trace" | grep -qi "^< connection: keep-alive"; then
+    pass "keep-alive GET response sends connection: keep-alive"
+else
+    fail "keep-alive GET response missing connection: keep-alive header"
+fi
+
+close_trace=$(curl -s -v -o /dev/null -H "Connection: close" "$BASE_URL/" "$BASE_URL/" 2>&1)
+if echo "$close_trace" | grep -qi "Re-using existing connection"; then
+    fail "Connection: close was not honored - connection got reused anyway"
+else
+    pass "Connection: close is honored (no reuse)"
+fi
+
+post_trace=$(curl -s -v -o /dev/null -d "x=1" "$BASE_URL/" "$BASE_URL/" 2>&1)
+if echo "$post_trace" | grep -qi "Re-using existing connection"; then
+    fail "POST connection was reused (should always close, to avoid body-drain hazards on error paths)"
+else
+    pass "POST always closes the connection"
+fi
+
 assert_status "multipart upload -> 201" 201 -F "file=@$WORK_DIR/upload_source.txt" "$BASE_URL/"
 uploaded=$(ls -t "$WORK_DIR/WWW/uploads"/*.txt 2>/dev/null | head -1)
 if [ -n "$uploaded" ] && diff -q "$WORK_DIR/upload_source.txt" "$uploaded" >/dev/null 2>&1; then
