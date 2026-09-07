@@ -29,7 +29,8 @@ bool allowedConfig(string const &line)
      || line == "upload" || line == "upload_path" \
      || line == "allow" || line == "return" \
      || line == "server" || line == "location" \
-     || line == "error_page" || line == "cgi_upload_path")
+     || line == "error_page" || line == "cgi_upload_path" \
+     || line == "cgi_path")
         return true;
     return false;
 }
@@ -64,6 +65,7 @@ bool isLocationDir(string const &dir)
     directives.push_back("upload");
     directives.push_back("upload_path");
     directives.push_back("cgi_upload_path");
+    directives.push_back("cgi_path");
     vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
     if (it != directives.end())
         return true;

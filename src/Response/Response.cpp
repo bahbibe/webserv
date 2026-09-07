@@ -250,10 +250,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (file.is_open())
         {
             file.close();
-            if (this->_path.rfind(".php") != string::npos)
-                this->_cgiPath = "/usr/bin/php-cgi";
-            else
-                this->_cgiPath = "/usr/bin/python3";
+            this->_cgiPath = resolveCgiPath(request);
             CGI(request);
         }
         else
@@ -295,6 +292,15 @@ void Response::sendResponse(Request &request, int fdSocket)
     }
 }
 
+string Response::resolveCgiPath(Request &request) const
+{
+    string ext = (this->_path.rfind(".php") != string::npos) ? "php" : "py";
+    map<string, string>::const_iterator it = request.directives.cgiPaths.find(ext);
+    if (it != request.directives.cgiPaths.end())
+        return it->second;
+    return ext == "php" ? "/usr/bin/php-cgi" : "/usr/bin/python3";
+}
+
 void Response::checks(Request &request)
 { 
     if (is_adir(this->_path) && !this->_flag)
@@ -333,10 +339,7 @@ void Response::checkAutoInedx(Request &request)
                 {
                     this->_absPath = this->_path;
                     file.close();
-                    if (this->_path.rfind(".php") != string::npos)
-                        this->_cgiPath = "/usr/bin/php-cgi";
-                    else
-                        this->_cgiPath = "/usr/bin/python3";
+                    this->_cgiPath = resolveCgiPath(request);
                    this->_cgiAutoIndex = true;
                 }
                 else

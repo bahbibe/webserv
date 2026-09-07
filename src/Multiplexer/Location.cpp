@@ -21,6 +21,7 @@ Location &Location::operator=(Location const &src)
         _upload_path = src._upload_path;
         _cgi_upload_path = src._cgi_upload_path;
         _return = src._return;
+        _cgiPaths = src._cgiPaths;
     }
     return *this;
 }
@@ -38,6 +39,7 @@ void Location::setUploadPath(string const &buff) {_upload_path = buff;}
 void Location::setCgiUploadPath(string const &buff) {_cgi_upload_path = buff;}
 void Location::setCgi(bool flag) {_cgi = flag;}
 void Location::setReturn(string const &buff) {_return = buff;}
+void Location::setCgiPath(string const &ext, string const &interpreter) {_cgiPaths[ext] = interpreter;}
 string Location::getReturn() const { return _return; }
 vector<string> Location::getMethods() const { return _methods; }
 string Location::getRoot() const { return _root; }
@@ -47,6 +49,7 @@ bool Location::getCgi() const { return _cgi; }
 string Location::getUploadPath() const { return _upload_path; }
 vector<string> Location::getIndexs() const { return _indexs; }
 string Location::getCgiUploadPath() const { return _cgi_upload_path; }
+map<string, string> Location::getCgiPaths() const { return _cgiPaths; }
 
 void Location::setMethods(string const &buff)
 {
@@ -72,6 +75,10 @@ void Location::print()
     cout << "    cgi: " << _cgi << endl;
     cout << "    upload_path: " << _upload_path << endl;
     cout << "    return: " << _return << endl;
+    cout << "    cgi_paths: ";
+    for (map<string, string>::const_iterator it = _cgiPaths.begin(); it != _cgiPaths.end(); ++it)
+        cout << it->first << "=" << it->second << " ";
+    cout << endl;
     cout << "    methods: ";
     for (size_t i = 0; i < _methods.size(); i++)
         cout << _methods[i] << " ";
