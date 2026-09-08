@@ -33,6 +33,7 @@
 #define CLOCKWORK(x) double(time(NULL) - (x))
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
+#define MAX_HEADER_BYTES 8192
 using namespace std;
 
 
