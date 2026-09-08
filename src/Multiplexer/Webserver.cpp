@@ -80,7 +80,10 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
+    {
+        close(clientSock);
         throw ServerException(ERR "Failed to add client to epoll");
+    }
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = time(NULL);
     gettimeofday(&req[clientSock]._startTv, NULL);
@@ -129,6 +132,27 @@ void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp
     req.erase(sock);
     resp.erase(sock);
     close(sock);
+}
+
+void Webserver::safeCloseConnection(int sock)
+{
+    try
+    {
+        map<int, Response>::iterator respIt = _resp.find(sock);
+        if (respIt != _resp.end() && respIt->second._isCGI)
+        {
+            kill(respIt->second.pid, SIGKILL);
+            waitpid(respIt->second.pid, 0, 0);
+        }
+        closeConnection(_req, _resp, sock);
+    }
+    catch (...)
+    {
+        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
+        close(sock);
+        _req.erase(sock);
+        _resp.erase(sock);
+    }
 }
 
 bool Webserver::matchServer(map<int, Request> &req, int sock)
@@ -181,65 +205,87 @@ void Webserver::start()
             continue;
         for (int i = 0; i < evCount; i++)
         {
-            if (matchServer(_req, ep.events[i].data.fd))
-                continue;
-            if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
+            int fd = ep.events[i].data.fd;
+            try
             {
-                if (_resp[ep.events[i].data.fd]._isCGI == true)
+                if (matchServer(_req, fd))
+                    continue;
+                if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
                 {
-                    kill(_resp[ep.events[i].data.fd].pid, SIGKILL);
-                    waitpid(_resp[ep.events[i].data.fd].pid, 0, 0);
-                }
-                closeConnection(_req, _resp, ep.events[i].data.fd);
-                continue;
-            }
-            if (ep.events[i].events & EPOLLIN)
-            {
-                _req[ep.events[i].data.fd]._start = time(NULL);
-
-                _req[ep.events[i].data.fd].readRequest();
-                if (_req[ep.events[i].data.fd].getIsRequestFinished())
-                {
-                    _resp.insert(make_pair(ep.events[i].data.fd, Response()));
-                    ep.event.data.fd = ep.events[i].data.fd;
-                    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
-                    epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, ep.events[i].data.fd, &ep.event);
-                }
-            }
-            if (ep.events[i].events & EPOLLOUT && _req[ep.events[i].data.fd].getIsRequestFinished())
-            {
-                int fd = ep.events[i].data.fd;
-                _resp[fd].sendResponse(_req[fd], fd);
-                if (_resp[fd].getIsFinished() == true)
-                {
-                    if (_resp[fd].getKeepAlive())
+                    if (_resp[fd]._isCGI == true)
                     {
-                        logAccess(_req[fd], &_resp[fd]);
-                        Server *srv = _req[fd].getServer();
-                        string clientIp = _req[fd]._clientIp;
-                        _req[fd] = Request(srv, fd, _servers);
-                        _req[fd]._clientIp = clientIp;
-                        _req[fd]._start = time(NULL);
-                        gettimeofday(&_req[fd]._startTv, NULL);
-                        _resp.erase(fd);
+                        kill(_resp[fd].pid, SIGKILL);
+                        waitpid(_resp[fd].pid, 0, 0);
+                    }
+                    closeConnection(_req, _resp, fd);
+                    continue;
+                }
+                if (ep.events[i].events & EPOLLIN)
+                {
+                    _req[fd]._start = time(NULL);
+
+                    _req[fd].readRequest();
+                    if (_req[fd].getIsRequestFinished())
+                    {
+                        _resp.insert(make_pair(fd, Response()));
                         ep.event.data.fd = fd;
-                        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                        ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
                         epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, fd, &ep.event);
                     }
-                    else
-                        closeConnection(_req, _resp, fd);
                 }
+                if (ep.events[i].events & EPOLLOUT && _req[fd].getIsRequestFinished())
+                {
+                    _resp[fd].sendResponse(_req[fd], fd);
+                    if (_resp[fd].getIsFinished() == true)
+                    {
+                        if (_resp[fd].getKeepAlive())
+                        {
+                            logAccess(_req[fd], &_resp[fd]);
+                            Server *srv = _req[fd].getServer();
+                            string clientIp = _req[fd]._clientIp;
+                            _req[fd] = Request(srv, fd, _servers);
+                            _req[fd]._clientIp = clientIp;
+                            _req[fd]._start = time(NULL);
+                            gettimeofday(&_req[fd]._startTv, NULL);
+                            _resp.erase(fd);
+                            ep.event.data.fd = fd;
+                            ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                            epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, fd, &ep.event);
+                        }
+                        else
+                            closeConnection(_req, _resp, fd);
+                    }
+                }
+            }
+            catch (const exception &e)
+            {
+                cerr << ERR "Unhandled exception servicing fd " << fd << ": " << e.what() << "\n";
+                if (_req.find(fd) != _req.end())
+                    safeCloseConnection(fd);
+            }
+            catch (...)
+            {
+                cerr << ERR "Unknown exception servicing fd " << fd << "\n";
+                if (_req.find(fd) != _req.end())
+                    safeCloseConnection(fd);
             }
         }
         for (map<int, Request>::iterator it = _req.begin(); it != _req.end(); ++it)
         {
-            if (!it->second.getIsRequestFinished() && CLOCKWORK(it->second._start) > TIMEOUT)
+            try
             {
-                it->second.setTimeout();
-                _resp.insert(make_pair(it->first, Response()));
-                ep.event.data.fd = it->first;
-                ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
-                epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, it->first, &ep.event);
+                if (!it->second.getIsRequestFinished() && CLOCKWORK(it->second._start) > TIMEOUT)
+                {
+                    it->second.setTimeout();
+                    _resp.insert(make_pair(it->first, Response()));
+                    ep.event.data.fd = it->first;
+                    ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                    epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, it->first, &ep.event);
+                }
+            }
+            catch (const exception &e)
+            {
+                cerr << ERR "Unhandled exception in timeout scan for fd " << it->first << ": " << e.what() << "\n";
             }
         }
     }
