@@ -181,10 +181,18 @@ requests under that path. Additional directives:
   responding, regardless of status.
 - Request bodies via `Content-Length`, `Transfer-Encoding: chunked`,
   or `multipart/form-data`.
+- Every response carries a `Date` header (RFC 9110 6.6.1).
 - Status codes returned: 200, 201, 204, 301, 400, 403, 404, 405, 408,
   409, 411, 413, 414, 500, 501, 504, 505.
 - Idle connections are dropped with a `408` after 10 seconds without a
-  complete request.
+  complete request, or after 30 seconds total regardless of activity
+  (a client trickling bytes just often enough to keep resetting the
+  idle timer still gets cut off).
+- The header block (request line + headers, before the body) is
+  capped at 8192 bytes; over that is a `400` and the connection is
+  closed.
+- Up to 512 concurrent connections; beyond that, new connections are
+  accepted and immediately closed rather than queued.
 - Directory requests without a trailing slash are redirected (301);
   directory requests are served from `index`, or an autoindex listing
   if `autoindex on` and no index file is found.

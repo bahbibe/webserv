@@ -534,6 +534,10 @@ void Response::SendHeader()
         map<int,string>::iterator it;
         it = this->status.find(this->_statusCode);
         this->_header = "HTTP/1.1 " + (it != this->status.end() ? it->second : "500 Internal Server Error") +"\r\n";
+        time_t now = time(NULL);
+        char dateBuf[32];
+        strftime(dateBuf, sizeof(dateBuf), "%a, %d %b %Y %H:%M:%S GMT", gmtime(&now));
+        this->_header += "Date: " + string(dateBuf) + "\r\n";
         if(_statusCode == 301)
         {
             this->_header += "Location: " + this->_path +"\r\n";

@@ -27,12 +27,15 @@
 #define DEFAULT_CONF "default.conf"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
+#define MAX_CONNECTIONS 512
 #define TIMEOUT 10
+#define REQUEST_TIMEOUT 30
 #define SHUTDOWN_GRACE 5
 #define CGI_TIMEOUT 5
 #define CLOCKWORK(x) double(time(NULL) - (x))
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
+#define MAX_HEADER_BYTES 8192
 using namespace std;
 
 

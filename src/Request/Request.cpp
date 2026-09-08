@@ -105,6 +105,11 @@ void Request::parseRequest()
     if (_isReadingBody)
         return this->parseBody();
     _headersBuffer.append(_requestBuffer);
+    if (_headersBuffer.length() > MAX_HEADER_BYTES)
+    {
+        _wantsClose = true;
+        setStatusCode(400, "Header block too large");
+    }
     size_t pos = _headersBuffer.find("\r\n\r\n");
     if (pos == string::npos)
         return;

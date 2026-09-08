@@ -75,6 +75,11 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
+    if (req.size() >= MAX_CONNECTIONS)
+    {
+        close(clientSock);
+        return;
+    }
     if (fcntl(clientSock, F_SETFL, O_NONBLOCK) == -1)
     {
         close(clientSock);
@@ -282,7 +287,9 @@ void Webserver::start()
         {
             try
             {
-                if (!it->second.getIsRequestFinished() && CLOCKWORK(it->second._start) > TIMEOUT)
+                if (!it->second.getIsRequestFinished()
+                    && (CLOCKWORK(it->second._start) > TIMEOUT
+                        || CLOCKWORK(it->second._startTv.tv_sec) > REQUEST_TIMEOUT))
                 {
                     it->second.setTimeout();
                     _resp.insert(make_pair(it->first, Response()));
