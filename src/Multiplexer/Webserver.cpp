@@ -77,6 +77,11 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
+    if (fcntl(clientSock, F_SETFL, O_NONBLOCK) == -1)
+    {
+        close(clientSock);
+        throw ServerException(ERR "Failed to set client socket non-blocking");
+    }
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))

@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <cerrno>
 
 #define BUFFERSIZE 1024
 using namespace std;
@@ -25,10 +26,14 @@ class Response
         bool _cgiAutoIndex;
         bool _isHead;
         bool _keepAlive;
+        bool _deleteDone;
 
         int _fdSocket;
         int _statusCode;
         size_t _bytesSent;
+        size_t _headerOffset;
+        size_t _bodyOffset;
+        size_t _pendingBodyLen;
 
 
         string _method;
@@ -81,6 +86,9 @@ class Response
         string templateError(string errorType);
         void checks(Request &request);
         string resolveCgiPath(Request &request) const;
+        bool flushHeader();
+        bool flushBody();
+        bool headerSent() const;
         void CGI(Request &req);
         int fillEnv(Request &req);
         double fileSize(string path);

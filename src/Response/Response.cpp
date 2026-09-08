@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), env(NULL), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), env(NULL), pid(0), _isCGI(false)
 {
     saveStatus();
 }
@@ -31,7 +31,7 @@ void Response::CGI(Request &req)
             else
                 freopen(req.directives.cgiFileName.c_str(), "r", stdin);
             execve(argv[0], (char* const*)argv, this->env);
-            perror("execve");
+            cerr << "execve: " << strerror(errno) << "\n";
             exit(127);
         }
     }
@@ -72,30 +72,31 @@ void Response::CGI(Request &req)
             }
             checkErrors(req);
         }
-        else if (file.is_open())
+        else
         {
-            file.read(buffer, 1023);
-            ss << buffer;
-            str = ss.str();
-            if ((pos = str.find("\r\n\r\n")) != string::npos)
+            if (file.is_open())
             {
-                int s = (str.length() - (pos + 4)) * -1;
-                this->_cgiHeader = str.substr(0, pos + 2);
-                this->file.clear();
-                this->file.seekg(s , ios::cur);
+                file.read(buffer, 1023);
+                ss << buffer;
+                str = ss.str();
+                if ((pos = str.find("\r\n\r\n")) != string::npos)
+                {
+                    int s = (str.length() - (pos + 4)) * -1;
+                    this->_cgiHeader = str.substr(0, pos + 2);
+                    this->file.clear();
+                    this->file.seekg(s , ios::cur);
+                }
+                else
+                {
+                    file.clear();
+                    file.seekg(0 ,ios::beg);
+                }
             }
-            else
-            {
-                file.clear();
-                file.seekg(0 ,ios::beg);
-            }
-        }
-        if (!this->_defaultError)
-        {
             this->_statusCode = 200;
             this->_method = "GET";
             SendHeader();
-            GET(req);
+            if (headerSent())
+                GET(req);
         }
     }
 }
@@ -119,6 +120,27 @@ void Response::GET(Request &request)
         this->_isCGI = false;
         return;
     }
+    if (this->_bodyOffset < this->_body.length())
+    {
+        if (!flushBody())
+            return;
+        this->_bytesSent += this->_pendingBodyLen;
+        if (this->_pendingBodyLen == 0)
+        {
+            file.close();
+            this->_flag = false;
+            this->_isfinished = true;
+            if (this->_isCGI == true)
+            {
+                freeEnv(this->env);
+                this->env = NULL;
+                remove(this->_path.c_str());
+                remove(request.directives.cgiFileName.c_str());
+            }
+            this->_isCGI = false;
+        }
+        return;
+    }
     char _body1[BUFFERSIZE] = {0};
     file.read(_body1, 1023);
     if (file.gcount() > 0)
@@ -128,24 +150,30 @@ void Response::GET(Request &request)
         this->_body = ss.str() + "\r\n";
         this->_body.append(_body1, file.gcount());
         this->_body.append("\r\n", 2);
-        write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
-        this->_bytesSent += file.gcount();
+        this->_bodyOffset = 0;
+        this->_pendingBodyLen = (size_t)file.gcount();
+        if (flushBody())
+            this->_bytesSent += this->_pendingBodyLen;
     }
     else if (file.gcount() == 0)
     {
         this->_body = "0\r\n\r\n";
-        write(this->_fdSocket, this->_body.c_str(),   this->_body.length());
-        file.close();
-        this->_flag = false;
-        this->_isfinished = true;
-        if (this->_isCGI == true)
+        this->_bodyOffset = 0;
+        this->_pendingBodyLen = 0;
+        if (flushBody())
         {
-            freeEnv(this->env);
-            this->env = NULL;
-            remove(this->_path.c_str());
-            remove(request.directives.cgiFileName.c_str());
+            file.close();
+            this->_flag = false;
+            this->_isfinished = true;
+            if (this->_isCGI == true)
+            {
+                freeEnv(this->env);
+                this->env = NULL;
+                remove(this->_path.c_str());
+                remove(request.directives.cgiFileName.c_str());
+            }
+            this->_isCGI = false;
         }
-        this->_isCGI = false;
     }
 }
 
@@ -223,10 +251,15 @@ void Response::initVars(Request &request, int fdSocket)
 void Response::sendResponse(Request &request, int fdSocket)
 {
     initVars(request, fdSocket);
+    if (!this->_header.empty() && !headerSent())
+    {
+        if (!flushHeader())
+            return;
+    }
     if (this->_isErrorCode == true)
-    {   if (!this->_flag)
-            checkErrors(request);
-        if (!this->_defaultError)
+    {
+        checkErrors(request);
+        if (!this->_defaultError && headerSent())
             GET(request);
     }
     else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
@@ -239,7 +272,8 @@ void Response::sendResponse(Request &request, int fdSocket)
             this->_statusCode = 301;
         }
         SendHeader();
-        this->_isfinished = true;
+        if (headerSent())
+            this->_isfinished = true;
     }
     else if ((!this->_flag && request.directives.isCgiAllowed)
         && (this->_path.rfind(".php") != string::npos
@@ -258,7 +292,7 @@ void Response::sendResponse(Request &request, int fdSocket)
             this->_isErrorCode = true;
             this->_statusCode = 404;
             checkErrors(request);
-            if (!this->_defaultError)
+            if (!this->_defaultError && headerSent())
                 GET(request);
         }
     }
@@ -268,26 +302,33 @@ void Response::sendResponse(Request &request, int fdSocket)
             checks(request);
         if (this->_cgiAutoIndex)
             CGI(request);
-        else if (!this->_defaultError)
+        else if (!this->_defaultError && headerSent())
             GET(request);
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
     {
-        if (is_adir(this->_path) && request.directives.isCGI == true)
-            checkAutoInedx(request);
-        else
-            checkErrors(request);
+        if (!this->_flag)
+        {
+            if (is_adir(this->_path) && request.directives.isCGI == true)
+                checkAutoInedx(request);
+            else
+                checkErrors(request);
+        }
         if (this->_cgiAutoIndex)
             CGI(request);
-        else if (!this->_defaultError)
+        else if (!this->_defaultError && headerSent())
             GET(request);
     }
     else if (this->_method == "DELETE" && !this->_isErrorCode)
     {
-        this->_statusCode = 204;
-        DELETE(this->_path);
+        if (!this->_deleteDone)
+        {
+            this->_statusCode = 204;
+            DELETE(this->_path);
+            this->_deleteDone = true;
+        }
         checkErrors(request);
-        if (!this->_defaultError)
+        if (!this->_defaultError && headerSent())
             GET(request);
     }
 }
@@ -367,30 +408,40 @@ void Response::tree_dir()
     DIR *dir = opendir(this->_path.c_str());
     if (dir)
     {
-        struct dirent *dp;
-        string name;
-        string filePath;
-        string body = "<html><head></head><body><ul>";
-        while ((dp = readdir(dir)))
-        {
-            name = dp->d_name;
-            body += "<li><a href='"+ name  +"'>"  + name +"</a></li>";
-        }
         this->_contentType = "text/html";
-        stringstream ss;
         SendHeader();
-        ss << hex << body.length();
-        this->_body += ss.str() + "\r\n";
-        this->_body += body + "\r\n";
-        this->_body += "0\r\n\r\n";
-        if (!this->_isHead)
+        if (this->_body.empty())
         {
-            write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
-            this->_bytesSent += body.length();
+            struct dirent *dp;
+            string name;
+            string body = "<html><head></head><body><ul>";
+            while ((dp = readdir(dir)))
+            {
+                name = dp->d_name;
+                body += "<li><a href='"+ name  +"'>"  + name +"</a></li>";
+            }
+            stringstream ss;
+            ss << hex << body.length();
+            this->_body = ss.str() + "\r\n";
+            this->_body += body + "\r\n";
+            this->_body += "0\r\n\r\n";
+            this->_bodyOffset = 0;
+            this->_pendingBodyLen = body.length();
         }
-        this->_defaultError = true;
-        this->_isfinished = true;
-        this->_flag = false;
+        closedir(dir);
+        if (this->_isHead)
+        {
+            this->_defaultError = true;
+            this->_isfinished = true;
+            this->_flag = false;
+        }
+        else if (flushBody())
+        {
+            this->_bytesSent += this->_pendingBodyLen;
+            this->_defaultError = true;
+            this->_isfinished = true;
+            this->_flag = false;
+        }
     }
 }
 
@@ -410,24 +461,33 @@ void Response::checkErrors(Request &request)
         file.open(this->_path.c_str(), ios::in | ios::binary);
     if (!file.is_open() || this->_path == "default")
     {
-        string error;
-        stringstream ss;
-        map<int, string>::iterator it;
         this->_contentType = "text/html";
         SendHeader();
-        it = this->status.find(this->_statusCode);
-        error = templateError(it != this->status.end() ? it->second : "500 Internal Server Error");
-        ss << hex << error.length();
-        this->_body = ss.str() + "\r\n";
-        this->_body += error + "\r\n";
-        this->_body += "0\r\n\r\n";
-        if (!this->_isHead)
+        if (this->_body.empty())
         {
-            write(this->_fdSocket, this->_body.c_str(),  this->_body.length());
-            this->_bytesSent += error.length();
+            string error;
+            stringstream ss;
+            map<int, string>::iterator it;
+            it = this->status.find(this->_statusCode);
+            error = templateError(it != this->status.end() ? it->second : "500 Internal Server Error");
+            ss << hex << error.length();
+            this->_body = ss.str() + "\r\n";
+            this->_body += error + "\r\n";
+            this->_body += "0\r\n\r\n";
+            this->_bodyOffset = 0;
+            this->_pendingBodyLen = error.length();
         }
-        this->_defaultError = true;
-        this->_isfinished = true;
+        if (this->_isHead)
+        {
+            this->_defaultError = true;
+            this->_isfinished = true;
+        }
+        else if (flushBody())
+        {
+            this->_bytesSent += this->_pendingBodyLen;
+            this->_defaultError = true;
+            this->_isfinished = true;
+        }
     }
     else if (file.good() && !this->_flag)
     {
@@ -465,28 +525,61 @@ void Response::saveStatus()
     this->status[505] = "505 HTTP Version Not Supported";
 }
 
-void Response::SendHeader() 
+void Response::SendHeader()
 {
-    map<int,string>::iterator it;
-    it = this->status.find(this->_statusCode);
-    this->_header = "HTTP/1.1 " + (it != this->status.end() ? it->second : "500 Internal Server Error") +"\r\n";
-    if(_statusCode == 301)
+    if (this->_header.empty())
     {
-        this->_header += "Location: " + this->_path +"\r\n";
-        this->_header += this->_keepAlive ? "connection: keep-alive\r\n\r\n" : "connection: close\r\n\r\n";
-    }
-    else
-    {
-        if (this->_contentType.empty())
-            this->_header += "Content-Type: text/html\r\n";
+        map<int,string>::iterator it;
+        it = this->status.find(this->_statusCode);
+        this->_header = "HTTP/1.1 " + (it != this->status.end() ? it->second : "500 Internal Server Error") +"\r\n";
+        if(_statusCode == 301)
+        {
+            this->_header += "Location: " + this->_path +"\r\n";
+            this->_header += this->_keepAlive ? "connection: keep-alive\r\n\r\n" : "connection: close\r\n\r\n";
+        }
         else
-            this->_header += "Content-Type: " + this->_contentType + "\r\n";
-        this->_header += "Transfer-Encoding: chunked\r\n";
-        if (this->_isCGI == true)
-            this->_header += this->_cgiHeader;
-        this->_header += this->_keepAlive ? "connection: keep-alive\r\n\r\n" : "connection: close\r\n\r\n";
+        {
+            if (this->_contentType.empty())
+                this->_header += "Content-Type: text/html\r\n";
+            else
+                this->_header += "Content-Type: " + this->_contentType + "\r\n";
+            this->_header += "Transfer-Encoding: chunked\r\n";
+            if (this->_isCGI == true)
+                this->_header += this->_cgiHeader;
+            this->_header += this->_keepAlive ? "connection: keep-alive\r\n\r\n" : "connection: close\r\n\r\n";
+        }
+        this->_headerOffset = 0;
     }
-    write(this->_fdSocket, this->_header.c_str(), this->_header.length());
+    flushHeader();
+}
+
+bool Response::flushHeader()
+{
+    if (this->_headerOffset >= this->_header.length())
+        return true;
+    ssize_t n = write(this->_fdSocket, this->_header.c_str() + this->_headerOffset,
+                       this->_header.length() - this->_headerOffset);
+    if (n <= 0)
+        return false;
+    this->_headerOffset += (size_t)n;
+    return this->_headerOffset >= this->_header.length();
+}
+
+bool Response::flushBody()
+{
+    if (this->_bodyOffset >= this->_body.length())
+        return true;
+    ssize_t n = write(this->_fdSocket, this->_body.c_str() + this->_bodyOffset,
+                       this->_body.length() - this->_bodyOffset);
+    if (n <= 0)
+        return false;
+    this->_bodyOffset += (size_t)n;
+    return this->_bodyOffset >= this->_body.length();
+}
+
+bool Response::headerSent() const
+{
+    return this->_headerOffset >= this->_header.length();
 }
 
 string Response::templateError(string errorType)
@@ -593,6 +686,10 @@ Response &Response::operator=(const Response &other)
         this->_cgiAutoIndex = other._cgiAutoIndex;
         this->start = other.start;
         this->_randPath = other._randPath;
+        this->_deleteDone = other._deleteDone;
+        this->_headerOffset = other._headerOffset;
+        this->_bodyOffset = other._bodyOffset;
+        this->_pendingBodyLen = other._pendingBodyLen;
     }
     return *this;
 }
