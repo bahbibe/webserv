@@ -72,8 +72,10 @@ extern map<string, int> socketMap;
 extern string confDir;
 extern string accessLogPath;
 extern volatile sig_atomic_t g_shutdown;
+extern volatile sig_atomic_t g_reopenLog;
 extern vector<string> configErrors;
 void handleShutdownSignal(int signum);
+void handleReopenLogSignal(int signum);
 void addConfigError(string const &msg);
 
 class Webserver
@@ -85,6 +87,7 @@ private:
     void stopListening();
     void logAccess(Request &req, Response *resp);
     void safeCloseConnection(int sock);
+    void reopenAccessLog();
 public:
     vector<Server> _servers;
     Webserver();

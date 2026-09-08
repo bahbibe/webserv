@@ -95,6 +95,18 @@ If the log file can't be opened (e.g. no write permission next to the
 binary), the server prints a warning and keeps serving without
 logging - it doesn't fail to start over this.
 
+### Log rotation
+
+`SIGHUP` closes and reopens `access.log` at the same path, without
+restarting - the standard logrotate pattern: rotate (rename)
+`access.log`, send `SIGHUP`, and the server picks up a fresh file
+while whatever was renamed stays exactly as it was:
+
+```
+mv access.log access.log.1
+kill -HUP $(pgrep webserv)
+```
+
 ## Config file
 
 The whole config file is validated before anything binds a socket:

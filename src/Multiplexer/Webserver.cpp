@@ -12,6 +12,16 @@ Webserver::Webserver()
         cerr << ERR "Unable to open access log at " << accessLogPath << ", continuing without it\n";
 }
 
+void Webserver::reopenAccessLog()
+{
+    if (_accessLog.is_open())
+        _accessLog.close();
+    _accessLog.clear();
+    _accessLog.open(accessLogPath.c_str(), ios::app);
+    if (!_accessLog.is_open())
+        cerr << ERR "Unable to reopen access log at " << accessLogPath << ", continuing without it\n";
+}
+
 
 Server &Webserver::operator[](size_t index)
 {
@@ -195,9 +205,15 @@ void Webserver::start()
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, handleShutdownSignal);
     signal(SIGTERM, handleShutdownSignal);
+    signal(SIGHUP, handleReopenLogSignal);
     time_t shutdownStarted = 0;
     while (1)
     {
+        if (g_reopenLog)
+        {
+            g_reopenLog = 0;
+            reopenAccessLog();
+        }
         if (g_shutdown && shutdownStarted == 0)
         {
             shutdownStarted = time(NULL);
