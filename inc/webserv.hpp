@@ -27,6 +27,7 @@
 #define DEFAULT_CONF "default.conf"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
+#define MAX_CONNECTIONS 512
 #define TIMEOUT 10
 #define SHUTDOWN_GRACE 5
 #define CGI_TIMEOUT 5
