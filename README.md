@@ -270,13 +270,12 @@ to be filled:
   sounds: temp files are explicitly exempt from the single-poll
   requirement, pipes aren't, so this touches the event loop, not just
   `Response::CGI()`.
-- A folder/function reorganization pass (the codebase has grown a lot
-  of features into a small number of files this session) - best done
-  as its own change, separate from any behavior change, so a
-  regression is never "was it the rename or the rewrite?"
 - POST keep-alive: needs guaranteed full-body draining on every error
   path (or an explicit drain step before reuse) so a rejected POST
   can't leave unread bytes on a connection about to be reused.
 - Per-location `client_max_body_size` override (currently server-level
   only).
-- A config reload on `SIGHUP` instead of requiring a restart.
+- A full config reload on `SIGHUP` (re-parse the file, rebuild live
+  servers/locations/sockets without dropping connections) instead of
+  requiring a restart - `SIGHUP` currently only reopens the access log
+  (see "Log rotation" above), which was deliberately scoped smaller.
