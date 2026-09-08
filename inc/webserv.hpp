@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
+#include <netdb.h>
 #include <csignal>
 #define RED "\033[0;31m"
 #define GREEN "\033[0;32m"
@@ -106,7 +107,7 @@ bool isComment(string const&);
 bool isBrackets(string const&);
 bool isServerDir(string const &);
 bool isLocationDir(string const &);
-bool isIpV4(string const &str);
+int resolveHostFamily(string const &host);
 bool isNumber(string const &);
 bool duplicateDirective(t_dir dir);
 void trim(string &str);

@@ -31,6 +31,7 @@ public:
     void print();
     void setupSocket();
     int getSocket() const;
+    string addrKey() const;
     class ServerException : public exception
     {
     private:

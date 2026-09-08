@@ -156,57 +156,79 @@ void Server::print()
     }
 }
 
+string Server::addrKey() const
+{
+    if (_host.find(':') != string::npos)
+        return "[" + _host + "]:" + _port;
+    return _host + ":" + _port;
+}
+
 void Server::setupSocket()
 {
-    map<string, int>::iterator it = socketMap.find(_host + ":" + _port);
+    string key = addrKey();
+    map<string, int>::iterator it = socketMap.find(key);
     if (it != socketMap.end())
     {
         _socket = it->second;
         return;
     }
-    int sockOpt = 1;
-    struct sockaddr_in serverAddr;
-    memset(&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = inet_addr(_host.c_str());
-    serverAddr.sin_port = htons(atoi(_port.c_str()));
-    if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    struct addrinfo hints;
+    struct addrinfo *res = NULL;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV | AI_PASSIVE;
+    int gaiStatus = getaddrinfo(_host.c_str(), _port.c_str(), &hints, &res);
+    if (gaiStatus != 0)
     {
-        addConfigError(ERR "Failed to create socket for " + _host + ":" + _port);
+        addConfigError(ERR "Invalid host/port " + key + " (" + gai_strerror(gaiStatus) + ")");
+        return;
+    }
+    int sockOpt = 1;
+    if ((_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1)
+    {
+        addConfigError(ERR "Failed to create socket for " + key);
+        freeaddrinfo(res);
         return;
     }
     if (fcntl(_socket, F_SETFL, O_NONBLOCK) == -1)
     {
-        addConfigError(ERR "Failed to set socket non-blocking for " + _host + ":" + _port);
+        addConfigError(ERR "Failed to set socket non-blocking for " + key);
         close(_socket);
+        freeaddrinfo(res);
         return;
     }
     if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
     {
-        addConfigError(ERR "Failed to set socket options for " + _host + ":" + _port);
+        addConfigError(ERR "Failed to set socket options for " + key);
         close(_socket);
+        freeaddrinfo(res);
         return;
     }
-    if (bind(_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)))
+    if (res->ai_family == AF_INET6)
+        setsockopt(_socket, IPPROTO_IPV6, IPV6_V6ONLY, &sockOpt, sizeof(sockOpt));
+    if (bind(_socket, res->ai_addr, res->ai_addrlen))
     {
-        addConfigError(ERR "Failed to bind " + _host + ":" + _port + " (" + strerror(errno) + ")");
+        addConfigError(ERR "Failed to bind " + key + " (" + strerror(errno) + ")");
         close(_socket);
+        freeaddrinfo(res);
         return;
     }
+    freeaddrinfo(res);
     if (listen(_socket, 1))
     {
-        addConfigError(ERR "Failed to listen on " + _host + ":" + _port);
+        addConfigError(ERR "Failed to listen on " + key);
         close(_socket);
         return;
     }
-    socketMap[_host + ":" + _port] = _socket;
-    cout << LISTENING << _host + ":" + _port + "\n";
+    socketMap[key] = _socket;
+    cout << LISTENING << key + "\n";
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
     {
-        addConfigError(ERR "Failed to add " + _host + ":" + _port + " to epoll");
-        socketMap.erase(_host + ":" + _port);
+        addConfigError(ERR "Failed to add " + key + " to epoll");
+        socketMap.erase(key);
         close(_socket);
         return;
     }

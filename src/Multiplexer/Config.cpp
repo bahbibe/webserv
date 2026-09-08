@@ -176,7 +176,7 @@ void Server::parseServer(string const &file)
                 line >> _host;
                 if (_host == "localhost")
                     _host = "127.0.0.1";
-                else if (!isIpV4(_host))
+                else if (resolveHostFamily(_host) == -1)
                     addConfigError(ERR "Invalid host: " + _host);
             }
             else if (buff == "listen")
