@@ -125,7 +125,7 @@ void Server::setErrorCodes(string const &code, string const &buff)
             _error_pages[code] = buff;
             return;
         }
-    throw ServerException(ERR "Invalid error code");
+    addConfigError(ERR "Invalid error_page code: " + code);
 }
 
 void Server::print()
@@ -171,19 +171,43 @@ void Server::setupSocket()
     serverAddr.sin_addr.s_addr = inet_addr(_host.c_str());
     serverAddr.sin_port = htons(atoi(_port.c_str()));
     if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        throw ServerException(ERR "Failed to create socket");
+    {
+        addConfigError(ERR "Failed to create socket for " + _host + ":" + _port);
+        return;
+    }
     if (fcntl(_socket, F_SETFL, O_NONBLOCK) == -1)
-        throw ServerException(ERR "Failed to set socket non-blocking");
+    {
+        addConfigError(ERR "Failed to set socket non-blocking for " + _host + ":" + _port);
+        close(_socket);
+        return;
+    }
     if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
-        throw ServerException(ERR "Failed to set socket options");
+    {
+        addConfigError(ERR "Failed to set socket options for " + _host + ":" + _port);
+        close(_socket);
+        return;
+    }
     if (bind(_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)))
-        throw ServerException(ERR "Failed to bind socket");
+    {
+        addConfigError(ERR "Failed to bind " + _host + ":" + _port + " (" + strerror(errno) + ")");
+        close(_socket);
+        return;
+    }
     if (listen(_socket, 1))
-        throw ServerException(ERR "Failed to listen on socket");
+    {
+        addConfigError(ERR "Failed to listen on " + _host + ":" + _port);
+        close(_socket);
+        return;
+    }
     socketMap[_host + ":" + _port] = _socket;
     cout << LISTENING << _host + ":" + _port + "\n";
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
-        throw ServerException(ERR "Failed to add socket to epoll");
+    {
+        addConfigError(ERR "Failed to add " + _host + ":" + _port + " to epoll");
+        socketMap.erase(_host + ":" + _port);
+        close(_socket);
+        return;
+    }
 }

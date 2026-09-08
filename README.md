@@ -97,6 +97,17 @@ logging - it doesn't fail to start over this.
 
 ## Config file
 
+The whole config file is validated before anything binds a socket:
+every bad directive value, unknown directive, missing root path,
+duplicate directive, and bind/listen failure (including a port
+already in use) across the *entire* file is collected and reported
+together, not just the first one hit - useful when writing a config
+from scratch. If any errors are found, the server prints all of them
+and exits without starting; nothing listens unless the whole file is
+clean. A malformed `{`/`}` structure is the one thing that still
+aborts immediately, since nothing past that point can be parsed
+reliably.
+
 Config files use an nginx-like block syntax:
 
 ```

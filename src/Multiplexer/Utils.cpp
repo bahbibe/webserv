@@ -20,21 +20,6 @@ void trim(string &str)
         str = str.substr(start, end - start + 1);
 }
 
-bool allowedConfig(string const &line)
-{
-    if (line == "host" || line == "listen" \
-     || line == "server_name" || line == "index" \
-     || line == "root" || line == "autoindex" \
-     || line == "client_max_body_size" || line == "cgi" \
-     || line == "upload" || line == "upload_path" \
-     || line == "allow" || line == "return" \
-     || line == "server" || line == "location" \
-     || line == "error_page" || line == "cgi_upload_path" \
-     || line == "cgi_path")
-        return true;
-    return false;
-}
-
 bool isServerDir(string const &dir)
 {
     vector<string> directives;
@@ -131,5 +116,10 @@ bool isNumber(const string &str)
             return false;
     }
     return true;
+}
+
+void addConfigError(string const &msg)
+{
+    configErrors.push_back(msg);
 }
 

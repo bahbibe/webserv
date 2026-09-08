@@ -63,8 +63,6 @@ void Webserver::brackets(string const &file)
                 throw ServerException(ERR "Invalid brackets");
             lim.pop();
         }
-        else if (!allowedConfig(tmp))
-            throw ServerException(ERR "Invalid config " + tmp);
     }
     if (!lim.empty())
         throw ServerException(ERR "Invalid brackets");
