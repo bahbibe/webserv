@@ -17,7 +17,7 @@ void Response::CGI(Request &req)
     if (this->_isCGI == false)
     {
         this->_isCGI = true;
-        this->start = clock();
+        this->start = time(NULL);
         this->_randPath = "/tmp/" + toSting(rand());
         fillEnv(req);
         cout.flush();
@@ -38,11 +38,10 @@ void Response::CGI(Request &req)
             exit(127);
         }
     }
-    int status;
+    int status = 0;
     pid_t wPid = waitpid(pid, &status, WNOHANG);
-    clock_t end = clock();
-    double time = (double)(end - this->start) / (double)CLOCKS_PER_SEC;
-    if (wPid == -1  || wPid > 0 || time > 5)
+    double elapsed = CLOCKWORK(this->start);
+    if (wPid == -1  || wPid > 0 || elapsed > CGI_TIMEOUT)
     {
         char buffer[1024] = {0};
         unsigned long pos;
@@ -54,7 +53,7 @@ void Response::CGI(Request &req)
         this->file.open(this->_path.c_str(), ios::in | ios::binary);
         this->_flag = true;
         this->_isCGI = true;
-        if (status != 0 || time > 5)
+        if (status != 0 || elapsed > CGI_TIMEOUT)
         {
             this->_isErrorCode = true;
             if (status != 0)

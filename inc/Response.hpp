@@ -46,7 +46,7 @@ class Response
         string _absPath;
         string _cgiHeader;
         string _randPath;
-        clock_t start;
+        time_t start;
 
         char **env;
 

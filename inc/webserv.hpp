@@ -29,6 +29,7 @@
 #define MAX_EVENTS 1024
 #define TIMEOUT 10
 #define SHUTDOWN_GRACE 5
+#define CGI_TIMEOUT 5
 #define CLOCKWORK(x) double(time(NULL) - (x))
 #define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
