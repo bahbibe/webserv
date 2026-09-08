@@ -287,7 +287,9 @@ void Webserver::start()
         {
             try
             {
-                if (!it->second.getIsRequestFinished() && CLOCKWORK(it->second._start) > TIMEOUT)
+                if (!it->second.getIsRequestFinished()
+                    && (CLOCKWORK(it->second._start) > TIMEOUT
+                        || CLOCKWORK(it->second._startTv.tv_sec) > REQUEST_TIMEOUT))
                 {
                     it->second.setTimeout();
                     _resp.insert(make_pair(it->first, Response()));

@@ -29,6 +29,7 @@
 #define MAX_EVENTS 1024
 #define MAX_CONNECTIONS 512
 #define TIMEOUT 10
+#define REQUEST_TIMEOUT 30
 #define SHUTDOWN_GRACE 5
 #define CGI_TIMEOUT 5
 #define CLOCKWORK(x) double(time(NULL) - (x))
