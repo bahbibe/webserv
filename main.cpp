@@ -5,6 +5,7 @@ map<string, int> socketMap;
 string confDir;
 string accessLogPath;
 volatile sig_atomic_t g_shutdown = 0;
+vector<string> configErrors;
 
 void handleShutdownSignal(int)
 {
@@ -46,10 +47,23 @@ int main(int argc, char const *argv[])
         server.brackets(buff);
         for (size_t i = 0; i < server._servers.size(); i++)
             server[i].parseServer(buff);
+        if (configErrors.empty())
+        {
+            for (size_t i = 0; i < server._servers.size(); i++)
+                server[i].setupSocket();
+        }
+        if (!configErrors.empty())
+        {
+            cerr << RED "Config has " << configErrors.size() << " error(s):" RESET "\n";
+            for (size_t i = 0; i < configErrors.size(); i++)
+                cerr << "  " << configErrors[i] << "\n";
+            return 1;
+        }
         server.start();
     }
     catch (const exception &e)
-    {      
+    {
         cerr << e.what() << '\n';
+        return 1;
     }
 }

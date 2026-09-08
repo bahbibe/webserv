@@ -8,6 +8,7 @@
 #include <map>
 #include <cstring>
 #include <cstdlib>
+#include <cerrno>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -66,7 +67,9 @@ extern map<string, int> socketMap;
 extern string confDir;
 extern string accessLogPath;
 extern volatile sig_atomic_t g_shutdown;
+extern vector<string> configErrors;
 void handleShutdownSignal(int signum);
+void addConfigError(string const &msg);
 
 class Webserver
 {
@@ -106,5 +109,4 @@ bool isLocationDir(string const &);
 bool isIpV4(string const &str);
 bool isNumber(string const &);
 bool duplicateDirective(t_dir dir);
-bool allowedConfig(string const &line);
 void trim(string &str);

@@ -34,7 +34,10 @@ Location *Server::parseLocation(stringstream &ss)
                 location->_dir.root++;
                 line >> tmp;
                 if (access(tmp.c_str(), F_OK) == -1)
+                {
+                    addConfigError(ERR + tmp + ": No such file or directory");
                     location->setRoot(_server_root);
+                }
                 else
                     location->setRoot(tmp);
             }
@@ -45,7 +48,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setAutoindex(true);
                 else if (tmp != "off")
-                    throw ServerException(ERR "Invalid autoindex");
+                    addConfigError(ERR "Invalid autoindex value: " + tmp);
             }
             else if (tmp == "cgi")
             {
@@ -54,7 +57,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setCgi(true);
                 else if (tmp != "off")
-                    throw ServerException(ERR "Invalid cgi");
+                    addConfigError(ERR "Invalid cgi value: " + tmp);
             }
             else if (tmp == "upload")
             {
@@ -63,7 +66,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setUpload(true);
                 else if (tmp != "off")
-                    throw ServerException(ERR "Invalid upload");
+                    addConfigError(ERR "Invalid upload value: " + tmp);
             }
             else if (tmp == "upload_path")
             {
@@ -88,15 +91,16 @@ Location *Server::parseLocation(stringstream &ss)
                 string ext, interpreter;
                 line >> ext >> interpreter;
                 if (ext.empty() || interpreter.empty())
-                    throw ServerException(ERR "Invalid cgi_path");
-                location->setCgiPath(ext, interpreter);
+                    addConfigError(ERR "Invalid cgi_path directive (needs an extension and an interpreter)");
+                else
+                    location->setCgiPath(ext, interpreter);
             }
         }
         else
-            throw ServerException(ERR "Invalid directive");
+            addConfigError(ERR "Invalid directive in location block: " + tmp);
     }
     if (duplicateDirective(location->_dir))
-        throw ServerException(ERR "Duplicate directive");
+        addConfigError(ERR "Duplicate directive in a location block");
     if (location->getRoot().empty())
         location->setRoot(_server_root);
     if (location->_dir.autoindex == 0)
@@ -154,7 +158,7 @@ void Server::parseServer(string const &file)
     t_dir dir;
     memset(&dir, 0, sizeof(t_dir));
     while (getline(ss, buff))
-    {   
+    {
         trim(buff);
         if (isBrackets(buff) && buff.find("}") != string::npos)
             break;
@@ -164,8 +168,6 @@ void Server::parseServer(string const &file)
         line >> buff;
         if (buff == "server" || buff == "}")
             continue;
-        else if (!allowedConfig(buff))
-            throw ServerException(ERR "Invalid config " + buff);
         if (isServerDir(buff))
         {
             if (buff == "host")
@@ -175,7 +177,7 @@ void Server::parseServer(string const &file)
                 if (_host == "localhost")
                     _host = "127.0.0.1";
                 else if (!isIpV4(_host))
-                    throw ServerException(ERR "Invalid host");
+                    addConfigError(ERR "Invalid host: " + _host);
             }
             else if (buff == "listen")
             {
@@ -184,7 +186,7 @@ void Server::parseServer(string const &file)
                 if (_port.empty())
                     _port = DEFAULT_PORT;
                 if (!isNumber(_port))
-                    throw ServerException(ERR "Invalid port");
+                    addConfigError(ERR "Invalid port: " + _port);
             }
             else if (buff == "server_name")
             {
@@ -210,7 +212,7 @@ void Server::parseServer(string const &file)
                 dir.root++;
                 line >> _server_root;
                 if (access(_server_root.c_str(), F_OK) == -1)
-                    throw ServerException(ERR + _server_root + ": No such file or directory");
+                    addConfigError(ERR + _server_root + ": No such file or directory");
             }
             else if (buff == "autoindex")
             {
@@ -221,14 +223,14 @@ void Server::parseServer(string const &file)
                 else if (buff == "off")
                     _autoindex = false;
                 else
-                    throw ServerException(ERR "Invalid autoindex");
+                    addConfigError(ERR "Invalid autoindex value: " + buff);
             }
             else if (buff == "client_max_body_size")
             {
                 dir.client_max_body_size++;
                 line >> _client_max_body_size;
                 if (!isNumber(_client_max_body_size))
-                    throw ServerException(ERR "Invalid client_max_body_size");
+                    addConfigError(ERR "Invalid client_max_body_size: " + _client_max_body_size);
             }
             else if (buff == "location")
             {
@@ -238,11 +240,10 @@ void Server::parseServer(string const &file)
         }
         else
         {
-            throw ServerException(ERR "Invalid directive");
+            addConfigError(ERR "Invalid directive at server level: " + buff);
         }
     }
     if (duplicateDirective(dir))
-        throw ServerException(ERR "Duplicate directive");
+        addConfigError(ERR "Duplicate directive in server " + (_host.empty() ? string("(unknown host)") : _host));
     Server::_pos = ss.tellg();
-    setupSocket();
 }
