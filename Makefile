@@ -1,10 +1,10 @@
 CC = c++
 CPPFLAGS = -Wall -Wextra -Werror -std=c++98
-SRC = main.cpp src/Multiplexer/Server.cpp src/Multiplexer/Location.cpp \
-		src/Multiplexer/Webserver.cpp src/Multiplexer/Utils.cpp  src/Multiplexer/Config.cpp \
+SRC = main.cpp src/Server/Server.cpp src/Server/Location.cpp \
+		src/Server/Webserver.cpp src/Server/ConfigUtils.cpp  src/Server/Config.cpp \
 		src/Request/Request.cpp src/Request/Helpers.cpp src/Request/Boundaries.cpp src/Request/Chunks.cpp \
-		src/Response/Response.cpp \
-		
+		src/Response/Response.cpp src/Response/Cgi.cpp \
+
 OBJ = $(SRC:.cpp=.o)
 NAME = webserv
 
