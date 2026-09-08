@@ -215,7 +215,7 @@ void Server::setupSocket()
         return;
     }
     freeaddrinfo(res);
-    if (listen(_socket, 1))
+    if (listen(_socket, SOMAXCONN))
     {
         addConfigError(ERR "Failed to listen on " + key);
         close(_socket);
