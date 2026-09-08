@@ -1,3 +1,5 @@
+*This project has been created as part of the 42 curriculum by bahbibe, bmakhlou, mahansal.*
+
 # webserv
 
 A HTTP/1.1 server written in C++98, built around a single-threaded
@@ -5,7 +7,18 @@ A HTTP/1.1 server written in C++98, built around a single-threaded
 file uploads (`multipart/form-data`, chunked and Content-Length
 bodies), CGI (PHP/Python), and an nginx-style config file.
 
-## Build
+## Description
+
+`webserv` implements enough of HTTP/1.1 to serve a real static
+website and CGI applications to a standard web browser or `curl`,
+without any external HTTP or Boost library: raw POSIX sockets, a
+single non-blocking `epoll` instance driving all client I/O (listen,
+read and write alike), and `fork()`/`execve()` for CGI. Its
+behaviour is driven entirely by an nginx-style configuration file
+(server blocks, location blocks, per-route method/redirect/upload/
+CGI/autoindex rules).
+
+## Instructions
 
 ```
 make        # build ./webserv
@@ -25,13 +38,40 @@ The server reads `conf/mime.types` and the default config at
 so it can be run from any working directory as long as those two
 files stay in a `conf/` folder next to the binary.
 
-## Usage
-
 ```
 ./webserv [config_file]
 ```
 
 If no config file is given, `conf/default.conf` is used.
+
+## Resources
+
+Classic references consulted while building and hardening this
+project:
+
+- RFC 9110 (HTTP Semantics), RFC 9111 (HTTP Caching), RFC 9112
+  (HTTP/1.1) — the current HTTP specification set, used to check
+  status code usage, header semantics, and connection/keep-alive
+  behaviour against the letter of the spec.
+- RFC 3875 (The Common Gateway Interface, CGI/1.1) — CGI
+  meta-variable set and request/response framing.
+- [nginx](https://nginx.org/en/docs/) documentation — the `server {}`
+  / `location {}` config block style this project's config format is
+  modeled on.
+
+AI assistance (Claude Code) was used throughout this project's
+hardening pass, under direct human direction with every design
+decision explicitly reviewed and confirmed before implementation:
+end-to-end code review against the 42 subject and the HTTP RFCs
+above; fixing bugs found that way (multipart parsing, path-traversal
+validation, epoll busy-spin/timeout handling, memory leaks caught via
+`valgrind`); implementing new features (HEAD method, graceful
+shutdown, access logging, HTTP/1.1 keep-alive, configurable CGI
+interpreter paths, non-blocking sockets with partial-write handling);
+and writing/extending the end-to-end test suite (`tests/run_tests.sh`).
+Every change was built with `-Wall -Wextra -Werror -std=c++98`, run
+through the test suite, and manually verified against a real running
+server (`curl`, `valgrind`) before being committed.
 
 ## Access log
 
@@ -144,11 +184,21 @@ requests under that path. Additional directives:
   server stops accepting new connections immediately, finishes any
   requests already in flight (up to a 5 second grace period, after
   which remaining connections are force-closed), then exits.
+- Sockets (listening and client) are non-blocking; all I/O is driven
+  through a single shared `epoll` instance, and partial/would-block
+  writes are resumed on the next writable tick rather than dropped.
+- A thrown exception while servicing one connection (e.g. an
+  allocation failure under memory pressure) closes just that
+  connection - it doesn't take the whole server down.
 
 ## Known limitations
 
 - Single-process, single-threaded: CGI scripts fork a child but the
   parent event loop blocks on each `epoll_wait` cycle while polling
   CGI completion, and a CGI process is killed after 5 seconds.
+- CGI stdio is wired up via `freopen()` onto temp files rather than
+  `pipe()`/`dup2()`, so it doesn't need its own non-blocking I/O
+  handling (temp files are exempt from the single-poll requirement)
+  - a `pipe()`-based rewrite is a possible future improvement.
 - No HTTPS/TLS.
 - No HTTP/1.0 or HTTP/2 support.

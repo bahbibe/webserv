@@ -76,6 +76,7 @@ private:
     ofstream _accessLog;
     void stopListening();
     void logAccess(Request &req, Response *resp);
+    void safeCloseConnection(int sock);
 public:
     vector<Server> _servers;
     Webserver();

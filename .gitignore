@@ -8,3 +8,4 @@ cgi/upload_*
 m.conf
 TODO.md
 access.log
+*.pdf

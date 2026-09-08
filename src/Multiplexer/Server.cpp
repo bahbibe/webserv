@@ -172,6 +172,8 @@ void Server::setupSocket()
     serverAddr.sin_port = htons(atoi(_port.c_str()));
     if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         throw ServerException(ERR "Failed to create socket");
+    if (fcntl(_socket, F_SETFL, O_NONBLOCK) == -1)
+        throw ServerException(ERR "Failed to set socket non-blocking");
     if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
         throw ServerException(ERR "Failed to set socket options");
     if (bind(_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)))
