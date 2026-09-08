@@ -209,7 +209,54 @@ requests under that path. Additional directives:
   CGI completion, and a CGI process is killed after 5 seconds.
 - CGI stdio is wired up via `freopen()` onto temp files rather than
   `pipe()`/`dup2()`, so it doesn't need its own non-blocking I/O
-  handling (temp files are exempt from the single-poll requirement)
-  - a `pipe()`-based rewrite is a possible future improvement.
+  handling (temp files are exempt from the single-poll requirement).
+  See "Possible future work" below.
+- No HTTP pipelining: a client must read each response before sending
+  the next request on the same connection (see "Keep-alive" above).
+- `POST` always closes the connection instead of being keep-alive
+  eligible, to avoid an unread request body being left on the socket
+  after an early-rejection error path.
 - No HTTPS/TLS.
-- No HTTP/1.0 or HTTP/2 support.
+- A handful of functions used (`remove()`, `realpath()`, `readlink()`,
+  `inet_ntop()`) aren't on the 42 subject's whitelisted external-
+  function list, and there's no whitelisted replacement for file
+  deletion, path resolution, or address formatting at all - these are
+  used anyway since the alternative is no DELETE, no path-traversal
+  check, or no IPv6 client logging.
+
+## Out of scope (by design)
+
+Considered and deliberately not implemented, rather than gaps waiting
+to be filled:
+
+- **HTTP/1.0.** The 42 subject explicitly calls it "a reference
+  point, not enforced." HTTP/1.0 has no persistent connections by
+  default (the inverse of 1.1, which this server already implements
+  correctly with keep-alive), so supporting it would mean a second,
+  parallel connection-handling code path for a strictly older
+  protocol version - real added complexity for zero behavior this
+  server doesn't already cover better under 1.1.
+- **HTTP/2 (or HTTP/3/QUIC).** Not a support flag on top of the
+  current server - a different wire protocol entirely (binary
+  framing, stream multiplexing, header compression, and for HTTP/3 a
+  UDP-based transport instead of TCP). Out of scope for a learning-
+  focused HTTP/1.1 server.
+
+## Possible future work
+
+- Rearchitect CGI stdio from `freopen()`-on-temp-files to
+  `pipe()`+`dup2()`, registering the pipe fds on the same shared
+  `epoll` instance non-blocking like every other fd. Bigger than it
+  sounds: temp files are explicitly exempt from the single-poll
+  requirement, pipes aren't, so this touches the event loop, not just
+  `Response::CGI()`.
+- A folder/function reorganization pass (the codebase has grown a lot
+  of features into a small number of files this session) - best done
+  as its own change, separate from any behavior change, so a
+  regression is never "was it the rename or the rewrite?"
+- POST keep-alive: needs guaranteed full-body draining on every error
+  path (or an explicit drain step before reuse) so a rejected POST
+  can't leave unread bytes on a connection about to be reused.
+- Per-location `client_max_body_size` override (currently server-level
+  only).
+- A config reload on `SIGHUP` instead of requiring a restart.
