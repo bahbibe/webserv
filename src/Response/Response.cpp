@@ -609,22 +609,51 @@ string Response::toSting(long long mun)
 
 int Response::fillEnv(Request &req)
 {
-    this->env = new char *[9]; 
-    env[0] = strdup(("REQUEST_METHOD=" + this->_method).c_str());
-    env[1] = strdup(("QUERY_STRING=" + req.directives.queryString).c_str());
-    env[2] = strdup("REDIRECT_STATUS=200");
-    env[3] = strdup(("PATH_INFO=" + this->_absPath).c_str());
-    env[4] = strdup(("SCRIPT_FILENAME=" + this->_absPath).c_str());
-    env[5] = strdup(("CONTENT_TYPE=" + req.directives.contentType).c_str());
+    vector<string> vars;
+    string requestUri = req.directives.requestTarget;
+    if (!req.directives.queryString.empty())
+        requestUri += "?" + req.directives.queryString;
+
+    vars.push_back("REQUEST_METHOD=" + this->_method);
+    vars.push_back("QUERY_STRING=" + req.directives.queryString);
+    vars.push_back("REDIRECT_STATUS=200");
+    vars.push_back("PATH_INFO=");
+    vars.push_back("SCRIPT_FILENAME=" + this->_absPath);
+    vars.push_back("SCRIPT_NAME=" + req.directives.requestTarget);
+    vars.push_back("REQUEST_URI=" + requestUri);
+    vars.push_back("GATEWAY_INTERFACE=CGI/1.1");
+    vars.push_back("SERVER_PROTOCOL=" + req.getHttpVersion());
+    vars.push_back("SERVER_SOFTWARE=webserv/1.0");
+    vars.push_back("REMOTE_ADDR=" + req._clientIp);
+    vars.push_back("CONTENT_TYPE=" + req.directives.contentType);
+    if (req.getServer())
+    {
+        vars.push_back("SERVER_NAME=" + req.getServer()->getHost());
+        vars.push_back("SERVER_PORT=" + req.getServer()->getPort());
+    }
     if (this->_method == "GET" || this->_method == "HEAD")
-        env[6] = strdup("CONTENT_LENGTH=0");
+        vars.push_back("CONTENT_LENGTH=0");
     else
     {
         double size = fileSize(req.directives.cgiFileName);
-        env[6] = strdup(("CONTENT_LENGTH=" + toSting(size)).c_str());
+        vars.push_back("CONTENT_LENGTH=" + toSting(size));
     }
-    env[7] = strdup(("HTTP_COOKIE=" + req.directives.httpCookie).c_str());
-    env[8] = NULL;
+    map<string, string> headers = req.getHeaders();
+    for (map<string, string>::iterator it = headers.begin(); it != headers.end(); ++it)
+    {
+        string name = it->first;
+        if (name == "content-type" || name == "content-length")
+            continue;
+        string envName = "HTTP_";
+        for (size_t i = 0; i < name.length(); i++)
+            envName += (name[i] == '-') ? '_' : (char)toupper((unsigned char)name[i]);
+        vars.push_back(envName + "=" + it->second);
+    }
+
+    this->env = new char *[vars.size() + 1];
+    for (size_t i = 0; i < vars.size(); i++)
+        env[i] = strdup(vars[i].c_str());
+    env[vars.size()] = NULL;
     return 1;
 }
 
