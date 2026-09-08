@@ -94,6 +94,7 @@ class Response
         double fileSize(string path);
         void freeEnv(char **env);
         char **dupEnv(char * const *env) const;
+        char *dupCStr(const char *s) const;
 
 
 };

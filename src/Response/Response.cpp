@@ -655,15 +655,23 @@ int Response::fillEnv(Request &req)
 
     this->env = new char *[vars.size() + 1];
     for (size_t i = 0; i < vars.size(); i++)
-        env[i] = strdup(vars[i].c_str());
+        env[i] = dupCStr(vars[i].c_str());
     env[vars.size()] = NULL;
     return 1;
+}
+
+char *Response::dupCStr(const char *s) const
+{
+    size_t len = strlen(s);
+    char *copy = new char[len + 1];
+    memcpy(copy, s, len + 1);
+    return copy;
 }
 
 void Response::freeEnv(char **env)
 {
     for (int i = 0; env[i]; i++)
-        free(env[i]);
+        delete[] env[i];
     delete[] env;
 }
 
@@ -676,7 +684,7 @@ char **Response::dupEnv(char * const *env) const
         n++;
     char **copy = new char *[n + 1];
     for (int i = 0; i < n; i++)
-        copy[i] = strdup(env[i]);
+        copy[i] = dupCStr(env[i]);
     copy[n] = NULL;
     return copy;
 }
