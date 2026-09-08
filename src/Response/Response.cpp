@@ -30,6 +30,9 @@ void Response::CGI(Request &req)
                 close(0);
             else
                 freopen(req.directives.cgiFileName.c_str(), "r", stdin);
+            size_t slash = this->_absPath.rfind('/');
+            if (slash != string::npos)
+                chdir(this->_absPath.substr(0, slash).c_str());
             execve(argv[0], (char* const*)argv, this->env);
             cerr << "execve: " << strerror(errno) << "\n";
             exit(127);
