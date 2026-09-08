@@ -5,11 +5,17 @@ map<string, int> socketMap;
 string confDir;
 string accessLogPath;
 volatile sig_atomic_t g_shutdown = 0;
+volatile sig_atomic_t g_reopenLog = 0;
 vector<string> configErrors;
 
 void handleShutdownSignal(int)
 {
     g_shutdown = 1;
+}
+
+void handleReopenLogSignal(int)
+{
+    g_reopenLog = 1;
 }
 
 static void resolveConfDir()
