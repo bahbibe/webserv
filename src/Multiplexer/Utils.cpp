@@ -66,30 +66,19 @@ bool duplicateDirective(t_dir dir)
     }
     return false;
 }
-bool isIpV4(string const &str)
+int resolveHostFamily(string const &host)
 {
-    vector<string> octets;
-    string::size_type pos = 0;
-    string::size_type prev = 0;
-    while ((pos = str.find('.', pos)) != string::npos)
-    {
-        octets.push_back(str.substr(prev, pos - prev));
-        prev = ++pos;
-    }
-    octets.push_back(str.substr(prev, pos - prev));
-    if (octets.size() != 4)
-        return false;
-    for (vector<string>::iterator it = octets.begin(); it != octets.end(); ++it)
-    {
-        if (!isNumber(*it))
-            return false;
-        stringstream ss(*it);
-        int num;
-        ss >> num;
-        if (num < 0 || num > 255)
-            return false;
-    }
-    return true;
+    struct addrinfo hints;
+    struct addrinfo *res = NULL;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_NUMERICHOST;
+    if (getaddrinfo(host.c_str(), NULL, &hints, &res) != 0)
+        return -1;
+    int family = res->ai_family;
+    freeaddrinfo(res);
+    return family;
 }
 
 bool isComment(const string &str)

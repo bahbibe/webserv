@@ -142,7 +142,7 @@ different ports).
 
 | Directive | Meaning |
 |---|---|
-| `host` | IP to bind (`localhost` is normalized to `127.0.0.1`) |
+| `host` | IPv4 or IPv6 address to bind (`localhost` is normalized to `127.0.0.1`); an IPv6 `host` binds IPv6-only (no dual-stack), so listen on both families with two `server` blocks on the same port |
 | `listen` | Port to bind (defaults to 80 if empty) |
 | `server_name` | One or more virtual host names |
 | `root` | Filesystem root for this server; must exist |

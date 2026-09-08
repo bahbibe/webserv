@@ -71,7 +71,7 @@ void Webserver::brackets(string const &file)
 void Webserver::newConnection(map<int, Request> &req, Server &server)
 {
     int clientSock;
-    struct sockaddr_in clientAddr;
+    struct sockaddr_storage clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
         throw ServerException(ERR "Accept failed");
@@ -90,7 +90,12 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = time(NULL);
     gettimeofday(&req[clientSock]._startTv, NULL);
-    req[clientSock]._clientIp = inet_ntoa(clientAddr.sin_addr);
+    char ipStr[INET6_ADDRSTRLEN];
+    void *addrPtr = (clientAddr.ss_family == AF_INET6)
+        ? (void *)&((struct sockaddr_in6 *)&clientAddr)->sin6_addr
+        : (void *)&((struct sockaddr_in *)&clientAddr)->sin_addr;
+    if (inet_ntop(clientAddr.ss_family, addrPtr, ipStr, sizeof(ipStr)))
+        req[clientSock]._clientIp = ipStr;
 }
 
 void Webserver::logAccess(Request &req, Response *resp)
