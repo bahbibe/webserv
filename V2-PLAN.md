@@ -29,7 +29,14 @@ cycle used everywhere else in this project's history.
   fatal `WebservException` messages still carry an old embedded
   "Error: " ANSI prefix alongside spdlog's own level tag — cosmetic,
   not fixed yet.
-- **Phase 3 (CGI: pipes instead of temp files) — not started.**
+- **Phase 3 (CGI: pipes instead of temp files) — done.** `freopen()`-
+  on-temp-files replaced with real non-blocking `pipe()`+`dup2()`+
+  `fork()`+`execve()`, pipe fds routed through the shared epoll loop
+  via a new `_cgiFdToClient` map. Verified against the full stress
+  matrix (large output with forced backpressure, large POST body,
+  crash/timeout before and after header commit, HEAD, autoindex-CGI,
+  keep-alive, client disconnect mid-stream) plus `valgrind
+  --track-fds=yes` showing zero leaked fds and zero leaked heap.
 - **Phase 4 (TLS) — not started.**
 - **Phase 5 (final hardening pass, README rewrite, merge) — not started.**
 
