@@ -138,7 +138,7 @@ void Server::mimeTypes()
             loaded = true;
         }
         else
-            throw Server::ServerException(ERR "Unable to open mime file");
+            throw WebservException(ERR "Unable to open mime file");
     }
     _extensions = cachedExtensions;
     _types = cachedTypes;

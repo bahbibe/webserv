@@ -42,6 +42,17 @@ using namespace std;
 class Response;
 class Request;
 class Server;
+
+class WebservException : public exception
+{
+public:
+    explicit WebservException(string const &msg) : _msg(msg) {}
+    const char *what() const noexcept override { return _msg.c_str(); }
+
+private:
+    string _msg;
+};
+
 typedef struct s_direrctive
 {
     int host;
@@ -98,15 +109,6 @@ public:
     void newConnection(map<int, Request> &req, Server &server);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
     bool matchServer(map<int, Request> &req, int sock);
-    class ServerException : public exception
-    {
-    private:
-        string _msg;
-    public:
-        ServerException(string const &msg) : _msg(msg) {}
-        virtual ~ServerException() throw() {}
-        virtual const char *what() const throw(){ return _msg.c_str();}
-    };
 };
 
 bool isWhitespace(string const&);

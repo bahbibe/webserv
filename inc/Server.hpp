@@ -32,15 +32,6 @@ public:
     void setupSocket();
     int getSocket() const;
     string addrKey() const;
-    class ServerException : public exception
-    {
-    private:
-        string _msg;
-    public:
-        ServerException(string const &msg) : _msg(msg) {}
-        virtual ~ServerException() throw() {}
-        virtual const char *what() const throw(){ return _msg.c_str();}
-    };
 
     size_t getClientMaxBodySize() const;
     map<string, Location *> getLocations() const;

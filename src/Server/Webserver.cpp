@@ -6,7 +6,7 @@
 Webserver::Webserver()
 {
     if ((ep.epollFd = epoll_create(1)) == -1)
-        throw ServerException(ERR "Failed to create epoll");
+        throw WebservException(ERR "Failed to create epoll");
     _accessLog.open(accessLogPath.c_str(), ios::app);
     if (!_accessLog.is_open())
         cerr << ERR "Unable to open access log at " << accessLogPath << ", continuing without it\n";
@@ -50,32 +50,32 @@ void Webserver::brackets(string const &file)
         {
             _servers.push_back(Server());
             if (!lim.empty())
-                throw ServerException(ERR "Invalid brackets");
+                throw WebservException(ERR "Invalid brackets");
             line >> tmp;
             if (tmp != "{")
-                throw ServerException(ERR "Invalid brackets");
+                throw WebservException(ERR "Invalid brackets");
             if (line.get() != EOF)
-                throw ServerException(ERR "Invalid brackets");
+                throw WebservException(ERR "Invalid brackets");
             lim.push(tmp);
         }
         else if (tmp == "location")
         {
             line >> tmp >> tmp;
             if (tmp != "{")
-                throw ServerException(ERR "Invalid brackets");
+                throw WebservException(ERR "Invalid brackets");
             if (line.get() != EOF)
-                throw ServerException(ERR "Invalid brackets");
+                throw WebservException(ERR "Invalid brackets");
             lim.push(tmp);
         }
         else if (tmp == "}")
         {
             if (lim.empty())
-                throw ServerException(ERR "Invalid brackets");
+                throw WebservException(ERR "Invalid brackets");
             lim.pop();
         }
     }
     if (!lim.empty())
-        throw ServerException(ERR "Invalid brackets");
+        throw WebservException(ERR "Invalid brackets");
 }
 
 void Webserver::newConnection(map<int, Request> &req, Server &server)
@@ -84,7 +84,7 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     struct sockaddr_storage clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
-        throw ServerException(ERR "Accept failed");
+        throw WebservException(ERR "Accept failed");
     if (req.size() >= MAX_CONNECTIONS)
     {
         close(clientSock);
@@ -93,14 +93,14 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if (fcntl(clientSock, F_SETFL, O_NONBLOCK) == -1)
     {
         close(clientSock);
-        throw ServerException(ERR "Failed to set client socket non-blocking");
+        throw WebservException(ERR "Failed to set client socket non-blocking");
     }
     ep.event.data.fd = clientSock;
     ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
     {
         close(clientSock);
-        throw ServerException(ERR "Failed to add client to epoll");
+        throw WebservException(ERR "Failed to add client to epoll");
     }
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = time(NULL);

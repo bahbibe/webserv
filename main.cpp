@@ -44,9 +44,9 @@ int main(int argc, char const *argv[])
         resolveConfDir();
         ifstream conf;
         (argc == 1) ? conf.open((confDir + DEFAULT_CONF).c_str()) : (argc == 2) ? conf.open(argv[1])
-                                                                     : throw Server::ServerException(USAGE);
+                                                                     : throw WebservException(USAGE);
         if (!conf.is_open())
-            throw Server::ServerException(ERR "Unable to open file");
+            throw WebservException(ERR "Unable to open file");
         string buff;
         getline(conf, buff, '\0');
         Webserver server;

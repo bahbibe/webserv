@@ -60,7 +60,7 @@ void Location::setMethods(string const &buff)
             _methods.push_back(buff);
             return;
         }
-    throw Server::ServerException(ERR "Invalid method");
+    throw WebservException(ERR "Invalid method");
 }
 
 void Location::print()
