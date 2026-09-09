@@ -37,7 +37,16 @@ cycle used everywhere else in this project's history.
   crash/timeout before and after header commit, HEAD, autoindex-CGI,
   keep-alive, client disconnect mid-stream) plus `valgrind
   --track-fds=yes` showing zero leaked fds and zero leaked heap.
-- **Phase 4 (TLS) — not started.**
+- **Phase 4 (TLS) — done.** `listen <port> ssl` + `ssl_certificate`/
+  `ssl_certificate_key`, OpenSSL-backed, handshake and I/O both
+  non-blocking through the same shared epoll loop (`TlsSession` in
+  `inc/Tls.hpp`/`src/Server/Tls.cpp`). Verified against a self-signed
+  cert: full handshake (TLS 1.3 negotiated), GET/404 over HTTPS,
+  TLS 1.1 correctly rejected (min version pinned to 1.2), plaintext
+  request against the SSL port fails without affecting the server,
+  2MB download byte-identical at full speed and throttled, keep-alive
+  over one TLS connection, mid-download disconnect, plus valgrind
+  `--track-fds=yes` showing zero leaked heap/fds across the matrix.
 - **Phase 5 (final hardening pass, README rewrite, merge) — not started.**
 
 ## Decisions made
