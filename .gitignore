@@ -1,5 +1,6 @@
 *.o
 webserv
+build/
 upload
 CGI/
 *.json
