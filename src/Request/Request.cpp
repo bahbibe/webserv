@@ -558,16 +558,15 @@ vector<string> Request::split(string str, string delimiter)
 
 string Request::toLowerCase(const string &str)
 {
-    string lowerCaseStr = "";
-    for (size_t i = 0; i < str.length(); i++)
-        lowerCaseStr += tolower(str[i]);
+    string lowerCaseStr = str;
+    transform(lowerCaseStr.begin(), lowerCaseStr.end(), lowerCaseStr.begin(),
+              [](unsigned char c) { return tolower(c); });
     return lowerCaseStr;
 }
 
 void Request::trim(string& str)
 {
-    while (str.length() > 0 && str[0] == ' ')
-        str.erase(0, 1);
-    while (str.length() > 0 && str[str.length() - 1] == ' ')
-        str.erase(str.length() - 1, 1);
+    size_t start = str.find_first_not_of(' ');
+    size_t end = str.find_last_not_of(' ');
+    str = (start == string::npos) ? "" : str.substr(start, end - start + 1);
 }
