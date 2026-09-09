@@ -17,14 +17,11 @@ Server &Server::operator=(Server const &src)
 {
     if (this != &src)
     {
-        map<string, Location *>::iterator oldIt = _locations.begin();
-        for (; oldIt != _locations.end(); oldIt++)
-            delete oldIt->second;
         _locations.clear();
-        map<string, Location *>::const_iterator it = src._locations.begin();
+        map<string, unique_ptr<Location> >::const_iterator it = src._locations.begin();
         for (; it != src._locations.end(); it++)
         {
-            _locations[it->first] = new Location(*it->second);
+            _locations[it->first] = make_unique<Location>(*it->second);
         }
         _error_pages = src._error_pages;
         _extensions = src._extensions;
@@ -41,7 +38,7 @@ Server &Server::operator=(Server const &src)
     return *this;
 }
 
-map<string, Location *> Server::getLocations() const
+const map<string, unique_ptr<Location> > &Server::getLocations() const
 {
     return _locations;
 }
@@ -96,17 +93,6 @@ int Server::getSocket() const
     return _socket;
 }
 
-Server::~Server()
-{
-    map<string, Location *>::iterator it = _locations.begin();
-    for (; it != _locations.end(); it++)
-    {
-        if(it->second)
-            delete it->second;
-    }
-    // close(_socket);
-}
-
 size_t Server::getClientMaxBodySize() const
 {
     if (_client_max_body_size == "")
@@ -149,7 +135,7 @@ void Server::print()
     cout << "client_max_body_size: " << _client_max_body_size << "\n";
     cout << "autoindex: " << _autoindex << "\n";
     cout << "==================LOCATIONS==================\n";
-    for (map<string, Location *>::iterator it = _locations.begin(); it != _locations.end(); it++)
+    for (map<string, unique_ptr<Location> >::iterator it = _locations.begin(); it != _locations.end(); it++)
     {
         cout << "Location: " << it->first << "\n";
         it->second->print();

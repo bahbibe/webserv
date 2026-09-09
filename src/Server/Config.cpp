@@ -1,11 +1,11 @@
 #include "../../inc/webserv.hpp"
 #include "../../inc/Server.hpp"
 
-Location *Server::parseLocation(stringstream &ss)
+unique_ptr<Location> Server::parseLocation(stringstream &ss)
 {
     string buff;
     string tmp;
-    Location *location = new Location();
+    unique_ptr<Location> location = make_unique<Location>();
     while (getline(ss, buff))
     {
         trim(buff);

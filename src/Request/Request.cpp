@@ -24,7 +24,8 @@ Request &Request::operator=(const Request &other)
         this->_filePath = other._filePath;
         this->_socketFd = other._socketFd;
         this->_server = other._server;
-        this->_location = other._location;
+        this->_defaultLocation = other._defaultLocation;
+        this->_location = (other._location == &other._defaultLocation) ? &this->_defaultLocation : other._location;
         this->_lineCount = other._lineCount;
         this->_statusCode = other._statusCode;
         this->_isRequestFinished = other._isRequestFinished;
@@ -183,15 +184,15 @@ void Request::setContentLength(string contentLength)
 
 Location* Request::findLocation()
 {
-    map<string, Location *> locations = this->_server->getLocations();
-    map<string, Location *>::iterator itb = locations.begin();
-    map<string, Location *>::iterator ite = locations.end();
+    map<string, unique_ptr<Location> > const &locations = this->_server->getLocations();
+    map<string, unique_ptr<Location> >::const_iterator itb = locations.begin();
+    map<string, unique_ptr<Location> >::const_iterator ite = locations.end();
     while (locations.size() > 0 && ite-- != itb)
     {
         if (!this->_requestTarget.compare(0, ite->first.length(), ite->first))
         {
             this->_requestTarget.erase(0, ite->first.length());
-            return ite->second;
+            return ite->second.get();
         }
     }
     return NULL;
@@ -250,17 +251,12 @@ void Request::setServer()
     this->_mimeTypes = _server->getExtensions();
     directives.types = _server->getTypes();
     setDefaultDirectives();
-    map<string, Location *> locations = this->_server->getLocations();
-    Location defaultLocation;
     _location = this->findLocation();
-    // if (_location == NULL && locations.size() > 0)
-    //     setStatusCode(404, "Not Found");
-    // else 
     if (_location == NULL)
     {
-        defaultLocation.setMethods("GET");
-        defaultLocation.setRoot(_server->getRoot());
-        _location = &defaultLocation;
+        _defaultLocation.setMethods("GET");
+        _defaultLocation.setRoot(_server->getRoot());
+        _location = &_defaultLocation;
     }
     vector<string> locationMethods = _location->getMethods();
     if (locationMethods.size() > 0)
@@ -544,11 +540,6 @@ int Request::getStatusCode() const
 map<string, string> Request::getHeaders() const
 {
     return this->_headers;
-}
-
-Location *Request::getLocation() const
-{
-    return this->_location;
 }
 
 vector<string> Request::split(string str, string delimiter)

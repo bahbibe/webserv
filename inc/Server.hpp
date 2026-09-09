@@ -1,11 +1,12 @@
 #pragma once
 #include "webserv.hpp"
 #include "Location.hpp"
+#include <memory>
 
 class Server
 {
 private:
-    map<string, Location *> _locations;
+    map<string, unique_ptr<Location> > _locations;
     map<string, string> _error_pages;
     map<string, vector<string> > _extensions;
     map<string, string> _types;
@@ -21,12 +22,11 @@ private:
     static streampos _pos;
 public:
     Server();
-    ~Server();
     Server(Server const &src);
     Server &operator=(Server const &src);
     void parseServer(string const &);
     void mimeTypes();
-    Location *parseLocation(stringstream &ss);
+    unique_ptr<Location> parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void print();
     void setupSocket();
@@ -34,7 +34,7 @@ public:
     string addrKey() const;
 
     size_t getClientMaxBodySize() const;
-    map<string, Location *> getLocations() const;
+    const map<string, unique_ptr<Location> > &getLocations() const;
     string getHost() const;
     string getPort() const;
     string getRoot() const;

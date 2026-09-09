@@ -74,7 +74,8 @@ private:
     bool _isCgi;
 
     map<string, vector<string> > _mimeTypes;
-    
+    Location _defaultLocation;
+
     //? Parsing
     void parseRequest();
     void parseRequestLine();
@@ -128,7 +129,6 @@ public:
     string getHttpVersion() const;
     int getStatusCode() const;
     map<string, string> getHeaders() const;
-    Location* getLocation() const;
     void setTimeout();
     bool getWantsClose() const;
     Server* getServer() const;
