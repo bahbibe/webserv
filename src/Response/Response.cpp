@@ -1,6 +1,6 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), env(NULL), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), pid(0), _isCGI(false)
 {
     saveStatus();
 }
@@ -16,8 +16,7 @@ void Response::GET(Request &request)
         this->_isfinished = true;
         if (this->_isCGI == true)
         {
-            freeEnv(this->env);
-            this->env = NULL;
+            this->_cgiEnv.clear();
             remove(this->_path.c_str());
             remove(request.directives.cgiFileName.c_str());
         }
@@ -36,8 +35,7 @@ void Response::GET(Request &request)
             this->_isfinished = true;
             if (this->_isCGI == true)
             {
-                freeEnv(this->env);
-                this->env = NULL;
+                this->_cgiEnv.clear();
                 remove(this->_path.c_str());
                 remove(request.directives.cgiFileName.c_str());
             }
@@ -71,8 +69,7 @@ void Response::GET(Request &request)
             this->_isfinished = true;
             if (this->_isCGI == true)
             {
-                freeEnv(this->env);
-                this->env = NULL;
+                this->_cgiEnv.clear();
                 remove(this->_path.c_str());
                 remove(request.directives.cgiFileName.c_str());
             }
@@ -506,7 +503,7 @@ string Response::toSting(long long mun)
     return ss.str();
 }
 
-Response::Response(const Response &other) : env(NULL)
+Response::Response(const Response &other)
 {
     *this = other;
 }
@@ -537,9 +534,7 @@ Response &Response::operator=(const Response &other)
         this->_cgiPath = other._cgiPath;
         this->_cgiHeader = other._cgiHeader;
         this->pid = other.pid;
-        if (this->env)
-            freeEnv(this->env);
-        this->env = dupEnv(other.env);
+        this->_cgiEnv = other._cgiEnv;
         this->_cgiAutoIndex = other._cgiAutoIndex;
         this->start = other.start;
         this->_randPath = other._randPath;
@@ -571,8 +566,3 @@ int Response::getStatusCode() const
     return this->_statusCode;
 }
 
-Response::~Response()
-{
-    if (this->env)
-        freeEnv(this->env);
-}

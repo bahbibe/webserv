@@ -48,7 +48,7 @@ class Response
         string _randPath;
         time_t start;
 
-        char **env;
+        vector<string> _cgiEnv;
 
         ifstream file;
         stringstream statusString;
@@ -59,7 +59,6 @@ class Response
 
     public:
         Response();
-        ~Response();
         void sendResponse(Request &request, int fdSocket);
         Response(const Response &other);
         Response &operator=(const Response &other);
@@ -90,11 +89,8 @@ class Response
         bool flushBody();
         bool headerSent() const;
         void CGI(Request &req);
-        int fillEnv(Request &req);
+        void fillEnv(Request &req);
         double fileSize(string path);
-        void freeEnv(char **env);
-        char **dupEnv(char * const *env) const;
-        char *dupCStr(const char *s) const;
 
 
 };
