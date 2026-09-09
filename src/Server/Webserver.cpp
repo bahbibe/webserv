@@ -105,6 +105,12 @@ void Webserver::logAccess(Request &req, Response *resp)
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
 {
     map<int, Response>::iterator respIt = resp.find(sock);
+    if (respIt != resp.end() && respIt->second._isCGI)
+    {
+        kill(respIt->second.pid, SIGKILL);
+        waitpid(respIt->second.pid, 0, 0);
+        respIt->second.closeCgiPipes(_cgiFdToClient);
+    }
     logAccess(req[sock], respIt != resp.end() ? &respIt->second : NULL);
     epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
     req.erase(sock);
@@ -116,16 +122,20 @@ void Webserver::safeCloseConnection(int sock)
 {
     try
     {
-        map<int, Response>::iterator respIt = _resp.find(sock);
-        if (respIt != _resp.end() && respIt->second._isCGI)
-        {
-            kill(respIt->second.pid, SIGKILL);
-            waitpid(respIt->second.pid, 0, 0);
-        }
         closeConnection(_req, _resp, sock);
     }
     catch (...)
     {
+        map<int, Response>::iterator respIt = _resp.find(sock);
+        if (respIt != _resp.end())
+        {
+            if (respIt->second._isCGI)
+            {
+                kill(respIt->second.pid, SIGKILL);
+                waitpid(respIt->second.pid, 0, 0);
+            }
+            respIt->second.closeCgiPipes(_cgiFdToClient);
+        }
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
         close(sock);
         _req.erase(sock);
@@ -190,13 +200,34 @@ void Webserver::start()
             {
                 if (matchServer(_req, fd))
                     continue;
+
+                map<int, int>::iterator cgiIt = _cgiFdToClient.find(fd);
+                if (cgiIt != _cgiFdToClient.end())
+                {
+                    int clientFd = cgiIt->second;
+                    map<int, Response>::iterator respIt = _resp.find(clientFd);
+                    if (respIt == _resp.end())
+                    {
+                        // Orphaned pipe fd (shouldn't normally happen) - drop it defensively.
+                        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, fd, NULL);
+                        close(fd);
+                        _cgiFdToClient.erase(fd);
+                        continue;
+                    }
+                    if (fd == respIt->second.getCgiStdoutFd())
+                        respIt->second.relayCgiOutput(_req[clientFd], _cgiFdToClient);
+                    else if (fd == respIt->second.getCgiStdinFd())
+                    {
+                        if (ep.events[i].events & (EPOLLHUP | EPOLLERR))
+                            respIt->second.closeCgiStdin(_cgiFdToClient);
+                        else
+                            respIt->second.flushCgiStdin(_cgiFdToClient);
+                    }
+                    continue;
+                }
+
                 if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
                 {
-                    if (_resp[fd]._isCGI == true)
-                    {
-                        kill(_resp[fd].pid, SIGKILL);
-                        waitpid(_resp[fd].pid, 0, 0);
-                    }
                     closeConnection(_req, _resp, fd);
                     continue;
                 }
@@ -215,7 +246,7 @@ void Webserver::start()
                 }
                 if (ep.events[i].events & EPOLLOUT && _req[fd].getIsRequestFinished())
                 {
-                    _resp[fd].sendResponse(_req[fd], fd);
+                    _resp[fd].sendResponse(_req[fd], fd, _cgiFdToClient);
                     if (_resp[fd].getIsFinished() == true)
                     {
                         if (_resp[fd].getKeepAlive())
@@ -278,6 +309,7 @@ void Webserver::start()
         {
             kill(respIt->second.pid, SIGKILL);
             waitpid(respIt->second.pid, 0, 0);
+            respIt->second.closeCgiPipes(_cgiFdToClient);
         }
         logAccess(it->second, respIt != _resp.end() ? &respIt->second : NULL);
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->first, NULL);

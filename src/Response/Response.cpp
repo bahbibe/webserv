@@ -1,11 +1,13 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), _cgiStdoutFd(-1), _cgiStdinFd(-1), _cgiHeaderParsed(false), _cgiReaped(false), _cgiTimedOut(false), _cgiDone(false), _cgiExitStatus(0), _cgiStdinChunkOffset(0), pid(0), _isCGI(false)
 {
     saveStatus();
 }
 
-void Response::GET(Request &request)
+// Pure static-file streaming - CGI responses are relayed directly by
+// CGI()/relayCgiOutput() via the pipe fds, never through here.
+void Response::GET()
 {
     signal(SIGPIPE, SIG_IGN);
     if (this->_isHead)
@@ -14,13 +16,6 @@ void Response::GET(Request &request)
             file.close();
         this->_flag = false;
         this->_isfinished = true;
-        if (this->_isCGI == true)
-        {
-            this->_cgiEnv.clear();
-            remove(this->_path.c_str());
-            remove(request.directives.cgiFileName.c_str());
-        }
-        this->_isCGI = false;
         return;
     }
     if (this->_bodyOffset < this->_body.length())
@@ -33,13 +28,6 @@ void Response::GET(Request &request)
             file.close();
             this->_flag = false;
             this->_isfinished = true;
-            if (this->_isCGI == true)
-            {
-                this->_cgiEnv.clear();
-                remove(this->_path.c_str());
-                remove(request.directives.cgiFileName.c_str());
-            }
-            this->_isCGI = false;
         }
         return;
     }
@@ -67,13 +55,6 @@ void Response::GET(Request &request)
             file.close();
             this->_flag = false;
             this->_isfinished = true;
-            if (this->_isCGI == true)
-            {
-                this->_cgiEnv.clear();
-                remove(this->_path.c_str());
-                remove(request.directives.cgiFileName.c_str());
-            }
-            this->_isCGI = false;
         }
     }
 }
@@ -117,7 +98,7 @@ void Response::initVars(Request &request, int fdSocket)
             this->_target = "/";
     }
 }
-void Response::sendResponse(Request &request, int fdSocket)
+void Response::sendResponse(Request &request, int fdSocket, map<int, int> &cgiFdToClient)
 {
     initVars(request, fdSocket);
     if (!this->_header.empty() && !headerSent())
@@ -129,7 +110,7 @@ void Response::sendResponse(Request &request, int fdSocket)
     {
         checkErrors(request);
         if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
     else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
@@ -154,7 +135,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         {
             file.close();
             this->_cgiPath = resolveCgiPath(request);
-            CGI(request);
+            CGI(request, cgiFdToClient);
         }
         else
         {
@@ -162,7 +143,7 @@ void Response::sendResponse(Request &request, int fdSocket)
             this->_statusCode = 404;
             checkErrors(request);
             if (!this->_defaultError && headerSent())
-                GET(request);
+                GET();
         }
     }
     else if ((this->_method == "GET" || this->_method == "HEAD") && !this->_isErrorCode)
@@ -170,9 +151,9 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_flag)
             checks(request);
         if (this->_cgiAutoIndex)
-            CGI(request);
+            CGI(request, cgiFdToClient);
         else if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
     {
@@ -184,9 +165,9 @@ void Response::sendResponse(Request &request, int fdSocket)
                 checkErrors(request);
         }
         if (this->_cgiAutoIndex)
-            CGI(request);
+            CGI(request, cgiFdToClient);
         else if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
     else if (this->_method == "DELETE" && !this->_isErrorCode)
     {
@@ -198,7 +179,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         }
         checkErrors(request);
         if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
 }
 
@@ -365,11 +346,20 @@ Response &Response::operator=(const Response &other)
         this->_cgiEnv = other._cgiEnv;
         this->_cgiAutoIndex = other._cgiAutoIndex;
         this->start = other.start;
-        this->_randPath = other._randPath;
         this->_deleteDone = other._deleteDone;
         this->_headerOffset = other._headerOffset;
         this->_bodyOffset = other._bodyOffset;
         this->_pendingBodyLen = other._pendingBodyLen;
+        this->_cgiStdoutFd = other._cgiStdoutFd;
+        this->_cgiStdinFd = other._cgiStdinFd;
+        this->_cgiHeaderParsed = other._cgiHeaderParsed;
+        this->_cgiReaped = other._cgiReaped;
+        this->_cgiTimedOut = other._cgiTimedOut;
+        this->_cgiDone = other._cgiDone;
+        this->_cgiExitStatus = other._cgiExitStatus;
+        this->_cgiOutBuf = other._cgiOutBuf;
+        this->_cgiStdinChunk = other._cgiStdinChunk;
+        this->_cgiStdinChunkOffset = other._cgiStdinChunkOffset;
     }
     return *this;
 }

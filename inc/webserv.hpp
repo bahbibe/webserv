@@ -150,6 +150,11 @@ class Webserver
 private:
     map<int, Request> _req;
     map<int, Response> _resp;
+    // CGI pipe fd -> owning client socket fd. Populated when Response::CGI()
+    // creates a pipe, consulted by the event loop to route a pipe-fd epoll
+    // event to the right Request/Response pair (pipe events are driven
+    // independently of the client socket's own events).
+    map<int, int> _cgiFdToClient;
     ofstream _accessLog;
     void stopListening();
     void logAccess(Request &req, Response *resp);
