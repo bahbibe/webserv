@@ -57,6 +57,8 @@ int main(int argc, char const *argv[])
         {
             for (size_t i = 0; i < server._servers.size(); i++)
                 server[i].setupSocket();
+            for (size_t i = 0; i < server._servers.size(); i++)
+                server[i].setupSsl();
         }
         if (configErrors.hasErrors())
         {

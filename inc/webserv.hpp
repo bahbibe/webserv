@@ -126,6 +126,8 @@ typedef struct s_direrctive
     int allow;
     int return_code;
     int server;
+    int ssl_certificate;
+    int ssl_certificate_key;
 } t_dir;
 
 typedef struct s_events

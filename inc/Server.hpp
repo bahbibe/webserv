@@ -1,6 +1,7 @@
 #pragma once
 #include "webserv.hpp"
 #include "Location.hpp"
+#include "Tls.hpp"
 #include <memory>
 
 class Server
@@ -19,6 +20,15 @@ private:
     bool _autoindex;
     t_dir _dir;
     int _socket;
+    bool _ssl;
+    string _sslCertPath;
+    string _sslKeyPath;
+    // Shared (not unique) across copies of this Server: config parsing
+    // copies Server objects around (push_back/operator=) before the
+    // context is ever loaded, and once setupSsl() has run on the
+    // instance actually kept in Webserver::_servers, every accepted
+    // connection just needs read access to the same loaded context.
+    shared_ptr<SSL_CTX> _sslCtx;
     static streampos _pos;
 public:
     Server();
@@ -29,6 +39,7 @@ public:
     unique_ptr<Location> parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
     void setupSocket();
+    void setupSsl();
     int getSocket() const;
     string addrKey() const;
 
@@ -43,4 +54,6 @@ public:
     vector<string> getServerNames() const;
     map<string, vector<string> > getExtensions() const;
     map<string, string> getTypes() const;
+    bool getSsl() const;
+    SSL_CTX *getSslCtx() const;
 };

@@ -89,7 +89,7 @@ void Request::readRequest()
     try {
         _start = time(NULL);
         _requestBuffer.clear();
-        _readBytes = read(_socketFd, _buffer, bufferSize);
+        _readBytes = tlsAwareRead(_socketFd, _buffer, bufferSize);
         if (_readBytes <= 0)
             return;
         _buffer[_readBytes] = '\0';

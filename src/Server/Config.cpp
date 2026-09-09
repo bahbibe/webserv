@@ -236,6 +236,28 @@ void Server::parseServer(string const &file)
                     _port = DEFAULT_PORT;
                 if (!isNumber(_port))
                     configErrors.add(ERR "Invalid port: " + _port);
+                string opt;
+                if (line >> opt)
+                {
+                    if (opt == "ssl")
+                        _ssl = true;
+                    else
+                        configErrors.add(ERR "Invalid listen option: " + opt);
+                }
+            }
+            else if (buff == "ssl_certificate")
+            {
+                dir.ssl_certificate++;
+                line >> _sslCertPath;
+                if (access(_sslCertPath.c_str(), F_OK) == -1)
+                    configErrors.add(ERR + _sslCertPath + ": No such file or directory");
+            }
+            else if (buff == "ssl_certificate_key")
+            {
+                dir.ssl_certificate_key++;
+                line >> _sslKeyPath;
+                if (access(_sslKeyPath.c_str(), F_OK) == -1)
+                    configErrors.add(ERR + _sslKeyPath + ": No such file or directory");
             }
             else if (buff == "server_name")
             {
@@ -294,5 +316,7 @@ void Server::parseServer(string const &file)
     }
     if (duplicateDirective(dir))
         configErrors.add(ERR "Duplicate directive in server " + (_host.empty() ? string("(unknown host)") : _host));
+    if (_ssl && (_sslCertPath.empty() || _sslKeyPath.empty()))
+        configErrors.add(ERR "listen ... ssl needs both ssl_certificate and ssl_certificate_key");
     Server::_pos = ss.tellg();
 }

@@ -2,6 +2,7 @@
 #include "../../inc/Server.hpp"
 #include "../../inc/Request.hpp"
 #include "../../inc/Response.hpp"
+#include "../../inc/Tls.hpp"
 
 Webserver::Webserver()
 {
@@ -51,9 +52,20 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
         throw WebservException(ERR "Failed to set client socket non-blocking");
     }
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    if (server.getSsl())
+    {
+        // SSL_accept() can want either direction on its very first
+        // call regardless of which epoll event woke us - register
+        // both until the handshake settles, then drop back to
+        // EPOLLIN-only (see the handshake routing in start()).
+        g_tlsSessions[clientSock] = make_unique<TlsSession>(server.getSslCtx(), clientSock);
+        ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    }
+    else
+        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
     {
+        g_tlsSessions.erase(clientSock);
         close(clientSock);
         throw WebservException(ERR "Failed to add client to epoll");
     }
@@ -115,6 +127,7 @@ void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp
     epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
     req.erase(sock);
     resp.erase(sock);
+    g_tlsSessions.erase(sock);
     close(sock);
 }
 
@@ -137,6 +150,7 @@ void Webserver::safeCloseConnection(int sock)
             respIt->second.closeCgiPipes(_cgiFdToClient);
         }
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
+        g_tlsSessions.erase(sock);
         close(sock);
         _req.erase(sock);
         _resp.erase(sock);
@@ -200,6 +214,21 @@ void Webserver::start()
             {
                 if (matchServer(_req, fd))
                     continue;
+
+                map<int, unique_ptr<TlsSession> >::iterator tlsIt = g_tlsSessions.find(fd);
+                if (tlsIt != g_tlsSessions.end() && !tlsIt->second->isEstablished())
+                {
+                    int rc = tlsIt->second->handshake();
+                    if (rc < 0)
+                        closeConnection(_req, _resp, fd);
+                    else if (rc == 1)
+                    {
+                        ep.event.data.fd = fd;
+                        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                        epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, fd, &ep.event);
+                    }
+                    continue;
+                }
 
                 map<int, int>::iterator cgiIt = _cgiFdToClient.find(fd);
                 if (cgiIt != _cgiFdToClient.end())
@@ -313,6 +342,7 @@ void Webserver::start()
         }
         logAccess(it->second, respIt != _resp.end() ? &respIt->second : NULL);
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->first, NULL);
+        g_tlsSessions.erase(it->first);
         close(it->first);
     }
     close(ep.epollFd);

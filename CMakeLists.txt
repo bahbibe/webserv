@@ -29,6 +29,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+find_package(OpenSSL REQUIRED)
+
 set(SOURCES
     main.cpp
     src/Server/Server.cpp
@@ -36,6 +38,7 @@ set(SOURCES
     src/Server/Webserver.cpp
     src/Server/ConfigUtils.cpp
     src/Server/Config.cpp
+    src/Server/Tls.cpp
     src/Request/Request.cpp
     src/Request/Helpers.cpp
     src/Request/Boundaries.cpp
@@ -47,7 +50,7 @@ set(SOURCES
 
 add_executable(webserv ${SOURCES})
 target_include_directories(webserv PRIVATE inc)
-target_link_libraries(webserv PRIVATE spdlog::spdlog_header_only)
+target_link_libraries(webserv PRIVATE spdlog::spdlog_header_only OpenSSL::SSL OpenSSL::Crypto)
 
 # Keep the binary at the repo root (./webserv), matching every existing
 # script and manual invocation - purely a build-system swap in Phase 0,

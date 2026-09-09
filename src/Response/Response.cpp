@@ -271,7 +271,7 @@ bool Response::flushHeader()
 {
     if (this->_headerOffset >= this->_header.length())
         return true;
-    ssize_t n = write(this->_fdSocket, this->_header.c_str() + this->_headerOffset,
+    ssize_t n = tlsAwareWrite(this->_fdSocket, this->_header.c_str() + this->_headerOffset,
                        this->_header.length() - this->_headerOffset);
     if (n <= 0)
         return false;
@@ -283,7 +283,7 @@ bool Response::flushBody()
 {
     if (this->_bodyOffset >= this->_body.length())
         return true;
-    ssize_t n = write(this->_fdSocket, this->_body.c_str() + this->_bodyOffset,
+    ssize_t n = tlsAwareWrite(this->_fdSocket, this->_body.c_str() + this->_bodyOffset,
                        this->_body.length() - this->_bodyOffset);
     if (n <= 0)
         return false;

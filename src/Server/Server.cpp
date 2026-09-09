@@ -2,7 +2,7 @@
 #include "../../inc/Response.hpp"
 
 streampos Server::_pos = 0;
-Server::Server() : _autoindex(false)
+Server::Server() : _autoindex(false), _ssl(false)
 {
     memset(&_dir, 0, sizeof(_dir));
 }
@@ -34,6 +34,10 @@ Server &Server::operator=(Server const &src)
         _client_max_body_size = src._client_max_body_size;
         _autoindex = src._autoindex;
         _socket = src._socket;
+        _ssl = src._ssl;
+        _sslCertPath = src._sslCertPath;
+        _sslKeyPath = src._sslKeyPath;
+        _sslCtx = src._sslCtx;
     }
     return *this;
 }
@@ -91,6 +95,16 @@ map<string, string> Server::getTypes() const
 int Server::getSocket() const
 {
     return _socket;
+}
+
+bool Server::getSsl() const
+{
+    return _ssl;
+}
+
+SSL_CTX *Server::getSslCtx() const
+{
+    return _sslCtx.get();
 }
 
 size_t Server::getClientMaxBodySize() const
@@ -186,4 +200,38 @@ void Server::setupSocket()
         return;
     }
     socketMap[key] = move(sock);
+}
+
+// Called once per SSL-enabled server block, after setupSocket() and
+// after config validation has already confirmed ssl_certificate/
+// ssl_certificate_key were both given. Any failure here (missing
+// file, key doesn't match cert, ...) is reported the same way every
+// other startup-time config problem is - added to configErrors and
+// caught by main.cpp before the server ever calls start().
+void Server::setupSsl()
+{
+    if (!_ssl)
+        return;
+    SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
+    if (!ctx)
+    {
+        configErrors.add(ERR "Failed to create SSL context for " + addrKey());
+        return;
+    }
+    // Every retry of a partial SSL_write() in this project reuses the
+    // exact same std::string::c_str() pointer and length (the offset
+    // only advances after a successful write) - safe without this -
+    // but set it anyway so that invariant is enforced by OpenSSL
+    // itself rather than left as an implicit assumption.
+    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+    if (SSL_CTX_use_certificate_file(ctx, _sslCertPath.c_str(), SSL_FILETYPE_PEM) <= 0
+        || SSL_CTX_use_PrivateKey_file(ctx, _sslKeyPath.c_str(), SSL_FILETYPE_PEM) <= 0
+        || !SSL_CTX_check_private_key(ctx))
+    {
+        configErrors.add(ERR "Failed to load SSL certificate/key for " + addrKey());
+        SSL_CTX_free(ctx);
+        return;
+    }
+    _sslCtx = shared_ptr<SSL_CTX>(ctx, SSL_CTX_free);
 }
