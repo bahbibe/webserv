@@ -1,6 +1,55 @@
 #include "../../inc/webserv.hpp"
 #include "../../inc/Server.hpp"
 
+// Pre-scans the whole config file for balanced server{}/location{}
+// nesting and records one Server per "server {" block found - the
+// pass that has to run before Server::parseServer()/parseLocation()
+// can fill in any of those blocks' directives.
+void Webserver::brackets(string const &file)
+{
+    stringstream ss(file);
+    string buff;
+    stack<string> lim;
+    string tmp;
+    while (getline(ss, buff))
+    {
+        trim(buff);
+        if (buff.empty() || buff[0] == '#')
+            continue;
+        stringstream line(buff);
+        line >> tmp;
+        if (tmp == "server")
+        {
+            _servers.push_back(Server());
+            if (!lim.empty())
+                throw WebservException(ERR "Invalid brackets");
+            line >> tmp;
+            if (tmp != "{")
+                throw WebservException(ERR "Invalid brackets");
+            if (line.get() != EOF)
+                throw WebservException(ERR "Invalid brackets");
+            lim.push(tmp);
+        }
+        else if (tmp == "location")
+        {
+            line >> tmp >> tmp;
+            if (tmp != "{")
+                throw WebservException(ERR "Invalid brackets");
+            if (line.get() != EOF)
+                throw WebservException(ERR "Invalid brackets");
+            lim.push(tmp);
+        }
+        else if (tmp == "}")
+        {
+            if (lim.empty())
+                throw WebservException(ERR "Invalid brackets");
+            lim.pop();
+        }
+    }
+    if (!lim.empty())
+        throw WebservException(ERR "Invalid brackets");
+}
+
 unique_ptr<Location> Server::parseLocation(stringstream &ss)
 {
     string buff;
