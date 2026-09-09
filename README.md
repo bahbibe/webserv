@@ -7,6 +7,14 @@ A HTTP/1.1 server written in C++98, built around a single-threaded
 file uploads (`multipart/form-data`, chunked and Content-Length
 bodies), CGI (PHP/Python), and an nginx-style config file.
 
+> **v2 in progress.** The 42 project this was built for was retired
+> from the curriculum, so a from-scratch modernization (C++20, CMake,
+> RAII throughout, `std::filesystem`, structured logging via spdlog,
+> and eventually TLS) is under way on the [`v2`
+> branch](https://github.com/bahbibe/webserv/tree/v2) - unmerged
+> until it's fully tested end to end. `main` (this branch) stays as
+> the C++98/Makefile version described below until then.
+
 ## Description
 
 `webserv` implements enough of HTTP/1.1 to serve a real static
