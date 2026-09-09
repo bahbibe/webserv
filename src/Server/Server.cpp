@@ -111,7 +111,7 @@ void Server::setErrorCodes(string const &code, string const &buff)
             _error_pages[code] = buff;
             return;
         }
-    addConfigError(ERR "Invalid error_page code: " + code);
+    configErrors.add(ERR "Invalid error_page code: " + code);
 }
 
 void Server::print()
@@ -167,26 +167,26 @@ void Server::setupSocket()
     int gaiStatus = getaddrinfo(_host.c_str(), _port.c_str(), &hints, &res);
     if (gaiStatus != 0)
     {
-        addConfigError(ERR "Invalid host/port " + key + " (" + gai_strerror(gaiStatus) + ")");
+        configErrors.add(ERR "Invalid host/port " + key + " (" + gai_strerror(gaiStatus) + ")");
         return;
     }
     int sockOpt = 1;
     UniqueFd sock(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
     if (!sock.valid())
     {
-        addConfigError(ERR "Failed to create socket for " + key);
+        configErrors.add(ERR "Failed to create socket for " + key);
         freeaddrinfo(res);
         return;
     }
     if (fcntl(sock.get(), F_SETFL, O_NONBLOCK) == -1)
     {
-        addConfigError(ERR "Failed to set socket non-blocking for " + key);
+        configErrors.add(ERR "Failed to set socket non-blocking for " + key);
         freeaddrinfo(res);
         return;
     }
     if (setsockopt(sock.get(), SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
     {
-        addConfigError(ERR "Failed to set socket options for " + key);
+        configErrors.add(ERR "Failed to set socket options for " + key);
         freeaddrinfo(res);
         return;
     }
@@ -194,14 +194,14 @@ void Server::setupSocket()
         setsockopt(sock.get(), IPPROTO_IPV6, IPV6_V6ONLY, &sockOpt, sizeof(sockOpt));
     if (bind(sock.get(), res->ai_addr, res->ai_addrlen))
     {
-        addConfigError(ERR "Failed to bind " + key + " (" + strerror(errno) + ")");
+        configErrors.add(ERR "Failed to bind " + key + " (" + strerror(errno) + ")");
         freeaddrinfo(res);
         return;
     }
     freeaddrinfo(res);
     if (listen(sock.get(), SOMAXCONN))
     {
-        addConfigError(ERR "Failed to listen on " + key);
+        configErrors.add(ERR "Failed to listen on " + key);
         return;
     }
     _socket = sock.get();
@@ -210,7 +210,7 @@ void Server::setupSocket()
     ep.event.events = EPOLLIN;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
     {
-        addConfigError(ERR "Failed to add " + key + " to epoll");
+        configErrors.add(ERR "Failed to add " + key + " to epoll");
         return;
     }
     socketMap[key] = move(sock);

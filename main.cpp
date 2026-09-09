@@ -6,7 +6,7 @@ string confDir;
 string accessLogPath;
 volatile sig_atomic_t g_shutdown = 0;
 volatile sig_atomic_t g_reopenLog = 0;
-vector<string> configErrors;
+ConfigValidator configErrors;
 
 void handleShutdownSignal(int)
 {
@@ -53,16 +53,14 @@ int main(int argc, char const *argv[])
         server.brackets(buff);
         for (size_t i = 0; i < server._servers.size(); i++)
             server[i].parseServer(buff);
-        if (configErrors.empty())
+        if (!configErrors.hasErrors())
         {
             for (size_t i = 0; i < server._servers.size(); i++)
                 server[i].setupSocket();
         }
-        if (!configErrors.empty())
+        if (configErrors.hasErrors())
         {
-            cerr << RED "Config has " << configErrors.size() << " error(s):" RESET "\n";
-            for (size_t i = 0; i < configErrors.size(); i++)
-                cerr << "  " << configErrors[i] << "\n";
+            configErrors.report(cerr);
             return 1;
         }
         server.start();

@@ -106,8 +106,3 @@ bool isNumber(const string &str)
     return true;
 }
 
-void addConfigError(string const &msg)
-{
-    configErrors.push_back(msg);
-}
-

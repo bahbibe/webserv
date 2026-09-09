@@ -93,6 +93,25 @@ private:
     int _fd;
 };
 
+// Collects every config-validation problem found across the whole
+// file (all server/location blocks) instead of stopping at the
+// first one - see the "report all config errors" behavior.
+class ConfigValidator
+{
+public:
+    void add(string const &msg) { _errors.push_back(msg); }
+    bool hasErrors() const { return !_errors.empty(); }
+    void report(ostream &out) const
+    {
+        out << RED "Config has " << _errors.size() << " error(s):" RESET "\n";
+        for (size_t i = 0; i < _errors.size(); i++)
+            out << "  " << _errors[i] << "\n";
+    }
+
+private:
+    vector<string> _errors;
+};
+
 typedef struct s_direrctive
 {
     int host;
@@ -124,10 +143,9 @@ extern string confDir;
 extern string accessLogPath;
 extern volatile sig_atomic_t g_shutdown;
 extern volatile sig_atomic_t g_reopenLog;
-extern vector<string> configErrors;
+extern ConfigValidator configErrors;
 void handleShutdownSignal(int signum);
 void handleReopenLogSignal(int signum);
-void addConfigError(string const &msg);
 
 class Webserver
 {
