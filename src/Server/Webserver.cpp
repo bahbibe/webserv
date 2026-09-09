@@ -193,11 +193,9 @@ bool Webserver::matchServer(map<int, Request> &req, int sock)
 
 void Webserver::stopListening()
 {
-    for (map<string, int>::iterator it = socketMap.begin(); it != socketMap.end(); ++it)
-    {
-        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->second, NULL);
-        close(it->second);
-    }
+    for (map<string, UniqueFd>::iterator it = socketMap.begin(); it != socketMap.end(); ++it)
+        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->second.get(), NULL);
+    socketMap.clear();
 }
 
 void Webserver::start()

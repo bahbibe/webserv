@@ -1,7 +1,7 @@
 #include "inc/Server.hpp"
 #include <climits>
 t_events ep;
-map<string, int> socketMap;
+map<string, UniqueFd> socketMap;
 string confDir;
 string accessLogPath;
 volatile sig_atomic_t g_shutdown = 0;

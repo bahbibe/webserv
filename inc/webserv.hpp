@@ -17,6 +17,7 @@
 #include <sys/epoll.h>
 #include <netdb.h>
 #include <csignal>
+#include <utility>
 #define RED "\033[0;31m"
 #define GREEN "\033[0;32m"
 #define YELLOW "\033[0;33m"
@@ -53,6 +54,45 @@ private:
     string _msg;
 };
 
+// Owns exactly one fd (socket, pipe, ...) and close()s it on destruction,
+// on reset(), or when overwritten by move-assignment. Move-only - a raw
+// int cached elsewhere (e.g. Server::_socket) stays a non-owning view.
+class UniqueFd
+{
+public:
+    UniqueFd() noexcept : _fd(-1) {}
+    explicit UniqueFd(int fd) noexcept : _fd(fd) {}
+    ~UniqueFd() { reset(); }
+
+    UniqueFd(UniqueFd const &) = delete;
+    UniqueFd &operator=(UniqueFd const &) = delete;
+
+    UniqueFd(UniqueFd &&other) noexcept : _fd(other._fd) { other._fd = -1; }
+    UniqueFd &operator=(UniqueFd &&other) noexcept
+    {
+        if (this != &other)
+        {
+            reset();
+            _fd = other._fd;
+            other._fd = -1;
+        }
+        return *this;
+    }
+
+    int get() const noexcept { return _fd; }
+    bool valid() const noexcept { return _fd != -1; }
+
+    void reset(int fd = -1) noexcept
+    {
+        if (_fd != -1)
+            close(_fd);
+        _fd = fd;
+    }
+
+private:
+    int _fd;
+};
+
 typedef struct s_direrctive
 {
     int host;
@@ -79,7 +119,7 @@ typedef struct s_events
 } t_events;
 
 extern t_events ep;
-extern map<string, int> socketMap;
+extern map<string, UniqueFd> socketMap;
 extern string confDir;
 extern string accessLogPath;
 extern volatile sig_atomic_t g_shutdown;

@@ -152,10 +152,10 @@ string Server::addrKey() const
 void Server::setupSocket()
 {
     string key = addrKey();
-    map<string, int>::iterator it = socketMap.find(key);
+    map<string, UniqueFd>::iterator it = socketMap.find(key);
     if (it != socketMap.end())
     {
-        _socket = it->second;
+        _socket = it->second.get();
         return;
     }
     struct addrinfo hints;
@@ -171,51 +171,47 @@ void Server::setupSocket()
         return;
     }
     int sockOpt = 1;
-    if ((_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1)
+    UniqueFd sock(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
+    if (!sock.valid())
     {
         addConfigError(ERR "Failed to create socket for " + key);
         freeaddrinfo(res);
         return;
     }
-    if (fcntl(_socket, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl(sock.get(), F_SETFL, O_NONBLOCK) == -1)
     {
         addConfigError(ERR "Failed to set socket non-blocking for " + key);
-        close(_socket);
         freeaddrinfo(res);
         return;
     }
-    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
+    if (setsockopt(sock.get(), SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
     {
         addConfigError(ERR "Failed to set socket options for " + key);
-        close(_socket);
         freeaddrinfo(res);
         return;
     }
     if (res->ai_family == AF_INET6)
-        setsockopt(_socket, IPPROTO_IPV6, IPV6_V6ONLY, &sockOpt, sizeof(sockOpt));
-    if (bind(_socket, res->ai_addr, res->ai_addrlen))
+        setsockopt(sock.get(), IPPROTO_IPV6, IPV6_V6ONLY, &sockOpt, sizeof(sockOpt));
+    if (bind(sock.get(), res->ai_addr, res->ai_addrlen))
     {
         addConfigError(ERR "Failed to bind " + key + " (" + strerror(errno) + ")");
-        close(_socket);
         freeaddrinfo(res);
         return;
     }
     freeaddrinfo(res);
-    if (listen(_socket, SOMAXCONN))
+    if (listen(sock.get(), SOMAXCONN))
     {
         addConfigError(ERR "Failed to listen on " + key);
-        close(_socket);
         return;
     }
-    socketMap[key] = _socket;
+    _socket = sock.get();
     cout << LISTENING << key + "\n";
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
     {
         addConfigError(ERR "Failed to add " + key + " to epoll");
-        socketMap.erase(key);
-        close(_socket);
         return;
     }
+    socketMap[key] = move(sock);
 }
