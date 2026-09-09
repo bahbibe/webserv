@@ -114,34 +114,6 @@ void Server::setErrorCodes(string const &code, string const &buff)
     configErrors.add(ERR "Invalid error_page code: " + code);
 }
 
-void Server::print()
-{
-    cout << "==================SERVER==================\n";
-    cout << "host: " + _host << "\n";
-    cout << "port: " + _port << "\n";
-    cout << "server_names: "
-            << "\n";
-    for (vector<string>::iterator it = _server_names.begin(); it != _server_names.end(); it++)
-        cout << "\t" << *it << "\n";
-    cout << "indexs: \n";
-    for (vector<string>::iterator it = _indexs.begin(); it != _indexs.end(); it++)
-        cout << "\t" << *it << "\n";
-    cout << "server_root: " + _server_root << "\n";
-    cout << "error_pages: "
-            << "\n";
-    for (map<string, string>::iterator it = _error_pages.begin(); it != _error_pages.end(); it++)
-        cout << "\t" << it->first << " " << it->second << " "
-                << "\n";
-    cout << "client_max_body_size: " << _client_max_body_size << "\n";
-    cout << "autoindex: " << _autoindex << "\n";
-    cout << "==================LOCATIONS==================\n";
-    for (map<string, unique_ptr<Location> >::iterator it = _locations.begin(); it != _locations.end(); it++)
-    {
-        cout << "Location: " << it->first << "\n";
-        it->second->print();
-    }
-}
-
 string Server::addrKey() const
 {
     if (_host.find(':') != string::npos)

@@ -42,7 +42,6 @@ private:
     int _socketFd;
     int _lineCount;
     int _statusCode;
-    string _statusMessage;
     bool _isRequestFinished;
     bool _isFoundCRLF;
     
@@ -119,11 +118,9 @@ public:
     void readRequest();
     void validateRequest();
     void setStatusCode(int statusCode, string statusMessage);
-    void printRequest();
 
     //? Getters
     bool getIsRequestFinished() const;
-    string getStatusMessage() const;
     string getMethod() const;
     string getRequestTarget() const;
     string getHttpVersion() const;

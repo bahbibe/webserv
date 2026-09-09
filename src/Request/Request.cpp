@@ -437,15 +437,11 @@ void Request::parseBodyWithChunked()
 
 void Request::setStatusCode(int statusCode, string statusMessage)
 {
-    // this->printRequest();
     this->_statusCode = statusCode;
     this->_isRequestFinished = true;
-    stringstream ss;
-    ss << statusCode;
     if (statusCode >= 400)
         this->isErrorCode = true;
-    this->_statusMessage = statusCode >= 400 ? RED + statusMessage + ": " + ss.str() + RESET : GREEN + statusMessage + ": " + ss.str() + RESET;
-    // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+    spdlog::debug("{} {} -> {} ({})", _method, _tmpRequestTarget, statusCode, statusMessage);
     throw  statusCode;
 }
 
@@ -459,8 +455,7 @@ void Request::setTimeout()
         remove(this->_filePath.c_str());
         this->_outfile.close();
     }
-    this->_statusMessage = RED "Request Timeout: 408" RESET;
-    // cout << GREEN << _tmpRequestTarget << " " << _method  << " " << _statusMessage << RESET << endl;
+    spdlog::debug("{} {} -> 408 (Request Timeout)", _method, _tmpRequestTarget);
 }
 
 bool Request::getWantsClose() const
@@ -473,50 +468,9 @@ Server *Request::getServer() const
     return this->_server;
 }
 
-void Request::printRequest()
-{
-    cout << GREEN "=====================Request=================" RESET << endl;
-    cout << "Method: " << _method << endl;
-    cout << "Request Target: " << _requestTarget << endl;
-    cout << "HTTP Version: " << _httpVersion << endl;
-    cout << "Headers size: " << _headers.size() << endl;
-    cout << "Boundary: " << _boundary << endl;
-    cout << "isCgi: " << _isCgi << endl;
-    cout << "Headers: " << endl;
-    map<string, string>::iterator it = _headers.begin();
-    for (; it != _headers.end(); it++)
-        cout << it->first << ": " << it->second << endl;
-    cout << BLUE "=====================Directives=================" RESET << endl;
-    cout << "Requested File Path: " << directives.requestedFile << endl;
-    cout << "Root: " << directives.serverRoot << endl;
-    cout << "Client Max Body Size: " << directives.clientMaxBodySize << endl;
-    cout << "Autoindex: " << directives.autoindex << endl;
-    cout << "Is Upload Allowed: " << directives.isUploadAllowed << endl;
-    cout << "Upload Path: " << directives.uploadPath << endl;
-    cout << "Is Cgi Allowed: " << directives.isCgiAllowed << endl;
-    cout << "Cgi upload Path: " << directives.cgiUploadPath << endl;
-    cout << "Return Redirect: " << directives.returnRedirect << endl;
-    cout << "requestTarget: " << directives.requestTarget << endl;
-    cout << "queryString: " << directives.queryString << endl;
-    cout << "httpCookie: " << directives.httpCookie << endl;
-    cout << "httpAccept: " << directives.httpAccept << endl;
-    cout << "CgiFileName: " << directives.cgiFileName << endl;
-    cout << "Content Type: " << directives.contentType << endl;
-    cout << "Boundary: " << directives.boundary << endl;
-    cout << "Content Length: " << directives.contentLength << endl;
-    cout << "Is CGI: " << directives.isCGI << endl;
-    cout << BLUE "=====================Directives=================" RESET << endl;
-    cout << GREEN "=====================Request=================" RESET << endl;
-}
-
 bool Request::getIsRequestFinished() const
 {
     return this->_isRequestFinished;
-}
-
-string Request::getStatusMessage() const
-{
-    return this->_statusMessage;
 }
 
 string Request::getMethod() const

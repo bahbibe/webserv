@@ -31,7 +31,6 @@ public:
     void setCgiUploadPath(string const &);
     void setReturn(string const &);
     void setCgiPath(string const &ext, string const &interpreter);
-    void print();
 
     string getReturn() const;
     vector<string> getMethods() const;

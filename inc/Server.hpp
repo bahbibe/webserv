@@ -28,7 +28,6 @@ public:
     void mimeTypes();
     unique_ptr<Location> parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
-    void print();
     void setupSocket();
     int getSocket() const;
     string addrKey() const;

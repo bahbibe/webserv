@@ -62,25 +62,3 @@ void Location::setMethods(string const &buff)
         }
     throw WebservException(ERR "Invalid method");
 }
-
-void Location::print()
-{
-    cout << "    indexs: ";
-    for (size_t i = 0; i < _indexs.size(); i++)
-        cout << _indexs[i] << " ";
-    cout << endl;
-    cout << "    root: " << _root << endl;
-    cout << "    autoindex: " << _autoindex << endl;
-    cout << "    upload: " << _upload << endl;
-    cout << "    cgi: " << _cgi << endl;
-    cout << "    upload_path: " << _upload_path << endl;
-    cout << "    return: " << _return << endl;
-    cout << "    cgi_paths: ";
-    for (map<string, string>::const_iterator it = _cgiPaths.begin(); it != _cgiPaths.end(); ++it)
-        cout << it->first << "=" << it->second << " ";
-    cout << endl;
-    cout << "    methods: ";
-    for (size_t i = 0; i < _methods.size(); i++)
-        cout << _methods[i] << " ";
-    cout << endl;
-}
