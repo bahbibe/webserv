@@ -11,6 +11,28 @@ until the whole plan below is implemented and tested — this is one
 continuous branch, not the usual per-feature branch/merge/release
 cycle used everywhere else in this project's history.
 
+## Status
+
+- **Phase 0 (CMake/C++20 build migration) — done.**
+- **Phase 1 (RAII/type cleanup) — done**, plus a wrap-up pass beyond
+  the original scope: `DELETE` rewritten onto `std::filesystem`
+  (found and fixed a real permission-check bug along the way),
+  `Response.cpp` split (autoindex/default-error-page generation into
+  `DefaultPages.cpp`), `Request::toLowerCase`/`trim` modernized (fixed
+  a real UB risk in the old `toLowerCase`), `Webserver::brackets()`
+  relocated into `Config.cpp`.
+- **Phase 2 (structured logging) — done** for the diagnostic-message
+  half: spdlog is in (CMake `FetchContent`, header-only), every real
+  cout/cerr diagnostic converted with proper levels, dead ANSI macros
+  and three dead debug-dump functions removed along the way.
+  `access.log` deliberately untouched, per plan. Known rough edge:
+  fatal `WebservException` messages still carry an old embedded
+  "Error: " ANSI prefix alongside spdlog's own level tag — cosmetic,
+  not fixed yet.
+- **Phase 3 (CGI: pipes instead of temp files) — not started.**
+- **Phase 4 (TLS) — not started.**
+- **Phase 5 (final hardening pass, README rewrite, merge) — not started.**
+
 ## Decisions made
 
 - **C++20.** GCC 13.3.0 (present on this machine) supports it fully.
