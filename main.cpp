@@ -67,7 +67,7 @@ int main(int argc, char const *argv[])
     }
     catch (const exception &e)
     {
-        cerr << e.what() << '\n';
+        spdlog::critical("{}", e.what());
         return 1;
     }
 }

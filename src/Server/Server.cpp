@@ -177,7 +177,7 @@ void Server::setupSocket()
         return;
     }
     _socket = sock.get();
-    cout << LISTENING << key + "\n";
+    spdlog::info("Listening on {}", key);
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))

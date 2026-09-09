@@ -42,7 +42,7 @@ void Response::CGI(Request &req)
             if (slash != string::npos)
                 chdir(this->_absPath.substr(0, slash).c_str());
             execve(argv[0], (char* const*)argv, envp.data());
-            cerr << "execve: " << strerror(errno) << "\n";
+            spdlog::error("execve: {}", strerror(errno));
             exit(127);
         }
     }

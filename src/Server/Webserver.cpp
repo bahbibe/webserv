@@ -9,7 +9,7 @@ Webserver::Webserver()
         throw WebservException(ERR "Failed to create epoll");
     _accessLog.open(accessLogPath.c_str(), ios::app);
     if (!_accessLog.is_open())
-        cerr << ERR "Unable to open access log at " << accessLogPath << ", continuing without it\n";
+        spdlog::warn("Unable to open access log at {}, continuing without it", accessLogPath);
 }
 
 void Webserver::reopenAccessLog()
@@ -19,7 +19,7 @@ void Webserver::reopenAccessLog()
     _accessLog.clear();
     _accessLog.open(accessLogPath.c_str(), ios::app);
     if (!_accessLog.is_open())
-        cerr << ERR "Unable to reopen access log at " << accessLogPath << ", continuing without it\n";
+        spdlog::warn("Unable to reopen access log at {}, continuing without it", accessLogPath);
 }
 
 
@@ -171,15 +171,13 @@ void Webserver::start()
         {
             shutdownStarted = time(NULL);
             stopListening();
-            cout << "\n" YELLOW "Shutting down, waiting for " << _req.size()
-                 << " in-flight connection(s)..." RESET "\n";
+            spdlog::info("Shutting down, waiting for {} in-flight connection(s)...", _req.size());
         }
         if (g_shutdown && _req.empty())
             break;
         if (g_shutdown && shutdownStarted && CLOCKWORK(shutdownStarted) > SHUTDOWN_GRACE)
         {
-            cout << YELLOW "Shutdown grace period elapsed, closing " << _req.size()
-                 << " remaining connection(s)." RESET "\n";
+            spdlog::warn("Shutdown grace period elapsed, closing {} remaining connection(s).", _req.size());
             break;
         }
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, 1000);
@@ -241,13 +239,13 @@ void Webserver::start()
             }
             catch (const exception &e)
             {
-                cerr << ERR "Unhandled exception servicing fd " << fd << ": " << e.what() << "\n";
+                spdlog::error("Unhandled exception servicing fd {}: {}", fd, e.what());
                 if (_req.find(fd) != _req.end())
                     safeCloseConnection(fd);
             }
             catch (...)
             {
-                cerr << ERR "Unknown exception servicing fd " << fd << "\n";
+                spdlog::error("Unknown exception servicing fd {}", fd);
                 if (_req.find(fd) != _req.end())
                     safeCloseConnection(fd);
             }
@@ -269,7 +267,7 @@ void Webserver::start()
             }
             catch (const exception &e)
             {
-                cerr << ERR "Unhandled exception in timeout scan for fd " << it->first << ": " << e.what() << "\n";
+                spdlog::error("Unhandled exception in timeout scan for fd {}: {}", it->first, e.what());
             }
         }
     }
@@ -286,5 +284,5 @@ void Webserver::start()
         close(it->first);
     }
     close(ep.epollFd);
-    cout << YELLOW "Shutdown complete." RESET "\n";
+    spdlog::info("Shutdown complete.");
 }

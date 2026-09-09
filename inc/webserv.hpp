@@ -20,9 +20,7 @@
 #include <utility>
 #include <spdlog/spdlog.h>
 #define RED "\033[0;31m"
-#define GREEN "\033[0;32m"
 #define YELLOW "\033[0;33m"
-#define BLUE "\033[0;34m"
 #define RESET "\033[0m"
 #define USAGE YELLOW "Usage: ./webserv [config_file] DEFAULT=NONE" RESET
 #define ERR RED "Error: " RESET
@@ -35,7 +33,6 @@
 #define SHUTDOWN_GRACE 5
 #define CGI_TIMEOUT 5
 #define CLOCKWORK(x) double(time(NULL) - (x))
-#define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
 #define MAX_HEADER_BYTES 8192
 using namespace std;
