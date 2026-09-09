@@ -80,54 +80,22 @@ void Response::GET(Request &request)
 
 void Response::DELETE(string path)
 {
-    if (is_adir(path))
-    {
-        DIR *dir = opendir(path.c_str());
-        if (dir)
-        {
-            struct dirent *dp;
-            while ((dp = readdir(dir)) != NULL)
-            {
-                if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
-                {
-                    string np = path + "/" + string(dp->d_name);
-                    if (dp->d_type == DT_DIR)
-                        DELETE(np);
-                    else
-                    {
-
-                        if (access(np.c_str(), W_OK) != -1)
-                            remove(np.c_str());
-                        else
-                        {
-                            this->_isErrorCode = true;
-                            this->_statusCode = 403;
-                        }
-                    }
-                }
-
-            }
-            closedir(dir);
-            remove(path.c_str());
-        }
-    }
-    else if (access(path.c_str(), F_OK) != -1)
-    {
-        ifstream file;
-        file.open(path.c_str(), ios::binary);
-        if (file.is_open())
-            remove(path.c_str());
-        else
-        {
-            this->_isErrorCode = true;
-            this->_statusCode = 403;
-        }
-        
-    }
-    else
+    namespace fs = std::filesystem;
+    error_code ec;
+    if (!fs::exists(path, ec))
     {
         this->_isErrorCode = true;
         this->_statusCode = 404;
+        return;
+    }
+    if (fs::is_directory(path, ec))
+        fs::remove_all(path, ec);
+    else
+        fs::remove(path, ec);
+    if (ec)
+    {
+        this->_isErrorCode = true;
+        this->_statusCode = 403;
     }
 }
 

@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <cerrno>
+#include <filesystem>
+#include <system_error>
 
 #define BUFFERSIZE 1024
 using namespace std;
