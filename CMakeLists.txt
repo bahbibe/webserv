@@ -20,6 +20,7 @@ set(SOURCES
     src/Request/Chunks.cpp
     src/Response/Response.cpp
     src/Response/Cgi.cpp
+    src/Response/DefaultPages.cpp
 )
 
 add_executable(webserv ${SOURCES})
