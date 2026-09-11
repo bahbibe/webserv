@@ -95,7 +95,9 @@ assert_empty_body()
 
 # --- build ---
 
-make -s -C "$ROOT_DIR" re >"$WORK_DIR/build.log" 2>&1
+rm -rf "$ROOT_DIR/build"
+cmake -S "$ROOT_DIR" -B "$ROOT_DIR/build" >"$WORK_DIR/build.log" 2>&1 \
+    && cmake --build "$ROOT_DIR/build" -j >>"$WORK_DIR/build.log" 2>&1
 if [ $? -ne 0 ]; then
     echo "build failed:"
     cat "$WORK_DIR/build.log"

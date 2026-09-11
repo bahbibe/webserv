@@ -1,11 +1,60 @@
 #include "../../inc/webserv.hpp"
 #include "../../inc/Server.hpp"
 
-Location *Server::parseLocation(stringstream &ss)
+// Pre-scans the whole config file for balanced server{}/location{}
+// nesting and records one Server per "server {" block found - the
+// pass that has to run before Server::parseServer()/parseLocation()
+// can fill in any of those blocks' directives.
+void Webserver::brackets(string const &file)
+{
+    stringstream ss(file);
+    string buff;
+    stack<string> lim;
+    string tmp;
+    while (getline(ss, buff))
+    {
+        trim(buff);
+        if (buff.empty() || buff[0] == '#')
+            continue;
+        stringstream line(buff);
+        line >> tmp;
+        if (tmp == "server")
+        {
+            _servers.push_back(Server());
+            if (!lim.empty())
+                throw WebservException(ERR "Invalid brackets");
+            line >> tmp;
+            if (tmp != "{")
+                throw WebservException(ERR "Invalid brackets");
+            if (line.get() != EOF)
+                throw WebservException(ERR "Invalid brackets");
+            lim.push(tmp);
+        }
+        else if (tmp == "location")
+        {
+            line >> tmp >> tmp;
+            if (tmp != "{")
+                throw WebservException(ERR "Invalid brackets");
+            if (line.get() != EOF)
+                throw WebservException(ERR "Invalid brackets");
+            lim.push(tmp);
+        }
+        else if (tmp == "}")
+        {
+            if (lim.empty())
+                throw WebservException(ERR "Invalid brackets");
+            lim.pop();
+        }
+    }
+    if (!lim.empty())
+        throw WebservException(ERR "Invalid brackets");
+}
+
+unique_ptr<Location> Server::parseLocation(stringstream &ss)
 {
     string buff;
     string tmp;
-    Location *location = new Location();
+    unique_ptr<Location> location = make_unique<Location>();
     while (getline(ss, buff))
     {
         trim(buff);
@@ -35,7 +84,7 @@ Location *Server::parseLocation(stringstream &ss)
                 line >> tmp;
                 if (access(tmp.c_str(), F_OK) == -1)
                 {
-                    addConfigError(ERR + tmp + ": No such file or directory");
+                    configErrors.add(ERR + tmp + ": No such file or directory");
                     location->setRoot(_server_root);
                 }
                 else
@@ -48,7 +97,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setAutoindex(true);
                 else if (tmp != "off")
-                    addConfigError(ERR "Invalid autoindex value: " + tmp);
+                    configErrors.add(ERR "Invalid autoindex value: " + tmp);
             }
             else if (tmp == "cgi")
             {
@@ -57,7 +106,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setCgi(true);
                 else if (tmp != "off")
-                    addConfigError(ERR "Invalid cgi value: " + tmp);
+                    configErrors.add(ERR "Invalid cgi value: " + tmp);
             }
             else if (tmp == "upload")
             {
@@ -66,7 +115,7 @@ Location *Server::parseLocation(stringstream &ss)
                 if (tmp == "on")
                     location->setUpload(true);
                 else if (tmp != "off")
-                    addConfigError(ERR "Invalid upload value: " + tmp);
+                    configErrors.add(ERR "Invalid upload value: " + tmp);
             }
             else if (tmp == "upload_path")
             {
@@ -91,16 +140,16 @@ Location *Server::parseLocation(stringstream &ss)
                 string ext, interpreter;
                 line >> ext >> interpreter;
                 if (ext.empty() || interpreter.empty())
-                    addConfigError(ERR "Invalid cgi_path directive (needs an extension and an interpreter)");
+                    configErrors.add(ERR "Invalid cgi_path directive (needs an extension and an interpreter)");
                 else
                     location->setCgiPath(ext, interpreter);
             }
         }
         else
-            addConfigError(ERR "Invalid directive in location block: " + tmp);
+            configErrors.add(ERR "Invalid directive in location block: " + tmp);
     }
     if (duplicateDirective(location->_dir))
-        addConfigError(ERR "Duplicate directive in a location block");
+        configErrors.add(ERR "Duplicate directive in a location block");
     if (location->getRoot().empty())
         location->setRoot(_server_root);
     if (location->_dir.autoindex == 0)
@@ -138,7 +187,7 @@ void Server::mimeTypes()
             loaded = true;
         }
         else
-            throw Server::ServerException(ERR "Unable to open mime file");
+            throw WebservException(ERR "Unable to open mime file");
     }
     _extensions = cachedExtensions;
     _types = cachedTypes;
@@ -177,7 +226,7 @@ void Server::parseServer(string const &file)
                 if (_host == "localhost")
                     _host = "127.0.0.1";
                 else if (resolveHostFamily(_host) == -1)
-                    addConfigError(ERR "Invalid host: " + _host);
+                    configErrors.add(ERR "Invalid host: " + _host);
             }
             else if (buff == "listen")
             {
@@ -186,7 +235,29 @@ void Server::parseServer(string const &file)
                 if (_port.empty())
                     _port = DEFAULT_PORT;
                 if (!isNumber(_port))
-                    addConfigError(ERR "Invalid port: " + _port);
+                    configErrors.add(ERR "Invalid port: " + _port);
+                string opt;
+                if (line >> opt)
+                {
+                    if (opt == "ssl")
+                        _ssl = true;
+                    else
+                        configErrors.add(ERR "Invalid listen option: " + opt);
+                }
+            }
+            else if (buff == "ssl_certificate")
+            {
+                dir.ssl_certificate++;
+                line >> _sslCertPath;
+                if (access(_sslCertPath.c_str(), F_OK) == -1)
+                    configErrors.add(ERR + _sslCertPath + ": No such file or directory");
+            }
+            else if (buff == "ssl_certificate_key")
+            {
+                dir.ssl_certificate_key++;
+                line >> _sslKeyPath;
+                if (access(_sslKeyPath.c_str(), F_OK) == -1)
+                    configErrors.add(ERR + _sslKeyPath + ": No such file or directory");
             }
             else if (buff == "server_name")
             {
@@ -212,7 +283,7 @@ void Server::parseServer(string const &file)
                 dir.root++;
                 line >> _server_root;
                 if (access(_server_root.c_str(), F_OK) == -1)
-                    addConfigError(ERR + _server_root + ": No such file or directory");
+                    configErrors.add(ERR + _server_root + ": No such file or directory");
             }
             else if (buff == "autoindex")
             {
@@ -223,14 +294,14 @@ void Server::parseServer(string const &file)
                 else if (buff == "off")
                     _autoindex = false;
                 else
-                    addConfigError(ERR "Invalid autoindex value: " + buff);
+                    configErrors.add(ERR "Invalid autoindex value: " + buff);
             }
             else if (buff == "client_max_body_size")
             {
                 dir.client_max_body_size++;
                 line >> _client_max_body_size;
                 if (!isNumber(_client_max_body_size))
-                    addConfigError(ERR "Invalid client_max_body_size: " + _client_max_body_size);
+                    configErrors.add(ERR "Invalid client_max_body_size: " + _client_max_body_size);
             }
             else if (buff == "location")
             {
@@ -240,10 +311,12 @@ void Server::parseServer(string const &file)
         }
         else
         {
-            addConfigError(ERR "Invalid directive at server level: " + buff);
+            configErrors.add(ERR "Invalid directive at server level: " + buff);
         }
     }
     if (duplicateDirective(dir))
-        addConfigError(ERR "Duplicate directive in server " + (_host.empty() ? string("(unknown host)") : _host));
+        configErrors.add(ERR "Duplicate directive in server " + (_host.empty() ? string("(unknown host)") : _host));
+    if (_ssl && (_sslCertPath.empty() || _sslKeyPath.empty()))
+        configErrors.add(ERR "listen ... ssl needs both ssl_certificate and ssl_certificate_key");
     Server::_pos = ss.tellg();
 }

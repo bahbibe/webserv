@@ -42,7 +42,6 @@ private:
     int _socketFd;
     int _lineCount;
     int _statusCode;
-    string _statusMessage;
     bool _isRequestFinished;
     bool _isFoundCRLF;
     
@@ -74,7 +73,8 @@ private:
     bool _isCgi;
 
     map<string, vector<string> > _mimeTypes;
-    
+    Location _defaultLocation;
+
     //? Parsing
     void parseRequest();
     void parseRequestLine();
@@ -118,17 +118,14 @@ public:
     void readRequest();
     void validateRequest();
     void setStatusCode(int statusCode, string statusMessage);
-    void printRequest();
 
     //? Getters
     bool getIsRequestFinished() const;
-    string getStatusMessage() const;
     string getMethod() const;
     string getRequestTarget() const;
     string getHttpVersion() const;
     int getStatusCode() const;
     map<string, string> getHeaders() const;
-    Location* getLocation() const;
     void setTimeout();
     bool getWantsClose() const;
     Server* getServer() const;

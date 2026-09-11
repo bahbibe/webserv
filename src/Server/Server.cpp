@@ -2,7 +2,7 @@
 #include "../../inc/Response.hpp"
 
 streampos Server::_pos = 0;
-Server::Server() : _autoindex(false)
+Server::Server() : _autoindex(false), _ssl(false)
 {
     memset(&_dir, 0, sizeof(_dir));
 }
@@ -17,14 +17,11 @@ Server &Server::operator=(Server const &src)
 {
     if (this != &src)
     {
-        map<string, Location *>::iterator oldIt = _locations.begin();
-        for (; oldIt != _locations.end(); oldIt++)
-            delete oldIt->second;
         _locations.clear();
-        map<string, Location *>::const_iterator it = src._locations.begin();
+        map<string, unique_ptr<Location> >::const_iterator it = src._locations.begin();
         for (; it != src._locations.end(); it++)
         {
-            _locations[it->first] = new Location(*it->second);
+            _locations[it->first] = make_unique<Location>(*it->second);
         }
         _error_pages = src._error_pages;
         _extensions = src._extensions;
@@ -37,11 +34,15 @@ Server &Server::operator=(Server const &src)
         _client_max_body_size = src._client_max_body_size;
         _autoindex = src._autoindex;
         _socket = src._socket;
+        _ssl = src._ssl;
+        _sslCertPath = src._sslCertPath;
+        _sslKeyPath = src._sslKeyPath;
+        _sslCtx = src._sslCtx;
     }
     return *this;
 }
 
-map<string, Location *> Server::getLocations() const
+const map<string, unique_ptr<Location> > &Server::getLocations() const
 {
     return _locations;
 }
@@ -96,15 +97,14 @@ int Server::getSocket() const
     return _socket;
 }
 
-Server::~Server()
+bool Server::getSsl() const
 {
-    map<string, Location *>::iterator it = _locations.begin();
-    for (; it != _locations.end(); it++)
-    {
-        if(it->second)
-            delete it->second;
-    }
-    // close(_socket);
+    return _ssl;
+}
+
+SSL_CTX *Server::getSslCtx() const
+{
+    return _sslCtx.get();
 }
 
 size_t Server::getClientMaxBodySize() const
@@ -125,35 +125,7 @@ void Server::setErrorCodes(string const &code, string const &buff)
             _error_pages[code] = buff;
             return;
         }
-    addConfigError(ERR "Invalid error_page code: " + code);
-}
-
-void Server::print()
-{
-    cout << "==================SERVER==================\n";
-    cout << "host: " + _host << "\n";
-    cout << "port: " + _port << "\n";
-    cout << "server_names: "
-            << "\n";
-    for (vector<string>::iterator it = _server_names.begin(); it != _server_names.end(); it++)
-        cout << "\t" << *it << "\n";
-    cout << "indexs: \n";
-    for (vector<string>::iterator it = _indexs.begin(); it != _indexs.end(); it++)
-        cout << "\t" << *it << "\n";
-    cout << "server_root: " + _server_root << "\n";
-    cout << "error_pages: "
-            << "\n";
-    for (map<string, string>::iterator it = _error_pages.begin(); it != _error_pages.end(); it++)
-        cout << "\t" << it->first << " " << it->second << " "
-                << "\n";
-    cout << "client_max_body_size: " << _client_max_body_size << "\n";
-    cout << "autoindex: " << _autoindex << "\n";
-    cout << "==================LOCATIONS==================\n";
-    for (map<string, Location *>::iterator it = _locations.begin(); it != _locations.end(); it++)
-    {
-        cout << "Location: " << it->first << "\n";
-        it->second->print();
-    }
+    configErrors.add(ERR "Invalid error_page code: " + code);
 }
 
 string Server::addrKey() const
@@ -166,10 +138,10 @@ string Server::addrKey() const
 void Server::setupSocket()
 {
     string key = addrKey();
-    map<string, int>::iterator it = socketMap.find(key);
+    map<string, UniqueFd>::iterator it = socketMap.find(key);
     if (it != socketMap.end())
     {
-        _socket = it->second;
+        _socket = it->second.get();
         return;
     }
     struct addrinfo hints;
@@ -181,55 +153,85 @@ void Server::setupSocket()
     int gaiStatus = getaddrinfo(_host.c_str(), _port.c_str(), &hints, &res);
     if (gaiStatus != 0)
     {
-        addConfigError(ERR "Invalid host/port " + key + " (" + gai_strerror(gaiStatus) + ")");
+        configErrors.add(ERR "Invalid host/port " + key + " (" + gai_strerror(gaiStatus) + ")");
         return;
     }
     int sockOpt = 1;
-    if ((_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1)
+    UniqueFd sock(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
+    if (!sock.valid())
     {
-        addConfigError(ERR "Failed to create socket for " + key);
+        configErrors.add(ERR "Failed to create socket for " + key);
         freeaddrinfo(res);
         return;
     }
-    if (fcntl(_socket, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl(sock.get(), F_SETFL, O_NONBLOCK) == -1)
     {
-        addConfigError(ERR "Failed to set socket non-blocking for " + key);
-        close(_socket);
+        configErrors.add(ERR "Failed to set socket non-blocking for " + key);
         freeaddrinfo(res);
         return;
     }
-    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
+    if (setsockopt(sock.get(), SOL_SOCKET, SO_REUSEADDR, &sockOpt, sizeof(sockOpt)))
     {
-        addConfigError(ERR "Failed to set socket options for " + key);
-        close(_socket);
+        configErrors.add(ERR "Failed to set socket options for " + key);
         freeaddrinfo(res);
         return;
     }
     if (res->ai_family == AF_INET6)
-        setsockopt(_socket, IPPROTO_IPV6, IPV6_V6ONLY, &sockOpt, sizeof(sockOpt));
-    if (bind(_socket, res->ai_addr, res->ai_addrlen))
+        setsockopt(sock.get(), IPPROTO_IPV6, IPV6_V6ONLY, &sockOpt, sizeof(sockOpt));
+    if (bind(sock.get(), res->ai_addr, res->ai_addrlen))
     {
-        addConfigError(ERR "Failed to bind " + key + " (" + strerror(errno) + ")");
-        close(_socket);
+        configErrors.add(ERR "Failed to bind " + key + " (" + strerror(errno) + ")");
         freeaddrinfo(res);
         return;
     }
     freeaddrinfo(res);
-    if (listen(_socket, SOMAXCONN))
+    if (listen(sock.get(), SOMAXCONN))
     {
-        addConfigError(ERR "Failed to listen on " + key);
-        close(_socket);
+        configErrors.add(ERR "Failed to listen on " + key);
         return;
     }
-    socketMap[key] = _socket;
-    cout << LISTENING << key + "\n";
+    _socket = sock.get();
+    spdlog::info("Listening on {}", key);
     ep.event.data.fd = _socket;
     ep.event.events = EPOLLIN;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, _socket, &ep.event))
     {
-        addConfigError(ERR "Failed to add " + key + " to epoll");
-        socketMap.erase(key);
-        close(_socket);
+        configErrors.add(ERR "Failed to add " + key + " to epoll");
         return;
     }
+    socketMap[key] = move(sock);
+}
+
+// Called once per SSL-enabled server block, after setupSocket() and
+// after config validation has already confirmed ssl_certificate/
+// ssl_certificate_key were both given. Any failure here (missing
+// file, key doesn't match cert, ...) is reported the same way every
+// other startup-time config problem is - added to configErrors and
+// caught by main.cpp before the server ever calls start().
+void Server::setupSsl()
+{
+    if (!_ssl)
+        return;
+    SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
+    if (!ctx)
+    {
+        configErrors.add(ERR "Failed to create SSL context for " + addrKey());
+        return;
+    }
+    // Every retry of a partial SSL_write() in this project reuses the
+    // exact same std::string::c_str() pointer and length (the offset
+    // only advances after a successful write) - safe without this -
+    // but set it anyway so that invariant is enforced by OpenSSL
+    // itself rather than left as an implicit assumption.
+    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+    if (SSL_CTX_use_certificate_file(ctx, _sslCertPath.c_str(), SSL_FILETYPE_PEM) <= 0
+        || SSL_CTX_use_PrivateKey_file(ctx, _sslKeyPath.c_str(), SSL_FILETYPE_PEM) <= 0
+        || !SSL_CTX_check_private_key(ctx))
+    {
+        configErrors.add(ERR "Failed to load SSL certificate/key for " + addrKey());
+        SSL_CTX_free(ctx);
+        return;
+    }
+    _sslCtx = shared_ptr<SSL_CTX>(ctx, SSL_CTX_free);
 }

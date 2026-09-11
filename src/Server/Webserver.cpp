@@ -2,14 +2,15 @@
 #include "../../inc/Server.hpp"
 #include "../../inc/Request.hpp"
 #include "../../inc/Response.hpp"
+#include "../../inc/Tls.hpp"
 
 Webserver::Webserver()
 {
     if ((ep.epollFd = epoll_create(1)) == -1)
-        throw ServerException(ERR "Failed to create epoll");
+        throw WebservException(ERR "Failed to create epoll");
     _accessLog.open(accessLogPath.c_str(), ios::app);
     if (!_accessLog.is_open())
-        cerr << ERR "Unable to open access log at " << accessLogPath << ", continuing without it\n";
+        spdlog::warn("Unable to open access log at {}, continuing without it", accessLogPath);
 }
 
 void Webserver::reopenAccessLog()
@@ -19,7 +20,7 @@ void Webserver::reopenAccessLog()
     _accessLog.clear();
     _accessLog.open(accessLogPath.c_str(), ios::app);
     if (!_accessLog.is_open())
-        cerr << ERR "Unable to reopen access log at " << accessLogPath << ", continuing without it\n";
+        spdlog::warn("Unable to reopen access log at {}, continuing without it", accessLogPath);
 }
 
 
@@ -33,58 +34,13 @@ Webserver::~Webserver()
     
 }
 
-void Webserver::brackets(string const &file)
-{
-    stringstream ss(file);
-    string buff;
-    stack<string> lim;
-    string tmp;
-    while (getline(ss, buff))
-    {
-        trim(buff);
-        if (buff.empty() || buff[0] == '#')
-            continue;
-        stringstream line(buff);
-        line >> tmp;
-        if (tmp == "server")
-        {
-            _servers.push_back(Server());
-            if (!lim.empty())
-                throw ServerException(ERR "Invalid brackets");
-            line >> tmp;
-            if (tmp != "{")
-                throw ServerException(ERR "Invalid brackets");
-            if (line.get() != EOF)
-                throw ServerException(ERR "Invalid brackets");
-            lim.push(tmp);
-        }
-        else if (tmp == "location")
-        {
-            line >> tmp >> tmp;
-            if (tmp != "{")
-                throw ServerException(ERR "Invalid brackets");
-            if (line.get() != EOF)
-                throw ServerException(ERR "Invalid brackets");
-            lim.push(tmp);
-        }
-        else if (tmp == "}")
-        {
-            if (lim.empty())
-                throw ServerException(ERR "Invalid brackets");
-            lim.pop();
-        }
-    }
-    if (!lim.empty())
-        throw ServerException(ERR "Invalid brackets");
-}
-
 void Webserver::newConnection(map<int, Request> &req, Server &server)
 {
     int clientSock;
     struct sockaddr_storage clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
     if ((clientSock = accept(server.getSocket(), (struct sockaddr *)&clientAddr, &addrLen)) == -1)
-        throw ServerException(ERR "Accept failed");
+        throw WebservException(ERR "Accept failed");
     if (req.size() >= MAX_CONNECTIONS)
     {
         close(clientSock);
@@ -93,14 +49,25 @@ void Webserver::newConnection(map<int, Request> &req, Server &server)
     if (fcntl(clientSock, F_SETFL, O_NONBLOCK) == -1)
     {
         close(clientSock);
-        throw ServerException(ERR "Failed to set client socket non-blocking");
+        throw WebservException(ERR "Failed to set client socket non-blocking");
     }
     ep.event.data.fd = clientSock;
-    ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    if (server.getSsl())
+    {
+        // SSL_accept() can want either direction on its very first
+        // call regardless of which epoll event woke us - register
+        // both until the handshake settles, then drop back to
+        // EPOLLIN-only (see the handshake routing in start()).
+        g_tlsSessions[clientSock] = make_unique<TlsSession>(server.getSslCtx(), clientSock);
+        ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+    }
+    else
+        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
     if (epoll_ctl(ep.epollFd, EPOLL_CTL_ADD, clientSock, &ep.event))
     {
+        g_tlsSessions.erase(clientSock);
         close(clientSock);
-        throw ServerException(ERR "Failed to add client to epoll");
+        throw WebservException(ERR "Failed to add client to epoll");
     }
     req.insert(make_pair(clientSock, Request(&server, clientSock, _servers)));
     req[clientSock]._start = time(NULL);
@@ -150,10 +117,17 @@ void Webserver::logAccess(Request &req, Response *resp)
 void Webserver::closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock)
 {
     map<int, Response>::iterator respIt = resp.find(sock);
+    if (respIt != resp.end() && respIt->second._isCGI)
+    {
+        kill(respIt->second.pid, SIGKILL);
+        waitpid(respIt->second.pid, 0, 0);
+        respIt->second.closeCgiPipes(_cgiFdToClient);
+    }
     logAccess(req[sock], respIt != resp.end() ? &respIt->second : NULL);
     epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
     req.erase(sock);
     resp.erase(sock);
+    g_tlsSessions.erase(sock);
     close(sock);
 }
 
@@ -161,17 +135,22 @@ void Webserver::safeCloseConnection(int sock)
 {
     try
     {
-        map<int, Response>::iterator respIt = _resp.find(sock);
-        if (respIt != _resp.end() && respIt->second._isCGI)
-        {
-            kill(respIt->second.pid, SIGKILL);
-            waitpid(respIt->second.pid, 0, 0);
-        }
         closeConnection(_req, _resp, sock);
     }
     catch (...)
     {
+        map<int, Response>::iterator respIt = _resp.find(sock);
+        if (respIt != _resp.end())
+        {
+            if (respIt->second._isCGI)
+            {
+                kill(respIt->second.pid, SIGKILL);
+                waitpid(respIt->second.pid, 0, 0);
+            }
+            respIt->second.closeCgiPipes(_cgiFdToClient);
+        }
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, sock, NULL);
+        g_tlsSessions.erase(sock);
         close(sock);
         _req.erase(sock);
         _resp.erase(sock);
@@ -193,11 +172,9 @@ bool Webserver::matchServer(map<int, Request> &req, int sock)
 
 void Webserver::stopListening()
 {
-    for (map<string, int>::iterator it = socketMap.begin(); it != socketMap.end(); ++it)
-    {
-        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->second, NULL);
-        close(it->second);
-    }
+    for (map<string, UniqueFd>::iterator it = socketMap.begin(); it != socketMap.end(); ++it)
+        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->second.get(), NULL);
+    socketMap.clear();
 }
 
 void Webserver::start()
@@ -218,15 +195,13 @@ void Webserver::start()
         {
             shutdownStarted = time(NULL);
             stopListening();
-            cout << "\n" YELLOW "Shutting down, waiting for " << _req.size()
-                 << " in-flight connection(s)..." RESET "\n";
+            spdlog::info("Shutting down, waiting for {} in-flight connection(s)...", _req.size());
         }
         if (g_shutdown && _req.empty())
             break;
         if (g_shutdown && shutdownStarted && CLOCKWORK(shutdownStarted) > SHUTDOWN_GRACE)
         {
-            cout << YELLOW "Shutdown grace period elapsed, closing " << _req.size()
-                 << " remaining connection(s)." RESET "\n";
+            spdlog::warn("Shutdown grace period elapsed, closing {} remaining connection(s).", _req.size());
             break;
         }
         int evCount = epoll_wait(ep.epollFd, ep.events, MAX_EVENTS, 1000);
@@ -239,13 +214,49 @@ void Webserver::start()
             {
                 if (matchServer(_req, fd))
                     continue;
+
+                map<int, unique_ptr<TlsSession> >::iterator tlsIt = g_tlsSessions.find(fd);
+                if (tlsIt != g_tlsSessions.end() && !tlsIt->second->isEstablished())
+                {
+                    int rc = tlsIt->second->handshake();
+                    if (rc < 0)
+                        closeConnection(_req, _resp, fd);
+                    else if (rc == 1)
+                    {
+                        ep.event.data.fd = fd;
+                        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                        epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, fd, &ep.event);
+                    }
+                    continue;
+                }
+
+                map<int, int>::iterator cgiIt = _cgiFdToClient.find(fd);
+                if (cgiIt != _cgiFdToClient.end())
+                {
+                    int clientFd = cgiIt->second;
+                    map<int, Response>::iterator respIt = _resp.find(clientFd);
+                    if (respIt == _resp.end())
+                    {
+                        // Orphaned pipe fd (shouldn't normally happen) - drop it defensively.
+                        epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, fd, NULL);
+                        close(fd);
+                        _cgiFdToClient.erase(fd);
+                        continue;
+                    }
+                    if (fd == respIt->second.getCgiStdoutFd())
+                        respIt->second.relayCgiOutput(_req[clientFd], _cgiFdToClient);
+                    else if (fd == respIt->second.getCgiStdinFd())
+                    {
+                        if (ep.events[i].events & (EPOLLHUP | EPOLLERR))
+                            respIt->second.closeCgiStdin(_cgiFdToClient);
+                        else
+                            respIt->second.flushCgiStdin(_cgiFdToClient);
+                    }
+                    continue;
+                }
+
                 if (ep.events[i].events & EPOLLHUP || ep.events[i].events & EPOLLRDHUP || ep.events[i].events & EPOLLERR)
                 {
-                    if (_resp[fd]._isCGI == true)
-                    {
-                        kill(_resp[fd].pid, SIGKILL);
-                        waitpid(_resp[fd].pid, 0, 0);
-                    }
                     closeConnection(_req, _resp, fd);
                     continue;
                 }
@@ -264,7 +275,7 @@ void Webserver::start()
                 }
                 if (ep.events[i].events & EPOLLOUT && _req[fd].getIsRequestFinished())
                 {
-                    _resp[fd].sendResponse(_req[fd], fd);
+                    _resp[fd].sendResponse(_req[fd], fd, _cgiFdToClient);
                     if (_resp[fd].getIsFinished() == true)
                     {
                         if (_resp[fd].getKeepAlive())
@@ -288,13 +299,13 @@ void Webserver::start()
             }
             catch (const exception &e)
             {
-                cerr << ERR "Unhandled exception servicing fd " << fd << ": " << e.what() << "\n";
+                spdlog::error("Unhandled exception servicing fd {}: {}", fd, e.what());
                 if (_req.find(fd) != _req.end())
                     safeCloseConnection(fd);
             }
             catch (...)
             {
-                cerr << ERR "Unknown exception servicing fd " << fd << "\n";
+                spdlog::error("Unknown exception servicing fd {}", fd);
                 if (_req.find(fd) != _req.end())
                     safeCloseConnection(fd);
             }
@@ -316,7 +327,7 @@ void Webserver::start()
             }
             catch (const exception &e)
             {
-                cerr << ERR "Unhandled exception in timeout scan for fd " << it->first << ": " << e.what() << "\n";
+                spdlog::error("Unhandled exception in timeout scan for fd {}: {}", it->first, e.what());
             }
         }
     }
@@ -327,11 +338,13 @@ void Webserver::start()
         {
             kill(respIt->second.pid, SIGKILL);
             waitpid(respIt->second.pid, 0, 0);
+            respIt->second.closeCgiPipes(_cgiFdToClient);
         }
         logAccess(it->second, respIt != _resp.end() ? &respIt->second : NULL);
         epoll_ctl(ep.epollFd, EPOLL_CTL_DEL, it->first, NULL);
+        g_tlsSessions.erase(it->first);
         close(it->first);
     }
     close(ep.epollFd);
-    cout << YELLOW "Shutdown complete." RESET "\n";
+    spdlog::info("Shutdown complete.");
 }

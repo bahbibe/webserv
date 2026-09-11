@@ -1,85 +1,101 @@
-*This project has been created as part of the 42 curriculum by bahbibe, bmakhlou, mahansal.*
-
 # webserv
 
-A HTTP/1.1 server written in C++98, built around a single-threaded
+An HTTP/1.1 (and HTTPS) server in C++20, built around a single-threaded
 `epoll` event loop. Handles static file serving, directory listings,
 file uploads (`multipart/form-data`, chunked and Content-Length
-bodies), CGI (PHP/Python), and an nginx-style config file.
+bodies), CGI (PHP/Python) over real non-blocking pipes, TLS
+termination, and an nginx-style config file.
 
-> **v2 in progress.** The 42 project this was built for was retired
-> from the curriculum, so a from-scratch modernization (C++20, CMake,
-> RAII throughout, `std::filesystem`, structured logging via spdlog,
-> and eventually TLS) is under way on the [`v2`
-> branch](https://github.com/bahbibe/webserv/tree/v2) - unmerged
-> until it's fully tested end to end. `main` (this branch) stays as
-> the C++98/Makefile version described below until then.
+Originally built as a 42 School project (C++98, a restricted function
+whitelist, no external libraries). That project was retired from the
+42 curriculum, which removed those constraints - this is a from-scratch
+modernization: C++20, RAII throughout, `std::filesystem`, structured
+logging, real CGI pipes instead of temp files, and OpenSSL-backed TLS,
+aimed at being genuinely production-worthy rather than just
+subject-compliant.
 
 ## Description
 
 `webserv` implements enough of HTTP/1.1 to serve a real static
-website and CGI applications to a standard web browser or `curl`,
-without any external HTTP or Boost library: raw POSIX sockets, a
-single non-blocking `epoll` instance driving all client I/O (listen,
-read and write alike), and `fork()`/`execve()` for CGI. Its
-behaviour is driven entirely by an nginx-style configuration file
-(server blocks, location blocks, per-route method/redirect/upload/
-CGI/autoindex rules).
+website and CGI applications to a standard web browser or `curl`: raw
+POSIX sockets, a single non-blocking `epoll` instance driving all
+client I/O (listen, read and write alike, plaintext or TLS), and
+`fork()`/`execve()` with non-blocking pipes for CGI. Its behavior is
+driven entirely by an nginx-style configuration file (server blocks,
+location blocks, per-route method/redirect/upload/CGI/autoindex
+rules, and per-server TLS certificates).
 
-## Instructions
+## Build
 
 ```
-make        # build ./webserv
-make re     # rebuild from scratch
-make clean  # remove object files
-make fclean # remove object files and the binary
-make run    # build, run with the default config, then clean
-make leaks  # build and run under valgrind (leak-check=full)
-make test   # build, then run tests/run_tests.sh (end-to-end, needs curl)
+cmake -S . -B build
+cmake --build build -j
 ```
 
-Requires a C++98 compiler (`c++`) and Linux (uses `epoll`). `make test`
-additionally needs `curl` and `python3` on `PATH`.
+Produces `./webserv` at the repo root (not inside `build/`), so every
+existing invocation and script below still works unchanged.
 
-The server reads `conf/mime.types` and the default config at
-`conf/default.conf` relative to the `webserv` binary's own location,
-so it can be run from any working directory as long as those two
-files stay in a `conf/` folder next to the binary.
+Requires:
+
+- A C++20 compiler (tested with GCC 13).
+- CMake 3.16+.
+- OpenSSL development headers (`libssl-dev` on Debian/Ubuntu,
+  `openssl-devel` on Fedora/RHEL) - TLS support links against it.
+- `curl` and `python3` on `PATH` to run the test suite.
+
+[spdlog](https://github.com/gabime/spdlog) is fetched and built
+automatically by CMake (`FetchContent`) - no separate install needed.
+
+```
+rm -rf build && cmake -S . -B build && cmake --build build -j   # clean rebuild
+bash tests/run_tests.sh                                          # end-to-end suite
+valgrind --leak-check=full ./webserv [config_file]               # manual leak check
+```
+
+## Usage
 
 ```
 ./webserv [config_file]
 ```
 
-If no config file is given, `conf/default.conf` is used.
+If no config file is given, `conf/default.conf` is used. The server
+reads `conf/mime.types` and the default config relative to the
+`webserv` binary's own location, so it can be run from any working
+directory as long as those two files stay in a `conf/` folder next to
+the binary.
 
 ## Resources
 
-Classic references consulted while building and hardening this
-project:
+Classic references consulted while building this project:
 
 - RFC 9110 (HTTP Semantics), RFC 9111 (HTTP Caching), RFC 9112
-  (HTTP/1.1) — the current HTTP specification set, used to check
+  (HTTP/1.1) - the current HTTP specification set, used to check
   status code usage, header semantics, and connection/keep-alive
-  behaviour against the letter of the spec.
-- RFC 3875 (The Common Gateway Interface, CGI/1.1) — CGI
+  behavior against the letter of the spec.
+- RFC 3875 (The Common Gateway Interface, CGI/1.1) - CGI
   meta-variable set and request/response framing.
-- [nginx](https://nginx.org/en/docs/) documentation — the `server {}`
+- RFC 8446 (TLS 1.3) and the [OpenSSL](https://www.openssl.org/docs/)
+  API documentation - non-blocking `SSL_accept()`/`SSL_read()`/
+  `SSL_write()` state handling.
+- [nginx](https://nginx.org/en/docs/) documentation - the `server {}`
   / `location {}` config block style this project's config format is
   modeled on.
 
 AI assistance (Claude Code) was used throughout this project's
-hardening pass, under direct human direction with every design
-decision explicitly reviewed and confirmed before implementation:
-end-to-end code review against the 42 subject and the HTTP RFCs
-above; fixing bugs found that way (multipart parsing, path-traversal
+hardening pass and the v2 modernization, under direct human direction
+with every design decision explicitly reviewed and confirmed before
+implementation: end-to-end code review against the HTTP RFCs above;
+fixing bugs found that way (multipart parsing, path-traversal
 validation, epoll busy-spin/timeout handling, memory leaks caught via
-`valgrind`); implementing new features (HEAD method, graceful
-shutdown, access logging, HTTP/1.1 keep-alive, configurable CGI
-interpreter paths, non-blocking sockets with partial-write handling);
-and writing/extending the end-to-end test suite (`tests/run_tests.sh`).
-Every change was built with `-Wall -Wextra -Werror -std=c++98`, run
-through the test suite, and manually verified against a real running
-server (`curl`, `valgrind`) before being committed.
+`valgrind`); implementing features (HEAD method, graceful shutdown,
+access logging, HTTP/1.1 keep-alive, configurable CGI interpreter
+paths, non-blocking sockets with partial-write handling); the v2
+rewrite itself (CMake/C++20 migration, RAII cleanup, structured
+logging, real non-blocking CGI pipes, TLS); and writing/extending the
+end-to-end test suite (`tests/run_tests.sh`). Every change was built
+warning-free (`-Wall -Wextra -Werror`), run through the test suite,
+and manually verified against a real running server (`curl`,
+`openssl s_client`, `valgrind`) before being committed.
 
 ## Access log
 
@@ -152,18 +168,31 @@ server {
         autoindex on
     }
 }
+
+server {
+    host 127.0.0.1
+    listen 8443 ssl
+    ssl_certificate /path/to/cert.pem
+    ssl_certificate_key /path/to/key.pem
+
+    root /path/to/site
+    index index.html
+}
 ```
 
 Multiple `server` blocks are supported (virtual hosting by
 `server_name` on a shared `host:port`, and independent listeners on
-different ports).
+different ports - plaintext and TLS listeners can coexist on
+different ports in the same config).
 
 ### Server-level directives
 
 | Directive | Meaning |
 |---|---|
 | `host` | IPv4 or IPv6 address to bind (`localhost` is normalized to `127.0.0.1`); an IPv6 `host` binds IPv6-only (no dual-stack), so listen on both families with two `server` blocks on the same port |
-| `listen` | Port to bind (defaults to 80 if empty) |
+| `listen <port> [ssl]` | Port to bind (defaults to 80 if empty); the `ssl` keyword makes this a TLS listener - requires `ssl_certificate` and `ssl_certificate_key` |
+| `ssl_certificate` | Path to a PEM certificate file (required if `listen ... ssl`) |
+| `ssl_certificate_key` | Path to the matching PEM private key (required if `listen ... ssl`) |
 | `server_name` | One or more virtual host names |
 | `root` | Filesystem root for this server; must exist |
 | `index` | Default file(s) served for a directory request |
@@ -194,6 +223,10 @@ requests under that path. Additional directives:
   permitted anywhere `GET` is, so `allow` directives don't need to
   list it separately.
 - HTTP/1.1 only (`505` on any other version).
+- TLS 1.2 minimum (TLS 1.3 negotiated where the client supports it),
+  OpenSSL-backed, fully non-blocking through the same `epoll` loop as
+  everything else - not a blocking `SSL_accept()`/`SSL_read()`/
+  `SSL_write()` anywhere.
 - Keep-alive: `GET`/`HEAD`/`DELETE` responses reuse the connection for
   the next request unless the client sends `Connection: close` (no
   pipelining - the client must read each response before sending the
@@ -219,6 +252,13 @@ requests under that path. Additional directives:
 - `DELETE` removes files and, recursively, directories.
 - Path traversal outside a location's configured root is rejected
   with `403`.
+- CGI stdin/stdout run over real non-blocking pipes registered on the
+  same `epoll` instance - no filesystem round-trip. A CGI process that
+  doesn't respond within 5 seconds is killed; if that happens before
+  any output was sent, the client gets a clean `504`, otherwise the
+  partial response is closed cleanly (matches real reverse-proxy
+  behavior - once a 200 stream has started, a crash truncates it
+  rather than retroactively becoming an error page).
 - `SIGINT`/`SIGTERM` (e.g. Ctrl-C) trigger a graceful shutdown: the
   server stops accepting new connections immediately, finishes any
   requests already in flight (up to a 5 second grace period, after
@@ -232,52 +272,41 @@ requests under that path. Additional directives:
 
 ## Known limitations
 
-- Single-process, single-threaded: CGI scripts fork a child but the
-  parent event loop blocks on each `epoll_wait` cycle while polling
-  CGI completion, and a CGI process is killed after 5 seconds.
-- CGI stdio is wired up via `freopen()` onto temp files rather than
-  `pipe()`/`dup2()`, so it doesn't need its own non-blocking I/O
-  handling (temp files are exempt from the single-poll requirement).
-  See "Possible future work" below.
+- Single-process, single-threaded reactor (the same model one nginx
+  worker process uses): CGI forks a child process, but the event loop
+  itself doesn't use additional threads. I/O-bound workloads (sockets,
+  disk, CGI exec) don't benefit much from in-process threading without
+  also reworking file I/O to be async, and multiple worker
+  *processes* (nginx's actual scaling model) would be a separate,
+  larger change.
 - No HTTP pipelining: a client must read each response before sending
   the next request on the same connection (see "Keep-alive" above).
 - `POST` always closes the connection instead of being keep-alive
   eligible, to avoid an unread request body being left on the socket
   after an early-rejection error path.
-- No HTTPS/TLS.
-- A handful of functions used (`remove()`, `realpath()`, `readlink()`,
-  `inet_ntop()`) aren't on the 42 subject's whitelisted external-
-  function list, and there's no whitelisted replacement for file
-  deletion, path resolution, or address formatting at all - these are
-  used anyway since the alternative is no DELETE, no path-traversal
-  check, or no IPv6 client logging.
+- No SNI / multiple TLS certificates on one listener - one certificate
+  per `server` block, matched by which listening socket accepted the
+  connection, not by the TLS ClientHello's server name.
 
 ## Out of scope (by design)
 
 Considered and deliberately not implemented, rather than gaps waiting
 to be filled:
 
-- **HTTP/1.0.** The 42 subject explicitly calls it "a reference
-  point, not enforced." HTTP/1.0 has no persistent connections by
-  default (the inverse of 1.1, which this server already implements
-  correctly with keep-alive), so supporting it would mean a second,
-  parallel connection-handling code path for a strictly older
-  protocol version - real added complexity for zero behavior this
-  server doesn't already cover better under 1.1.
+- **HTTP/1.0.** No persistent connections by default (the inverse of
+  1.1, which this server already implements correctly with
+  keep-alive), so supporting it would mean a second, parallel
+  connection-handling code path for a strictly older protocol
+  version - real added complexity for zero behavior this server
+  doesn't already cover better under 1.1.
 - **HTTP/2 (or HTTP/3/QUIC).** Not a support flag on top of the
   current server - a different wire protocol entirely (binary
   framing, stream multiplexing, header compression, and for HTTP/3 a
-  UDP-based transport instead of TCP). Out of scope for a learning-
-  focused HTTP/1.1 server.
+  UDP-based transport instead of TCP). Out of scope for a
+  learning-focused HTTP/1.1 server.
 
 ## Possible future work
 
-- Rearchitect CGI stdio from `freopen()`-on-temp-files to
-  `pipe()`+`dup2()`, registering the pipe fds on the same shared
-  `epoll` instance non-blocking like every other fd. Bigger than it
-  sounds: temp files are explicitly exempt from the single-poll
-  requirement, pipes aren't, so this touches the event loop, not just
-  `Response::CGI()`.
 - POST keep-alive: needs guaranteed full-body draining on every error
   path (or an explicit drain step before reuse) so a rejected POST
   can't leave unread bytes on a connection about to be reused.
@@ -287,3 +316,8 @@ to be filled:
   servers/locations/sockets without dropping connections) instead of
   requiring a restart - `SIGHUP` currently only reopens the access log
   (see "Log rotation" above), which was deliberately scoped smaller.
+- SNI-based certificate selection for multiple TLS virtual hosts on
+  one listener.
+- Multi-worker-process scaling (nginx's actual model) if throughput
+  ever becomes the bottleneck - a scaling change, not a correctness
+  one, and not part of this project's current scope.

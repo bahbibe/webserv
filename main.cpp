@@ -1,12 +1,12 @@
 #include "inc/Server.hpp"
 #include <climits>
 t_events ep;
-map<string, int> socketMap;
+map<string, UniqueFd> socketMap;
 string confDir;
 string accessLogPath;
 volatile sig_atomic_t g_shutdown = 0;
 volatile sig_atomic_t g_reopenLog = 0;
-vector<string> configErrors;
+ConfigValidator configErrors;
 
 void handleShutdownSignal(int)
 {
@@ -44,32 +44,32 @@ int main(int argc, char const *argv[])
         resolveConfDir();
         ifstream conf;
         (argc == 1) ? conf.open((confDir + DEFAULT_CONF).c_str()) : (argc == 2) ? conf.open(argv[1])
-                                                                     : throw Server::ServerException(USAGE);
+                                                                     : throw WebservException(USAGE);
         if (!conf.is_open())
-            throw Server::ServerException(ERR "Unable to open file");
+            throw WebservException(ERR "Unable to open file");
         string buff;
         getline(conf, buff, '\0');
         Webserver server;
         server.brackets(buff);
         for (size_t i = 0; i < server._servers.size(); i++)
             server[i].parseServer(buff);
-        if (configErrors.empty())
+        if (!configErrors.hasErrors())
         {
             for (size_t i = 0; i < server._servers.size(); i++)
                 server[i].setupSocket();
+            for (size_t i = 0; i < server._servers.size(); i++)
+                server[i].setupSsl();
         }
-        if (!configErrors.empty())
+        if (configErrors.hasErrors())
         {
-            cerr << RED "Config has " << configErrors.size() << " error(s):" RESET "\n";
-            for (size_t i = 0; i < configErrors.size(); i++)
-                cerr << "  " << configErrors[i] << "\n";
+            configErrors.report(cerr);
             return 1;
         }
         server.start();
     }
     catch (const exception &e)
     {
-        cerr << e.what() << '\n';
+        spdlog::critical("{}", e.what());
         return 1;
     }
 }

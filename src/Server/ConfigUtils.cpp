@@ -32,6 +32,8 @@ bool isServerDir(string const &dir)
     directives.push_back("index");
     directives.push_back("autoindex");
     directives.push_back("location");
+    directives.push_back("ssl_certificate");
+    directives.push_back("ssl_certificate_key");
     vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
     if (it != directives.end())
         return true;
@@ -59,12 +61,12 @@ bool isLocationDir(string const &dir)
 
 bool duplicateDirective(t_dir dir)
 {
-    for (size_t i = 0; i < sizeof(t_dir) / sizeof(int); i++)
-    {
-        if (((int *)&dir)[i] > 1)
-            return true;
-    }
-    return false;
+    return dir.host > 1 || dir.listen > 1 || dir.server_name > 1
+        || dir.index > 1 || dir.root > 1 || dir.autoindex > 1
+        || dir.client_max_body_size > 1 || dir.cgi > 1 || dir.upload > 1
+        || dir.upload_path > 1 || dir.cgi_upload_path > 1 || dir.allow > 1
+        || dir.return_code > 1 || dir.server > 1
+        || dir.ssl_certificate > 1 || dir.ssl_certificate_key > 1;
 }
 int resolveHostFamily(string const &host)
 {
@@ -105,10 +107,5 @@ bool isNumber(const string &str)
             return false;
     }
     return true;
-}
-
-void addConfigError(string const &msg)
-{
-    configErrors.push_back(msg);
 }
 

@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <cerrno>
+#include <filesystem>
+#include <system_error>
 
 #define BUFFERSIZE 1024
 using namespace std;
@@ -45,10 +47,21 @@ class Response
         string _cgiPath;
         string _absPath;
         string _cgiHeader;
-        string _randPath;
         time_t start;
 
-        char **env;
+        vector<string> _cgiEnv;
+
+        int _cgiStdoutFd;
+        int _cgiStdinFd;
+        bool _cgiHeaderParsed;
+        bool _cgiReaped;
+        bool _cgiTimedOut;
+        bool _cgiDone;
+        int _cgiExitStatus;
+        string _cgiOutBuf;
+        string _cgiStdinChunk;
+        size_t _cgiStdinChunkOffset;
+        ifstream _cgiStdinFile;
 
         ifstream file;
         stringstream statusString;
@@ -59,18 +72,27 @@ class Response
 
     public:
         Response();
-        ~Response();
-        void sendResponse(Request &request, int fdSocket);
+        void sendResponse(Request &request, int fdSocket, map<int, int> &cgiFdToClient);
         Response(const Response &other);
         Response &operator=(const Response &other);
         bool getIsFinished() const;
         bool getKeepAlive() const;
         size_t getBytesSent() const;
         int getStatusCode() const;
-        void GET(Request &request);
+        void GET();
         void DELETE(string path);
         pid_t pid;
         bool _isCGI;
+
+        // CGI pipe I/O - driven by epoll events on the pipe fds
+        // themselves (see Webserver::start()'s _cgiFdToClient routing),
+        // not by the client socket's events like everything above.
+        int getCgiStdoutFd() const;
+        int getCgiStdinFd() const;
+        bool relayCgiOutput(Request &request, map<int, int> &cgiFdToClient);
+        bool flushCgiStdin(map<int, int> &cgiFdToClient);
+        void closeCgiStdin(map<int, int> &cgiFdToClient);
+        void closeCgiPipes(map<int, int> &cgiFdToClient);
 
     private:
         void initVars(Request &request, int fdSocket);
@@ -89,12 +111,9 @@ class Response
         bool flushHeader();
         bool flushBody();
         bool headerSent() const;
-        void CGI(Request &req);
-        int fillEnv(Request &req);
+        void CGI(Request &req, map<int, int> &cgiFdToClient);
+        void fillEnv(Request &req);
         double fileSize(string path);
-        void freeEnv(char **env);
-        char **dupEnv(char * const *env) const;
-        char *dupCStr(const char *s) const;
 
 
 };

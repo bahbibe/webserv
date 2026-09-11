@@ -1,11 +1,13 @@
 #include "../../inc/Response.hpp"
 
-Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), env(NULL), pid(0), _isCGI(false)
+Response::Response():_flag(false),_isfinished(false),_defaultError(false),_isErrorCode(false),_cgiAutoIndex(false),_isHead(false),_keepAlive(false),_deleteDone(false) ,_fdSocket(0), _statusCode(0), _bytesSent(0), _headerOffset(0), _bodyOffset(0), _pendingBodyLen(0), _cgiStdoutFd(-1), _cgiStdinFd(-1), _cgiHeaderParsed(false), _cgiReaped(false), _cgiTimedOut(false), _cgiDone(false), _cgiExitStatus(0), _cgiStdinChunkOffset(0), pid(0), _isCGI(false)
 {
     saveStatus();
 }
 
-void Response::GET(Request &request)
+// Pure static-file streaming - CGI responses are relayed directly by
+// CGI()/relayCgiOutput() via the pipe fds, never through here.
+void Response::GET()
 {
     signal(SIGPIPE, SIG_IGN);
     if (this->_isHead)
@@ -14,14 +16,6 @@ void Response::GET(Request &request)
             file.close();
         this->_flag = false;
         this->_isfinished = true;
-        if (this->_isCGI == true)
-        {
-            freeEnv(this->env);
-            this->env = NULL;
-            remove(this->_path.c_str());
-            remove(request.directives.cgiFileName.c_str());
-        }
-        this->_isCGI = false;
         return;
     }
     if (this->_bodyOffset < this->_body.length())
@@ -34,14 +28,6 @@ void Response::GET(Request &request)
             file.close();
             this->_flag = false;
             this->_isfinished = true;
-            if (this->_isCGI == true)
-            {
-                freeEnv(this->env);
-                this->env = NULL;
-                remove(this->_path.c_str());
-                remove(request.directives.cgiFileName.c_str());
-            }
-            this->_isCGI = false;
         }
         return;
     }
@@ -69,68 +55,28 @@ void Response::GET(Request &request)
             file.close();
             this->_flag = false;
             this->_isfinished = true;
-            if (this->_isCGI == true)
-            {
-                freeEnv(this->env);
-                this->env = NULL;
-                remove(this->_path.c_str());
-                remove(request.directives.cgiFileName.c_str());
-            }
-            this->_isCGI = false;
         }
     }
 }
 
 void Response::DELETE(string path)
 {
-    if (is_adir(path))
-    {
-        DIR *dir = opendir(path.c_str());
-        if (dir)
-        {
-            struct dirent *dp;
-            while ((dp = readdir(dir)) != NULL)
-            {
-                if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
-                {
-                    string np = path + "/" + string(dp->d_name);
-                    if (dp->d_type == DT_DIR)
-                        DELETE(np);
-                    else
-                    {
-
-                        if (access(np.c_str(), W_OK) != -1)
-                            remove(np.c_str());
-                        else
-                        {
-                            this->_isErrorCode = true;
-                            this->_statusCode = 403;
-                        }
-                    }
-                }
-
-            }
-            closedir(dir);
-            remove(path.c_str());
-        }
-    }
-    else if (access(path.c_str(), F_OK) != -1)
-    {
-        ifstream file;
-        file.open(path.c_str(), ios::binary);
-        if (file.is_open())
-            remove(path.c_str());
-        else
-        {
-            this->_isErrorCode = true;
-            this->_statusCode = 403;
-        }
-        
-    }
-    else
+    namespace fs = std::filesystem;
+    error_code ec;
+    if (!fs::exists(path, ec))
     {
         this->_isErrorCode = true;
         this->_statusCode = 404;
+        return;
+    }
+    if (fs::is_directory(path, ec))
+        fs::remove_all(path, ec);
+    else
+        fs::remove(path, ec);
+    if (ec)
+    {
+        this->_isErrorCode = true;
+        this->_statusCode = 403;
     }
 }
 
@@ -152,7 +98,7 @@ void Response::initVars(Request &request, int fdSocket)
             this->_target = "/";
     }
 }
-void Response::sendResponse(Request &request, int fdSocket)
+void Response::sendResponse(Request &request, int fdSocket, map<int, int> &cgiFdToClient)
 {
     initVars(request, fdSocket);
     if (!this->_header.empty() && !headerSent())
@@ -164,7 +110,7 @@ void Response::sendResponse(Request &request, int fdSocket)
     {
         checkErrors(request);
         if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
     else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
@@ -189,7 +135,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         {
             file.close();
             this->_cgiPath = resolveCgiPath(request);
-            CGI(request);
+            CGI(request, cgiFdToClient);
         }
         else
         {
@@ -197,7 +143,7 @@ void Response::sendResponse(Request &request, int fdSocket)
             this->_statusCode = 404;
             checkErrors(request);
             if (!this->_defaultError && headerSent())
-                GET(request);
+                GET();
         }
     }
     else if ((this->_method == "GET" || this->_method == "HEAD") && !this->_isErrorCode)
@@ -205,9 +151,9 @@ void Response::sendResponse(Request &request, int fdSocket)
         if (!this->_flag)
             checks(request);
         if (this->_cgiAutoIndex)
-            CGI(request);
+            CGI(request, cgiFdToClient);
         else if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
     else if (this->_method == "POST" && !this->_isErrorCode)
     {
@@ -219,9 +165,9 @@ void Response::sendResponse(Request &request, int fdSocket)
                 checkErrors(request);
         }
         if (this->_cgiAutoIndex)
-            CGI(request);
+            CGI(request, cgiFdToClient);
         else if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
     else if (this->_method == "DELETE" && !this->_isErrorCode)
     {
@@ -233,7 +179,7 @@ void Response::sendResponse(Request &request, int fdSocket)
         }
         checkErrors(request);
         if (!this->_defaultError && headerSent())
-            GET(request);
+            GET();
     }
 }
 
@@ -260,137 +206,6 @@ void Response::checks(Request &request)
             this->_flag = true;
         }
     }
-}
-
-void Response::checkAutoInedx(Request &request)
-{
-        for (size_t i = 0; i < request.directives.indexs.size(); i++)
-        {
-            string index = this->_path + request.directives.indexs[i];
-            this->file.open(index.c_str(), ios::in | ios::binary);
-            if (file.is_open())
-            {
-                this->_path = index;
-                if (request.directives.isCgiAllowed && (this->_path.rfind(".php") != string::npos || this->_path.rfind(".py") != string::npos))
-                {
-                    this->_absPath = this->_path;
-                    file.close();
-                    this->_cgiPath = resolveCgiPath(request);
-                   this->_cgiAutoIndex = true;
-                }
-                else
-                {
-                    this->_statusCode = 200;
-                    this->_flag = true;
-                    findeContentType(request);
-                    SendHeader();
-                }
-                return;
-            }
-        }
-    if (request.directives.autoindex)
-        tree_dir();
-    else
-    {
-        request.isErrorCode = 1;
-        this->_statusCode = 403;
-        checkErrors(request);
-    }
-}
-
-void Response::tree_dir()
-{
-    DIR *dir = opendir(this->_path.c_str());
-    if (dir)
-    {
-        this->_contentType = "text/html";
-        SendHeader();
-        if (this->_body.empty())
-        {
-            struct dirent *dp;
-            string name;
-            string body = "<html><head></head><body><ul>";
-            while ((dp = readdir(dir)))
-            {
-                name = dp->d_name;
-                body += "<li><a href='"+ name  +"'>"  + name +"</a></li>";
-            }
-            stringstream ss;
-            ss << hex << body.length();
-            this->_body = ss.str() + "\r\n";
-            this->_body += body + "\r\n";
-            this->_body += "0\r\n\r\n";
-            this->_bodyOffset = 0;
-            this->_pendingBodyLen = body.length();
-        }
-        closedir(dir);
-        if (this->_isHead)
-        {
-            this->_defaultError = true;
-            this->_isfinished = true;
-            this->_flag = false;
-        }
-        else if (flushBody())
-        {
-            this->_bytesSent += this->_pendingBodyLen;
-            this->_defaultError = true;
-            this->_isfinished = true;
-            this->_flag = false;
-        }
-    }
-}
-
-string Response::getErrorPage(Request &request, int statusCode)
-{
-    map<string, string>::iterator it;
-    it = request.directives.errorPages.find(toSting(statusCode));
-    if (it != request.directives.errorPages.end())
-        return it->second;
-    return "default";
-}
-
-void Response::checkErrors(Request &request)
-{
-    this->_path = getErrorPage(request, this->_statusCode);
-    if (!this->_flag)
-        file.open(this->_path.c_str(), ios::in | ios::binary);
-    if (!file.is_open() || this->_path == "default")
-    {
-        this->_contentType = "text/html";
-        SendHeader();
-        if (this->_body.empty())
-        {
-            string error;
-            stringstream ss;
-            map<int, string>::iterator it;
-            it = this->status.find(this->_statusCode);
-            error = templateError(it != this->status.end() ? it->second : "500 Internal Server Error");
-            ss << hex << error.length();
-            this->_body = ss.str() + "\r\n";
-            this->_body += error + "\r\n";
-            this->_body += "0\r\n\r\n";
-            this->_bodyOffset = 0;
-            this->_pendingBodyLen = error.length();
-        }
-        if (this->_isHead)
-        {
-            this->_defaultError = true;
-            this->_isfinished = true;
-        }
-        else if (flushBody())
-        {
-            this->_bytesSent += this->_pendingBodyLen;
-            this->_defaultError = true;
-            this->_isfinished = true;
-        }
-    }
-    else if (file.good() && !this->_flag)
-    {
-        findeContentType(request);
-        SendHeader();
-        this->_flag = true;
-    }
-
 }
 
 int Response::is_adir(string &path)
@@ -456,7 +271,7 @@ bool Response::flushHeader()
 {
     if (this->_headerOffset >= this->_header.length())
         return true;
-    ssize_t n = write(this->_fdSocket, this->_header.c_str() + this->_headerOffset,
+    ssize_t n = tlsAwareWrite(this->_fdSocket, this->_header.c_str() + this->_headerOffset,
                        this->_header.length() - this->_headerOffset);
     if (n <= 0)
         return false;
@@ -468,7 +283,7 @@ bool Response::flushBody()
 {
     if (this->_bodyOffset >= this->_body.length())
         return true;
-    ssize_t n = write(this->_fdSocket, this->_body.c_str() + this->_bodyOffset,
+    ssize_t n = tlsAwareWrite(this->_fdSocket, this->_body.c_str() + this->_bodyOffset,
                        this->_body.length() - this->_bodyOffset);
     if (n <= 0)
         return false;
@@ -479,15 +294,6 @@ bool Response::flushBody()
 bool Response::headerSent() const
 {
     return this->_headerOffset >= this->_header.length();
-}
-
-string Response::templateError(string errorType)
-{
-    string errorBody;
-
-    errorBody = "<html><head><title>"+ errorType +"</title></head>";
-    errorBody += "<body><center><h1>"+ errorType + "</h1></center><hr><center>M0BLACK</center></body>";
-    return errorBody;
 }
 
 void Response::findeContentType(Request &req)
@@ -506,7 +312,7 @@ string Response::toSting(long long mun)
     return ss.str();
 }
 
-Response::Response(const Response &other) : env(NULL)
+Response::Response(const Response &other)
 {
     *this = other;
 }
@@ -537,16 +343,23 @@ Response &Response::operator=(const Response &other)
         this->_cgiPath = other._cgiPath;
         this->_cgiHeader = other._cgiHeader;
         this->pid = other.pid;
-        if (this->env)
-            freeEnv(this->env);
-        this->env = dupEnv(other.env);
+        this->_cgiEnv = other._cgiEnv;
         this->_cgiAutoIndex = other._cgiAutoIndex;
         this->start = other.start;
-        this->_randPath = other._randPath;
         this->_deleteDone = other._deleteDone;
         this->_headerOffset = other._headerOffset;
         this->_bodyOffset = other._bodyOffset;
         this->_pendingBodyLen = other._pendingBodyLen;
+        this->_cgiStdoutFd = other._cgiStdoutFd;
+        this->_cgiStdinFd = other._cgiStdinFd;
+        this->_cgiHeaderParsed = other._cgiHeaderParsed;
+        this->_cgiReaped = other._cgiReaped;
+        this->_cgiTimedOut = other._cgiTimedOut;
+        this->_cgiDone = other._cgiDone;
+        this->_cgiExitStatus = other._cgiExitStatus;
+        this->_cgiOutBuf = other._cgiOutBuf;
+        this->_cgiStdinChunk = other._cgiStdinChunk;
+        this->_cgiStdinChunkOffset = other._cgiStdinChunkOffset;
     }
     return *this;
 }
@@ -571,8 +384,3 @@ int Response::getStatusCode() const
     return this->_statusCode;
 }
 
-Response::~Response()
-{
-    if (this->env)
-        freeEnv(this->env);
-}

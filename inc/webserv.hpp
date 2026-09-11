@@ -17,10 +17,10 @@
 #include <sys/epoll.h>
 #include <netdb.h>
 #include <csignal>
+#include <utility>
+#include <spdlog/spdlog.h>
 #define RED "\033[0;31m"
-#define GREEN "\033[0;32m"
 #define YELLOW "\033[0;33m"
-#define BLUE "\033[0;34m"
 #define RESET "\033[0m"
 #define USAGE YELLOW "Usage: ./webserv [config_file] DEFAULT=NONE" RESET
 #define ERR RED "Error: " RESET
@@ -33,7 +33,6 @@
 #define SHUTDOWN_GRACE 5
 #define CGI_TIMEOUT 5
 #define CLOCKWORK(x) double(time(NULL) - (x))
-#define LISTENING GREEN "Listening on " RESET
 #define BUFFER_SIZE 1024
 #define MAX_HEADER_BYTES 8192
 using namespace std;
@@ -42,6 +41,75 @@ using namespace std;
 class Response;
 class Request;
 class Server;
+
+class WebservException : public exception
+{
+public:
+    explicit WebservException(string const &msg) : _msg(msg) {}
+    const char *what() const noexcept override { return _msg.c_str(); }
+
+private:
+    string _msg;
+};
+
+// Owns exactly one fd (socket, pipe, ...) and close()s it on destruction,
+// on reset(), or when overwritten by move-assignment. Move-only - a raw
+// int cached elsewhere (e.g. Server::_socket) stays a non-owning view.
+class UniqueFd
+{
+public:
+    UniqueFd() noexcept : _fd(-1) {}
+    explicit UniqueFd(int fd) noexcept : _fd(fd) {}
+    ~UniqueFd() { reset(); }
+
+    UniqueFd(UniqueFd const &) = delete;
+    UniqueFd &operator=(UniqueFd const &) = delete;
+
+    UniqueFd(UniqueFd &&other) noexcept : _fd(other._fd) { other._fd = -1; }
+    UniqueFd &operator=(UniqueFd &&other) noexcept
+    {
+        if (this != &other)
+        {
+            reset();
+            _fd = other._fd;
+            other._fd = -1;
+        }
+        return *this;
+    }
+
+    int get() const noexcept { return _fd; }
+    bool valid() const noexcept { return _fd != -1; }
+
+    void reset(int fd = -1) noexcept
+    {
+        if (_fd != -1)
+            close(_fd);
+        _fd = fd;
+    }
+
+private:
+    int _fd;
+};
+
+// Collects every config-validation problem found across the whole
+// file (all server/location blocks) instead of stopping at the
+// first one - see the "report all config errors" behavior.
+class ConfigValidator
+{
+public:
+    void add(string const &msg) { _errors.push_back(msg); }
+    bool hasErrors() const { return !_errors.empty(); }
+    void report(ostream &out) const
+    {
+        out << RED "Config has " << _errors.size() << " error(s):" RESET "\n";
+        for (size_t i = 0; i < _errors.size(); i++)
+            out << "  " << _errors[i] << "\n";
+    }
+
+private:
+    vector<string> _errors;
+};
+
 typedef struct s_direrctive
 {
     int host;
@@ -58,6 +126,8 @@ typedef struct s_direrctive
     int allow;
     int return_code;
     int server;
+    int ssl_certificate;
+    int ssl_certificate_key;
 } t_dir;
 
 typedef struct s_events
@@ -68,21 +138,25 @@ typedef struct s_events
 } t_events;
 
 extern t_events ep;
-extern map<string, int> socketMap;
+extern map<string, UniqueFd> socketMap;
 extern string confDir;
 extern string accessLogPath;
 extern volatile sig_atomic_t g_shutdown;
 extern volatile sig_atomic_t g_reopenLog;
-extern vector<string> configErrors;
+extern ConfigValidator configErrors;
 void handleShutdownSignal(int signum);
 void handleReopenLogSignal(int signum);
-void addConfigError(string const &msg);
 
 class Webserver
 {
 private:
     map<int, Request> _req;
     map<int, Response> _resp;
+    // CGI pipe fd -> owning client socket fd. Populated when Response::CGI()
+    // creates a pipe, consulted by the event loop to route a pipe-fd epoll
+    // event to the right Request/Response pair (pipe events are driven
+    // independently of the client socket's own events).
+    map<int, int> _cgiFdToClient;
     ofstream _accessLog;
     void stopListening();
     void logAccess(Request &req, Response *resp);
@@ -98,15 +172,6 @@ public:
     void newConnection(map<int, Request> &req, Server &server);
     void closeConnection(map<int, Request> &req, map<int, Response> &resp, int sock);
     bool matchServer(map<int, Request> &req, int sock);
-    class ServerException : public exception
-    {
-    private:
-        string _msg;
-    public:
-        ServerException(string const &msg) : _msg(msg) {}
-        virtual ~ServerException() throw() {}
-        virtual const char *what() const throw(){ return _msg.c_str();}
-    };
 };
 
 bool isWhitespace(string const&);
