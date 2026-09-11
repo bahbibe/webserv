@@ -47,7 +47,18 @@ cycle used everywhere else in this project's history.
   2MB download byte-identical at full speed and throttled, keep-alive
   over one TLS connection, mid-download disconnect, plus valgrind
   `--track-fds=yes` showing zero leaked heap/fds across the matrix.
-- **Phase 5 (final hardening pass, README rewrite, merge) — not started.**
+- **Phase 5 (final hardening pass, README rewrite, merge) — regression
+  pass and README done; merge to `main` still pending.** Full sweep
+  against the combined Phase 0-4 codebase: clean rebuild (zero
+  warnings), `tests/run_tests.sh` 26/26, live checks for the
+  header-size cap (400 at 8192 bytes), CGI timeout (504 at ~5.3s),
+  Slowloris-style idle trickle (408 at the 30s total-request-time
+  cap), the 512-connection cap (exactly the 8 over-cap connections
+  closed), and a combined valgrind `--track-fds=yes` pass exercising
+  static/404/CGI/upload/DELETE all over one TLS listener in the same
+  run (0 heap leaks, 0 leaked fds, 0 errors). README rewritten for
+  v2. Merge is the one remaining step - gated on an explicit go-ahead,
+  same as every other phase transition this branch.
 
 ## Decisions made
 
