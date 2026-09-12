@@ -275,10 +275,18 @@ void Webserver::start()
                 }
                 if (ep.events[i].events & EPOLLOUT && _req[fd].getIsRequestFinished())
                 {
-                    _resp[fd].sendResponse(_req[fd], fd, _cgiFdToClient);
-                    if (_resp[fd].getIsFinished() == true)
+                    // Once the response is fully sent, leave it alone even
+                    // if EPOLLOUT keeps firing (an always-writable socket
+                    // fires it every tick) - a POST can still be draining
+                    // its declared body at this point, and re-entering
+                    // sendResponse() after it already reported finished
+                    // would re-run its "close out the stream" branches and
+                    // send a duplicate terminator.
+                    if (!_resp[fd].getIsFinished())
+                        _resp[fd].sendResponse(_req[fd], fd, _cgiFdToClient);
+                    if (_resp[fd].getIsFinished() == true && !_req[fd].isDraining())
                     {
-                        if (_resp[fd].getKeepAlive())
+                        if (_resp[fd].getKeepAlive() && !_req[fd].isDrainTimedOut())
                         {
                             logAccess(_req[fd], &_resp[fd]);
                             Server *srv = _req[fd].getServer();
@@ -323,6 +331,19 @@ void Webserver::start()
                     ep.event.data.fd = it->first;
                     ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
                     epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, it->first, &ep.event);
+                }
+                // A POST draining its leftover declared body after an
+                // early error/success can't get another timeout via the
+                // branch above (isRequestFinished is already true) - if
+                // the client stalls or trickles it out past the same
+                // idle/absolute limits, abort the drain so the response
+                // dispatch above forces a close instead of reusing the
+                // connection with unread bytes still on the wire.
+                else if (it->second.isDraining()
+                    && (CLOCKWORK(it->second._start) > TIMEOUT
+                        || CLOCKWORK(it->second._startTv.tv_sec) > REQUEST_TIMEOUT))
+                {
+                    it->second.abortDraining();
                 }
             }
             catch (const exception &e)

@@ -90,7 +90,13 @@ void Response::initVars(Request &request, int fdSocket)
         this->_path = request.directives.requestedFile;
         this->_method = request.getMethod();
         this->_isHead = (this->_method == "HEAD");
-        this->_keepAlive = (this->_method != "POST") && !request.getWantsClose() && (this->_statusCode != 408);
+        // POST is keep-alive eligible too, but only when its body length
+        // was known up front (Content-Length or multipart, never
+        // chunked) - Request pairs this with its own drain/drain-timeout
+        // state (see Webserver::start()) to make sure the full declared
+        // body is actually off the wire before the connection is reused.
+        this->_keepAlive = !request.getWantsClose() && (this->_statusCode != 408)
+            && (this->_method != "POST" || request.hasKnownBodyLength());
         this->_target = request.directives.requestTarget;
         this->_isErrorCode = request.isErrorCode;
         this->_absPath = request.directives.requestedFile;

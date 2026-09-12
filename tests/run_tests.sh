@@ -227,9 +227,70 @@ fi
 
 post_trace=$(curl -s -v -o /dev/null -d "x=1" "$BASE_URL/" "$BASE_URL/" 2>&1)
 if echo "$post_trace" | grep -qi "Re-using existing connection"; then
-    fail "POST connection was reused (should always close, to avoid body-drain hazards on error paths)"
+    pass "successful Content-Length POST reuses the connection (keep-alive)"
 else
-    pass "POST always closes the connection"
+    fail "successful POST did not reuse the connection"
+fi
+
+chunked_ka_trace=$(curl -s -v -o /dev/null -H "Transfer-Encoding: chunked" --data-binary "@$WORK_DIR/upload_source.txt" "$BASE_URL/" \
+    --next -H "Transfer-Encoding: chunked" --data-binary "@$WORK_DIR/upload_source.txt" "$BASE_URL/" 2>&1)
+if echo "$chunked_ka_trace" | grep -qi "Re-using existing connection"; then
+    fail "chunked POST connection was reused (body length isn't known up front, so it can't be safely drained on an early error - should always close)"
+else
+    pass "chunked POST still always closes the connection"
+fi
+
+# A POST rejected early (413, body too large) still has to have its
+# whole declared Content-Length drained off the wire before the
+# connection can be reused - otherwise the leftover bytes get parsed
+# as the start of the next request. Drive this over a raw socket so
+# the drain and the next request share one real TCP connection,
+# which curl's --next can't guarantee.
+drain_result=$(python3 - "$PORT" <<'PYEOF'
+import socket, sys, time
+
+def recv_one_response(s, timeout=15):
+    s.settimeout(timeout)
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        chunk = s.recv(4096)
+        if not chunk:
+            return buf
+        buf += chunk
+    head, rest = buf.split(b"\r\n\r\n", 1)
+    if b"chunked" not in head.lower():
+        return buf
+    body = rest
+    while b"\r\n0\r\n\r\n" not in body:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        body += chunk
+    return head + b"\r\n\r\n" + body
+
+port = int(sys.argv[1])
+s = socket.create_connection(("127.0.0.1", port), timeout=5)
+total_len = 1100000
+head_chunk = b"x" * 50000
+req = (b"POST / HTTP/1.1\r\nHost: x\r\nContent-Type: application/octet-stream\r\n"
+       b"Content-Length: " + str(total_len).encode() + b"\r\n\r\n") + head_chunk
+s.sendall(req)
+resp1 = recv_one_response(s)
+s.sendall(b"y" * (total_len - len(head_chunk)))
+time.sleep(1)
+s.sendall(b"GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+resp2 = recv_one_response(s)
+s.close()
+print(resp1.split(b"\r\n")[0].decode(errors="replace"))
+print(resp2.split(b"\r\n")[0].decode(errors="replace"))
+PYEOF
+)
+drain_status1=$(echo "$drain_result" | sed -n '1p')
+drain_status2=$(echo "$drain_result" | sed -n '2p')
+if [ "$drain_status1" = "HTTP/1.1 413 Content Too Large" ] && [ "$drain_status2" = "HTTP/1.1 200 OK" ]; then
+    pass "oversized POST body is drained so the reused connection's next request parses cleanly"
+else
+    fail "drain-then-reuse produced status1='$drain_status1' status2='$drain_status2'"
 fi
 
 assert_status "multipart upload -> 201" 201 -F "file=@$WORK_DIR/upload_source.txt" "$BASE_URL/"

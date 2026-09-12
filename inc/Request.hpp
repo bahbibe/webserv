@@ -67,6 +67,22 @@ private:
     string _boundary;
     bool _wantsClose;
 
+    // POST keep-alive support: a POST whose body length is known up
+    // front (Content-Length or multipart, never chunked - see
+    // captureDeclaredBodyLength()) can reuse its connection once its
+    // full declared body has actually been read off the wire, whether
+    // that happens via normal success or via an early error. Draining
+    // covers the gap when an error fires before the client has
+    // finished sending: the rest of the declared body still has to be
+    // read and discarded before the socket is safe to hand to a new
+    // Request object.
+    bool _hasContentLength;
+    size_t _declaredContentLength;
+    size_t _bodyBytesConsumed;
+    bool _isDraining;
+    size_t _drainRemaining;
+    bool _drainTimedOut;
+
     Boundaries _boundaries;
     Chunks _chunks;
     
@@ -98,6 +114,7 @@ private:
     string toLowerCase(const string &str);
     void findServer();
     Location* findLocation();
+    void captureDeclaredBodyLength();
 public:
     int bufferSize;
     //? Server directives
@@ -129,4 +146,8 @@ public:
     void setTimeout();
     bool getWantsClose() const;
     Server* getServer() const;
+    bool isDraining() const;
+    bool isDrainTimedOut() const;
+    bool hasKnownBodyLength() const;
+    void abortDraining();
 };

@@ -38,6 +38,12 @@ Request &Request::operator=(const Request &other)
         this->_isBodyBoundary = other._isBodyBoundary;
         this->_boundary = other._boundary;
         this->_wantsClose = other._wantsClose;
+        this->_hasContentLength = other._hasContentLength;
+        this->_declaredContentLength = other._declaredContentLength;
+        this->_bodyBytesConsumed = other._bodyBytesConsumed;
+        this->_isDraining = other._isDraining;
+        this->_drainRemaining = other._drainRemaining;
+        this->_drainTimedOut = other._drainTimedOut;
 
         this->_headersBuffer = other._headersBuffer;
         this->_requestBuffer = other._requestBuffer;
@@ -60,7 +66,10 @@ Request &Request::operator=(const Request &other)
 
 Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false), _isCgi(false), isErrorCode(false) , _ready(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false),
+    _hasContentLength(false), _declaredContentLength(0), _bodyBytesConsumed(0),
+    _isDraining(false), _drainRemaining(0), _drainTimedOut(false),
+    _isCgi(false), isErrorCode(false) , _ready(false)
 {
     this->_readBytes = 0;
     this->_location = NULL;
@@ -72,7 +81,10 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
 
 Request::Request(Server* server, int socketFd, vector<Server> servers) : _socketFd(socketFd), _lineCount(0), _statusCode(200), _isRequestFinished(false),
     _isFoundCRLF(false),  _outfileIsCreated(false), _bodyLength(0),
-    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false), _isCgi(false), isErrorCode(false), _ready(false)
+    _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false),
+    _hasContentLength(false), _declaredContentLength(0), _bodyBytesConsumed(0),
+    _isDraining(false), _drainRemaining(0), _drainTimedOut(false),
+    _isCgi(false), isErrorCode(false), _ready(false)
 {
     this->servers = servers;
     this->_server = server;
@@ -88,6 +100,18 @@ void Request::readRequest()
 {
     try {
         _start = time(NULL);
+        if (this->_isDraining)
+        {
+            char drainBuf[BUFFER_SIZE];
+            size_t want = min((size_t)BUFFER_SIZE, this->_drainRemaining);
+            ssize_t n = tlsAwareRead(_socketFd, drainBuf, want);
+            if (n <= 0)
+                return;
+            this->_drainRemaining -= (size_t)n;
+            if (this->_drainRemaining == 0)
+                this->_isDraining = false;
+            return;
+        }
         _requestBuffer.clear();
         _readBytes = tlsAwareRead(_socketFd, _buffer, bufferSize);
         if (_readBytes <= 0)
@@ -120,8 +144,31 @@ void Request::parseRequest()
     _requestBuffer.erase(0, _headersBuffer.length() + 4);
     parseRequestLine();
     parseHeaders();
+    captureDeclaredBodyLength();
     _headersBuffer.clear();
     parseBody();
+}
+
+// Read-only extraction, run once headers are parsed and before any
+// validation - just so an error raised anywhere downstream (even one
+// that fires before setContentLength() would otherwise run, like a
+// 405 from setServer()) already knows whether the declared body
+// length is known and how large it is. A malformed Content-Length
+// here is left alone - the real validation and its 400 still happen
+// in setContentLength() when the POST/multipart path actually runs.
+void Request::captureDeclaredBodyLength()
+{
+    if (_headers.find("transfer-encoding") != _headers.end())
+        return;
+    map<string, string>::iterator it = _headers.find("content-length");
+    if (it == _headers.end() || it->second.empty())
+        return;
+    for (size_t i = 0; i < it->second.length(); i++)
+        if (!isdigit(static_cast<unsigned char>(it->second[i])))
+            return;
+    stringstream ss(it->second);
+    ss >> _declaredContentLength;
+    _hasContentLength = true;
 }
 
 void Request::parseRequestLine()
@@ -394,6 +441,7 @@ void Request::parseBodyWithBoundaries()
 
 void Request::parseBody()
 {
+    this->_bodyBytesConsumed += (size_t)this->_readBytes;
     if (!this->_isReadingBody)
         this->validateRequest();
     if (this->_method != "POST")
@@ -443,8 +491,42 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     this->_isRequestFinished = true;
     if (statusCode >= 400)
         this->isErrorCode = true;
+    // Every POST finishes here, success or error. If the client
+    // declared a body length up front (Content-Length or multipart -
+    // never chunked, see captureDeclaredBodyLength()) and hasn't
+    // actually sent all of it yet, the rest is still coming on the
+    // wire and has to be read and discarded before this connection
+    // can be handed to a new Request - otherwise those leftover bytes
+    // get misparsed as the start of the next request.
+    if (this->_method == "POST" && this->_hasContentLength && !this->_wantsClose
+        && statusCode != 408 && this->_declaredContentLength > this->_bodyBytesConsumed)
+    {
+        this->_isDraining = true;
+        this->_drainRemaining = this->_declaredContentLength - this->_bodyBytesConsumed;
+    }
     spdlog::debug("{} {} -> {} ({})", _method, _tmpRequestTarget, statusCode, statusMessage);
     throw  statusCode;
+}
+
+bool Request::isDraining() const
+{
+    return this->_isDraining;
+}
+
+bool Request::isDrainTimedOut() const
+{
+    return this->_drainTimedOut;
+}
+
+bool Request::hasKnownBodyLength() const
+{
+    return this->_hasContentLength;
+}
+
+void Request::abortDraining()
+{
+    this->_isDraining = false;
+    this->_drainTimedOut = true;
 }
 
 void Request::setTimeout()
