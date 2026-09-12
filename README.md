@@ -1,68 +1,119 @@
 # webserv
 
-An HTTP/1.1 (and HTTPS) server in C++20, built around a single-threaded
-`epoll` event loop. Handles static file serving, directory listings,
-file uploads (`multipart/form-data`, chunked and Content-Length
-bodies), CGI (PHP/Python) over real non-blocking pipes, TLS
-termination, and an nginx-style config file.
+*A from-scratch HTTP/1.1 and HTTPS server in C++20 - no framework, no external HTTP library, just epoll and POSIX sockets.*
 
-Originally built as a 42 School project (C++98, a restricted function
+![C++20](https://img.shields.io/badge/C%2B%2B-20-blue)
+![CMake](https://img.shields.io/badge/CMake-3.16%2B-informational)
+![OpenSSL](https://img.shields.io/badge/TLS-OpenSSL%203.0-informational)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+Originally a 42 School project (C++98, a restricted function
 whitelist, no external libraries). That project was retired from the
-42 curriculum, which removed those constraints - this is a from-scratch
-modernization: C++20, RAII throughout, `std::filesystem`, structured
-logging, real CGI pipes instead of temp files, and OpenSSL-backed TLS,
-aimed at being genuinely production-worthy rather than just
-subject-compliant.
+42 curriculum, which lifted those constraints - this is a
+from-scratch modernization: C++20, RAII throughout,
+`std::filesystem`, structured logging, real CGI pipes instead of temp
+files, and OpenSSL-backed TLS.
 
-## Description
+## Quick start
 
-`webserv` implements enough of HTTP/1.1 to serve a real static
-website and CGI applications to a standard web browser or `curl`: raw
-POSIX sockets, a single non-blocking `epoll` instance driving all
-client I/O (listen, read and write alike, plaintext or TLS), and
-`fork()`/`execve()` with non-blocking pipes for CGI. Its behavior is
-driven entirely by an nginx-style configuration file (server blocks,
-location blocks, per-route method/redirect/upload/CGI/autoindex
-rules, and per-server TLS certificates).
+Verified on Ubuntu 24.04, GCC 13, CMake 3.28, OpenSSL 3.0.
 
-## Build
+Needs a C++20 compiler, CMake 3.16+, and OpenSSL development headers
+(`libssl-dev` on Debian/Ubuntu, `openssl-devel` on Fedora/RHEL).
+`curl` and `python3` too if you also want to run the test suite.
+[spdlog](https://github.com/gabime/spdlog) is fetched and built
+automatically by CMake - nothing else to install.
 
 ```
+git clone https://github.com/bahbibe/webserv.git
+cd webserv
 cmake -S . -B build
 cmake --build build -j
+./webserv
 ```
 
-Produces `./webserv` at the repo root (not inside `build/`), so every
-existing invocation and script below still works unchanged.
+That starts the server on `http://127.0.0.1:8090`, using
+`conf/default.conf` and the example site checked into `WWW/`:
 
-Requires:
+```
+curl http://127.0.0.1:8090/                                 # static page
+curl http://127.0.0.1:8090/cgi-bin/info.py                  # live CGI output
+curl -F "file=@somefile.txt" http://127.0.0.1:8090/uploads   # upload a file
+curl http://127.0.0.1:8090/uploads/                          # see it listed
+```
 
-- A C++20 compiler (tested with GCC 13).
-- CMake 3.16+.
-- OpenSSL development headers (`libssl-dev` on Debian/Ubuntu,
-  `openssl-devel` on Fedora/RHEL) - TLS support links against it.
-- `curl` and `python3` on `PATH` to run the test suite.
-
-[spdlog](https://github.com/gabime/spdlog) is fetched and built
-automatically by CMake (`FetchContent`) - no separate install needed.
+To serve your own site: `./webserv path/to/your.conf` - see "Config
+file" below for the full directive reference.
 
 ```
 rm -rf build && cmake -S . -B build && cmake --build build -j   # clean rebuild
-bash tests/run_tests.sh                                          # end-to-end suite
-valgrind --leak-check=full ./webserv [config_file]               # manual leak check
+bash tests/run_tests.sh                                          # end-to-end test suite
+valgrind --leak-check=full ./webserv [config_file]                # manual leak check
 ```
 
-## Usage
+## Architecture
 
-```
-./webserv [config_file]
+Single process, single thread, one `epoll` instance. Every fd that
+could block - client sockets, CGI stdin/stdout pipes, TLS handshakes -
+is registered on it non-blocking; nothing here calls a blocking
+`read()`, `write()`, `accept()`, or `SSL_accept()`.
+
+```mermaid
+flowchart LR
+    client(("client")) -->|connect| listen["listening socket"]
+    listen -->|accept, non-blocking| epoll{{"epoll_wait loop\n(single thread)"}}
+    epoll -->|EPOLLIN: request bytes| req["Request: parse headers / body"]
+    epoll -->|EPOLLOUT: socket writable| resp["Response: send headers / body"]
+    req -->|static file or autoindex| resp
+    req -->|CGI location| fork["fork() + execve()"]
+    fork -->|stdin/stdout pipes, non-blocking| epoll
+    epoll -->|pipe readable| relay["relay CGI output into Response"]
+    epoll -->|pipe writable| feed["feed POST body into CGI stdin"]
+    relay --> resp
+    listen -->|"listen ... ssl"| tls["SSL_accept()\none epoll tick at a time"]
+    tls -->|handshake complete| req
 ```
 
-If no config file is given, `conf/default.conf` is used. The server
-reads `conf/mime.types` and the default config relative to the
-`webserv` binary's own location, so it can be run from any working
-directory as long as those two files stay in a `conf/` folder next to
-the binary.
+## Notable engineering decisions
+
+- **CGI runs over real non-blocking pipes, not temp files.**
+  `pipe()` + `dup2()` + `fork()` + `execve()`, with the pipe fds
+  registered on the *same* epoll instance as client sockets - a CGI
+  response streams as it's produced instead of buffering to disk
+  first. A crash before any output gets a clean 500; a crash after
+  streaming has already started just truncates the response cleanly,
+  matching how a real reverse proxy behaves.
+- **POST keep-alive with byte-exact body draining.** The easy,
+  common shortcut is to just close every POST connection so an
+  unread request body can never corrupt the next request. This
+  tracks raw bytes consumed against the declared `Content-Length`
+  instead, and if an error fires before the client finishes sending,
+  drains exactly the declared remainder off the wire before reusing
+  the connection. Verified over a real socket: an oversized POST gets
+  a `413` with the connection kept alive, and the next request on
+  that same TCP connection still parses cleanly.
+- **TLS runs inside the same non-blocking reactor.**
+  `SSL_accept()`/`SSL_read()`/`SSL_write()` advance one `epoll` tick
+  at a time - no blocking handshake, no separate thread. TLS 1.2
+  minimum, TLS 1.3 negotiated by default.
+- **Config validation collects every error before starting
+  anything.** A bad directive, a missing root path, a port already
+  in use - the whole file is checked and every problem reported
+  together, not just the first one hit.
+
+Some numbers: ~3,900 lines of C++, one thread, 28 end-to-end test
+checks (`tests/run_tests.sh`), zero warnings under
+`-Wall -Wextra -Werror`, and a
+`valgrind --leak-check=full --track-fds=yes` pass across the CGI/TLS/
+upload/keep-alive matrix shows 0 leaked heap allocations and 0 leaked
+file descriptors.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Index page](docs/screenshots/index.png) The example site (`WWW/`), served over plain HTTP. | ![CGI output](docs/screenshots/cgi.png) `/cgi-bin/info.py` - a live CGI script showing its own meta-variables and request headers, run over `fork()`+`execve()` and a real pipe. |
+| ![TLS handshake](docs/screenshots/tls.png) `curl -v` against the same server over TLS - a real TLS 1.3 handshake, negotiated by the non-blocking `epoll`-driven `SSL_accept()`. | |
 
 ## Resources
 
@@ -143,6 +194,18 @@ and exits without starting; nothing listens unless the whole file is
 clean. A malformed `{`/`}` structure is the one thing that still
 aborts immediately, since nothing past that point can be parsed
 reliably.
+
+The config file itself, plus `mime.types`, are found relative to the
+`webserv` binary's own location (via `/proc/self/exe`), so `./webserv
+[config_file]` works from any working directory. Paths *written
+inside* the config - `root`, `upload_path`, `cgi_upload_path`,
+`ssl_certificate` - are not: they resolve relative to whatever
+directory `webserv` was launched from, same as any other program
+reading a relative path. A relative `root` needs to actually resolve
+to something real, which for CGI locations in particular matters:
+the server `chdir()`s into a CGI script's own directory before
+running it, so use an absolute path (or launch from a fixed,
+known directory) if that's a concern.
 
 Config files use an nginx-like block syntax:
 
