@@ -256,6 +256,7 @@ void Request::setServer()
     {
         _defaultLocation.setMethods("GET");
         _defaultLocation.setRoot(_server->getRoot());
+        _defaultLocation.setClientMaxBodySize(_server->getClientMaxBodySize());
         _location = &_defaultLocation;
     }
     vector<string> locationMethods = _location->getMethods();
@@ -276,6 +277,7 @@ void Request::setServer()
     directives.autoindex = _location->getAutoindex();
     directives.serverRoot = _location->getRoot();
     directives.indexs = _location->getIndexs();
+    directives.clientMaxBodySize = _location->getClientMaxBodySize();
     if (directives.indexs.empty())
         directives.indexs = _server->getIndexs();
     if (!directives.serverRoot.empty() && directives.serverRoot[directives.serverRoot.length() - 1] != '/')

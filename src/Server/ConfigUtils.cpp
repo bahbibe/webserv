@@ -53,6 +53,7 @@ bool isLocationDir(string const &dir)
     directives.push_back("upload_path");
     directives.push_back("cgi_upload_path");
     directives.push_back("cgi_path");
+    directives.push_back("client_max_body_size");
     vector<string>::iterator it = find(directives.begin(), directives.end(), dir);
     if (it != directives.end())
         return true;

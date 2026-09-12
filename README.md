@@ -203,8 +203,9 @@ different ports in the same config).
 
 ### Location-level directives
 
-`root`, `index`, `autoindex` override the server-level value for
-requests under that path. Additional directives:
+`root`, `index`, `autoindex`, `client_max_body_size` override the
+server-level value for requests under that path. Additional
+directives:
 
 | Directive | Meaning |
 |---|---|
@@ -310,8 +311,6 @@ to be filled:
 - POST keep-alive: needs guaranteed full-body draining on every error
   path (or an explicit drain step before reuse) so a rejected POST
   can't leave unread bytes on a connection about to be reused.
-- Per-location `client_max_body_size` override (currently server-level
-  only).
 - A full config reload on `SIGHUP` (re-parse the file, rebuild live
   servers/locations/sockets without dropping connections) instead of
   requiring a restart - `SIGHUP` currently only reopens the access log

@@ -14,6 +14,7 @@ private:
     string _cgi_upload_path;
     string _return;
     map<string, string> _cgiPaths;
+    size_t _client_max_body_size;
 
 public:
     t_dir _dir;
@@ -31,8 +32,10 @@ public:
     void setCgiUploadPath(string const &);
     void setReturn(string const &);
     void setCgiPath(string const &ext, string const &interpreter);
+    void setClientMaxBodySize(size_t);
 
     string getReturn() const;
+    size_t getClientMaxBodySize() const;
     vector<string> getMethods() const;
     string getRoot() const;
     bool getUpload() const;
