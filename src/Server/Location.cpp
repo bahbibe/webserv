@@ -22,11 +22,12 @@ Location &Location::operator=(Location const &src)
         _cgi_upload_path = src._cgi_upload_path;
         _return = src._return;
         _cgiPaths = src._cgiPaths;
+        _client_max_body_size = src._client_max_body_size;
     }
     return *this;
 }
 
-Location::Location() : _autoindex(false), _cgi(false), _upload(false)
+Location::Location() : _autoindex(false), _cgi(false), _upload(false), _client_max_body_size(0)
 {
     memset(&_dir, 0, sizeof(_dir));
 }
@@ -39,6 +40,7 @@ void Location::setUploadPath(string const &buff) {_upload_path = buff;}
 void Location::setCgiUploadPath(string const &buff) {_cgi_upload_path = buff;}
 void Location::setCgi(bool flag) {_cgi = flag;}
 void Location::setReturn(string const &buff) {_return = buff;}
+void Location::setClientMaxBodySize(size_t size) {_client_max_body_size = size;}
 void Location::setCgiPath(string const &ext, string const &interpreter) {_cgiPaths[ext] = interpreter;}
 string Location::getReturn() const { return _return; }
 vector<string> Location::getMethods() const { return _methods; }
@@ -50,6 +52,7 @@ string Location::getUploadPath() const { return _upload_path; }
 vector<string> Location::getIndexs() const { return _indexs; }
 string Location::getCgiUploadPath() const { return _cgi_upload_path; }
 map<string, string> Location::getCgiPaths() const { return _cgiPaths; }
+size_t Location::getClientMaxBodySize() const { return _client_max_body_size; }
 
 void Location::setMethods(string const &buff)
 {

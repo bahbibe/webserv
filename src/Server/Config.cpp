@@ -144,6 +144,19 @@ unique_ptr<Location> Server::parseLocation(stringstream &ss)
                 else
                     location->setCgiPath(ext, interpreter);
             }
+            else if (tmp == "client_max_body_size")
+            {
+                location->_dir.client_max_body_size++;
+                line >> tmp;
+                if (!isNumber(tmp))
+                    configErrors.add(ERR "Invalid client_max_body_size: " + tmp);
+                else
+                {
+                    size_t size = 0;
+                    stringstream(tmp) >> size;
+                    location->setClientMaxBodySize(size);
+                }
+            }
         }
         else
             configErrors.add(ERR "Invalid directive in location block: " + tmp);
@@ -154,6 +167,8 @@ unique_ptr<Location> Server::parseLocation(stringstream &ss)
         location->setRoot(_server_root);
     if (location->_dir.autoindex == 0)
         location->setAutoindex(_autoindex);
+    if (location->_dir.client_max_body_size == 0)
+        location->setClientMaxBodySize(getClientMaxBodySize());
     return location;
 }
 void Server::mimeTypes()
