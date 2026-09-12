@@ -228,11 +228,17 @@ directives:
   OpenSSL-backed, fully non-blocking through the same `epoll` loop as
   everything else - not a blocking `SSL_accept()`/`SSL_read()`/
   `SSL_write()` anywhere.
-- Keep-alive: `GET`/`HEAD`/`DELETE` responses reuse the connection for
-  the next request unless the client sends `Connection: close` (no
-  pipelining - the client must read each response before sending the
-  next request). `POST` always closes the connection after
-  responding, regardless of status.
+- Keep-alive: responses reuse the connection for the next request
+  unless the client sends `Connection: close` (no pipelining - the
+  client must read each response before sending the next request).
+  `POST` is keep-alive eligible too, but only when its body length
+  was declared up front (`Content-Length` or `multipart/form-data`):
+  if an error fires before the client finishes sending, the rest of
+  the declared body is read and discarded before the connection is
+  reused, so no leftover bytes get parsed as the start of the next
+  request. A `POST` using `Transfer-Encoding: chunked` always closes
+  instead - its body length isn't known up front, so there's nothing
+  reliable to drain on an early error.
 - Request bodies via `Content-Length`, `Transfer-Encoding: chunked`,
   or `multipart/form-data`.
 - Every response carries a `Date` header (RFC 9110 6.6.1).
@@ -282,9 +288,10 @@ directives:
   larger change.
 - No HTTP pipelining: a client must read each response before sending
   the next request on the same connection (see "Keep-alive" above).
-- `POST` always closes the connection instead of being keep-alive
-  eligible, to avoid an unread request body being left on the socket
-  after an early-rejection error path.
+- A `POST` with `Transfer-Encoding: chunked` always closes the
+  connection instead of being keep-alive eligible - its declared body
+  length isn't known up front, so there's nothing reliable to drain
+  if an error happens partway through (see "Keep-alive" above).
 - No SNI / multiple TLS certificates on one listener - one certificate
   per `server` block, matched by which listening socket accepted the
   connection, not by the TLS ClientHello's server name.
@@ -308,9 +315,6 @@ to be filled:
 
 ## Possible future work
 
-- POST keep-alive: needs guaranteed full-body draining on every error
-  path (or an explicit drain step before reuse) so a rejected POST
-  can't leave unread bytes on a connection about to be reused.
 - A full config reload on `SIGHUP` (re-parse the file, rebuild live
   servers/locations/sockets without dropping connections) instead of
   requiring a restart - `SIGHUP` currently only reopens the access log
