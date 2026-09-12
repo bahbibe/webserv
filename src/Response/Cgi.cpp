@@ -57,6 +57,18 @@ void Response::CGI(Request &req, map<int, int> &cgiFdToClient)
     {
         this->_isCGI = true;
         this->start = time(NULL);
+        // _absPath has to be a real absolute path here, not whatever
+        // the config's `root` happened to be written as: it's used
+        // both as argv[1] to execve() AFTER the child has already
+        // chdir()'d into its own directory below, and as the
+        // SCRIPT_FILENAME CGI meta-variable (which CGI/1.1 requires
+        // to be absolute). A relative `root` would otherwise get
+        // re-resolved against the new cwd and double up on itself.
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        fs::path canonical = fs::canonical(this->_absPath, ec);
+        if (!ec)
+            this->_absPath = canonical.string();
         fillEnv(req);
         cout.flush();
 
