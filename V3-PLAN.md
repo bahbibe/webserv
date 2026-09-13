@@ -57,7 +57,17 @@ supervised-daemon story. This plan gets webserv to the same place.
   to end - the unit is 8 lines of standard boilerplate, low risk, but
   flagged rather than overclaimed. `tests/run_tests.sh` (28/28)
   reproduced the bug once, confirmed the fix once.
-- **Phase 4 (docs, hardening pass) - not started.**
+- **Phase 4 (docs, hardening pass) - done.** README: rewrote the
+  config-resolution paragraph for the real three-tier order, added a
+  "Main-context directives" table and a "Production deployment"
+  section, updated "Known limitations"/"Possible future work" for the
+  root-only systemd service. Five new automated checks in
+  `tests/run_tests.sh` formalize what Phases 1-3 verified by hand
+  where that's actually appropriate (global-directive validation,
+  pid/error_log behavior) - config resolution order and install.sh
+  stay hand-verified in a container, since they need root and real
+  system paths the regular suite can't assume. Full suite: 33/33.
+  **All four phases done - ready to merge, pending final go-ahead.**
 
 ## Rule for this effort
 
