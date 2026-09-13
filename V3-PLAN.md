@@ -36,7 +36,27 @@ supervised-daemon story. This plan gets webserv to the same place.
   genuinely invalid one) and a call-ordering bug in `main.cpp`
   (`error_log` has to be wired up before `setupSocket()`'s own
   logging). Full regression suite (28/28) unaffected.
-- **Phase 3 (install.sh, systemd unit) - not started.**
+- **Phase 3 (install.sh, systemd unit) - done.** `scripts/install.sh`/
+  `uninstall.sh`, `scripts/webserv.service` (`Type=simple`, no
+  double-fork needed), `conf/webserv.conf.install` (FHS paths,
+  absolute throughout). Also closed a gap Phase 1 left (access log
+  path wasn't tier-aware) and, while testing in a container, found
+  and fixed a real bug retroactively affecting Phase 1 too: the
+  system-tier switch ran unconditionally based on whether
+  `/etc/webserv/` existed on disk, independent of whether an explicit
+  config path was given - meaning any machine with that directory
+  present (including this project's own `tests/run_tests.sh`) got its
+  access log and mime.types silently redirected regardless of the
+  config actually in use. Fixed by scoping all system-tier logic to
+  only the code path that runs when no CLI argument was given.
+  Verified in a disposable Ubuntu 24.04 Docker container - full
+  install → auto-resolved config → static/CGI/upload/404 all correct,
+  logs landing in the right place, non-clobber re-install, uninstall
+  prompts. `systemctl start/stop/reload` itself needs a real systemd
+  PID 1 (not available in a plain container) and is not verified end
+  to end - the unit is 8 lines of standard boilerplate, low risk, but
+  flagged rather than overclaimed. `tests/run_tests.sh` (28/28)
+  reproduced the bug once, confirmed the fix once.
 - **Phase 4 (docs, hardening pass) - not started.**
 
 ## Rule for this effort
