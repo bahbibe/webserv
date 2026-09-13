@@ -34,6 +34,27 @@ static void resolveConfDir()
         confDir = execDir + "conf/";
     }
     accessLogPath = execDir + "access.log";
+    // A real system install (see V3-PLAN.md) wins over the binary-
+    // relative conf/ fallback above, whenever /etc/webserv/ actually
+    // exists - checked once here so mime.types resolution and the
+    // auto-selected config path (resolveDefaultConfigPath() below)
+    // agree on the same answer. Every existing invocation of this
+    // project (run from a git checkout, no system install present)
+    // is unaffected - confDir stays exactly the binary-relative path
+    // it always was.
+    if (access(SYSTEM_CONF_DIR, F_OK) == 0)
+        confDir = SYSTEM_CONF_DIR;
+}
+
+// Only used when no config file was given on the command line -
+// prefers the installed system config over the dev/repo-checkout
+// default, matching whichever tier resolveConfDir() picked for
+// confDir above.
+static string resolveDefaultConfigPath()
+{
+    if (confDir == SYSTEM_CONF_DIR)
+        return string(SYSTEM_CONF_DIR) + SYSTEM_CONF_FILE;
+    return confDir + DEFAULT_CONF;
 }
 
 int main(int argc, char const *argv[])
@@ -43,8 +64,8 @@ int main(int argc, char const *argv[])
         srand(time(NULL));
         resolveConfDir();
         ifstream conf;
-        (argc == 1) ? conf.open((confDir + DEFAULT_CONF).c_str()) : (argc == 2) ? conf.open(argv[1])
-                                                                     : throw WebservException(USAGE);
+        (argc == 1) ? conf.open(resolveDefaultConfigPath().c_str()) : (argc == 2) ? conf.open(argv[1])
+                                                                      : throw WebservException(USAGE);
         if (!conf.is_open())
             throw WebservException(ERR "Unable to open file");
         string buff;
