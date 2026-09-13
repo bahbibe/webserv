@@ -25,6 +25,13 @@
 #define USAGE YELLOW "Usage: ./webserv [config_file] DEFAULT=NONE" RESET
 #define ERR RED "Error: " RESET
 #define DEFAULT_CONF "default.conf"
+// Installed-system config location (see V3-PLAN.md "config resolution
+// order"): preferred over the binary-relative conf/ fallback above
+// whenever it exists, for both the auto-selected config file and
+// mime.types (Server::mimeTypes() reads confDir + "mime.types").
+#define SYSTEM_CONF_DIR "/etc/webserv/"
+#define SYSTEM_CONF_FILE "webserv.conf"
+#define SYSTEM_LOG_DIR "/var/log/webserv/"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
 #define MAX_CONNECTIONS 512
@@ -141,11 +148,19 @@ extern t_events ep;
 extern map<string, UniqueFd> socketMap;
 extern string confDir;
 extern string accessLogPath;
+// Main-context directives (see V3-PLAN.md Phase 2): written outside any
+// server {} block, parsed by parseGlobalDirectives(). Empty pidPath/
+// errorLogPath means the directive wasn't given - no pidfile is
+// written, diagnostics stay on the default stdout sink.
+extern string pidPath;
+extern string errorLogPath;
+extern string errorLogLevel;
 extern volatile sig_atomic_t g_shutdown;
 extern volatile sig_atomic_t g_reopenLog;
 extern ConfigValidator configErrors;
 void handleShutdownSignal(int signum);
 void handleReopenLogSignal(int signum);
+void parseGlobalDirectives(string const &file);
 
 class Webserver
 {

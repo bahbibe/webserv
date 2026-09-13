@@ -50,6 +50,69 @@ void Webserver::brackets(string const &file)
         throw WebservException(ERR "Invalid brackets");
 }
 
+// Directives written outside any server {} block - only "pid" and
+// "error_log" right now (see V3-PLAN.md Phase 2). Run after brackets()
+// has already confirmed the file's {}-structure is balanced, so a
+// plain depth counter (rather than re-validating structure here too)
+// is enough to know whether a given line is actually at the top level.
+// Anything unrecognized at depth 0 is a config error - previously a
+// stray top-level line was silently ignored, not even a warning.
+void parseGlobalDirectives(string const &file)
+{
+    stringstream ss(file);
+    string buff;
+    string tmp;
+    int depth = 0;
+    while (getline(ss, buff))
+    {
+        trim(buff);
+        if (buff.empty() || isComment(buff))
+            continue;
+        stringstream line(buff);
+        line >> tmp;
+        if (tmp == "server" || tmp == "location")
+        {
+            depth++;
+            continue;
+        }
+        if (tmp == "}")
+        {
+            if (depth > 0)
+                depth--;
+            continue;
+        }
+        if (depth > 0)
+            continue;
+        if (tmp == "pid")
+        {
+            line >> pidPath;
+            if (pidPath.empty())
+                configErrors.add(ERR "Invalid pid directive (needs a path)");
+        }
+        else if (tmp == "error_log")
+        {
+            line >> errorLogPath;
+            string level;
+            if (line >> level)
+            {
+                static const string validLevels[] = {"trace", "debug", "info", "warn", "error", "critical", "off"};
+                bool found = false;
+                for (size_t i = 0; i < sizeof(validLevels) / sizeof(validLevels[0]); i++)
+                    if (level == validLevels[i])
+                        found = true;
+                if (!found)
+                    configErrors.add(ERR "Invalid error_log level: " + level);
+                else
+                    errorLogLevel = level;
+            }
+            if (errorLogPath.empty())
+                configErrors.add(ERR "Invalid error_log directive (needs a path)");
+        }
+        else
+            configErrors.add(ERR "Invalid directive at top level: " + tmp);
+    }
+}
+
 unique_ptr<Location> Server::parseLocation(stringstream &ss)
 {
     string buff;
@@ -221,6 +284,14 @@ void Server::parseServer(string const &file)
     string buff;
     t_dir dir;
     memset(&dir, 0, sizeof(t_dir));
+    // Content between _pos and this block's own "server {" line isn't
+    // necessarily ours: it can be blank lines, comments, or (since v3)
+    // main-context directives like "pid"/"error_log" sitting before,
+    // between, or after server {} blocks. None of that is this
+    // function's directive set to validate - parseGlobalDirectives()
+    // already owns it - so everything is skipped unconditionally until
+    // this block's own opening line is actually seen.
+    bool entered = false;
     while (getline(ss, buff))
     {
         trim(buff);
@@ -230,7 +301,14 @@ void Server::parseServer(string const &file)
             continue;
         stringstream line(buff);
         line >> buff;
-        if (buff == "server" || buff == "}")
+        if (buff == "server")
+        {
+            entered = true;
+            continue;
+        }
+        if (!entered)
+            continue;
+        if (buff == "}")
             continue;
         if (isServerDir(buff))
         {
