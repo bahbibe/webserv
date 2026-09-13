@@ -38,26 +38,35 @@ static void resolveConfDir()
         confDir = execDir + "conf/";
     }
     accessLogPath = execDir + "access.log";
-    // A real system install (see V3-PLAN.md) wins over the binary-
-    // relative conf/ fallback above, whenever /etc/webserv/ actually
-    // exists - checked once here so mime.types resolution and the
-    // auto-selected config path (resolveDefaultConfigPath() below)
-    // agree on the same answer. Every existing invocation of this
-    // project (run from a git checkout, no system install present)
-    // is unaffected - confDir stays exactly the binary-relative path
-    // it always was.
-    if (access(SYSTEM_CONF_DIR, F_OK) == 0)
-        confDir = SYSTEM_CONF_DIR;
 }
 
-// Only used when no config file was given on the command line -
-// prefers the installed system config over the dev/repo-checkout
-// default, matching whichever tier resolveConfDir() picked for
-// confDir above.
+// Only called when no config file was given on the command line.
+// Prefers a real system install (/etc/webserv/webserv.conf) over the
+// binary-relative conf/default.conf fallback resolveConfDir() already
+// set up - and, only in that case, also redirects confDir (so
+// mime.types resolves from the same place - Server::mimeTypes() reads
+// confDir + "mime.types") and the access log to /var/log/webserv/, a
+// service binary living in /usr/local/sbin having no business writing
+// access.log right next to itself.
+//
+// An explicit CLI config path never triggers any of this, regardless
+// of whether /etc/webserv/ happens to exist on the machine - this
+// function isn't even called in that case (see main() below).
+// "Explicit argument always wins" has to mean everything downstream
+// too, not just which config file gets read: this function used to be
+// folded into resolveConfDir() (called unconditionally), which meant
+// any machine that had /etc/webserv/ lying around - including this
+// project's own tests/run_tests.sh, which always passes an explicit
+// throwaway config - got its access log and mime.types silently
+// redirected there anyway.
 static string resolveDefaultConfigPath()
 {
-    if (confDir == SYSTEM_CONF_DIR)
+    if (access(SYSTEM_CONF_DIR, F_OK) == 0)
+    {
+        confDir = SYSTEM_CONF_DIR;
+        accessLogPath = string(SYSTEM_LOG_DIR) + "access.log";
         return string(SYSTEM_CONF_DIR) + SYSTEM_CONF_FILE;
+    }
     return confDir + DEFAULT_CONF;
 }
 

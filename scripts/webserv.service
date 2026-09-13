@@ -1,0 +1,12 @@
+[Unit]
+Description=webserv HTTP/HTTPS server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/webserv
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -31,6 +31,7 @@
 // mime.types (Server::mimeTypes() reads confDir + "mime.types").
 #define SYSTEM_CONF_DIR "/etc/webserv/"
 #define SYSTEM_CONF_FILE "webserv.conf"
+#define SYSTEM_LOG_DIR "/var/log/webserv/"
 #define DEFAULT_PORT "80"
 #define MAX_EVENTS 1024
 #define MAX_CONNECTIONS 512
