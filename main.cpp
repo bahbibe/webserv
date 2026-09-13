@@ -1,9 +1,13 @@
 #include "inc/Server.hpp"
 #include <climits>
+#include <spdlog/sinks/basic_file_sink.h>
 t_events ep;
 map<string, UniqueFd> socketMap;
 string confDir;
 string accessLogPath;
+string pidPath;
+string errorLogPath;
+string errorLogLevel = "info";
 volatile sig_atomic_t g_shutdown = 0;
 volatile sig_atomic_t g_reopenLog = 0;
 ConfigValidator configErrors;
@@ -57,6 +61,37 @@ static string resolveDefaultConfigPath()
     return confDir + DEFAULT_CONF;
 }
 
+// error_log <path> [level]; replaces the default stdout sink with a
+// file sink, matching nginx's own error_log semantics (it redirects
+// where diagnostics go, it doesn't add a second destination). Left
+// alone (default stdout sink, "info" level) if error_log wasn't given -
+// covers every existing invocation of this project unchanged. A file
+// that can't be opened (bad path, no permission) falls back to the
+// default sink with a warning rather than refusing to start over a
+// logging misconfiguration.
+static void setupLogging()
+{
+    if (errorLogPath.empty())
+        return;
+    try
+    {
+        auto fileSink = make_shared<spdlog::sinks::basic_file_sink_mt>(errorLogPath, false);
+        auto logger = make_shared<spdlog::logger>("webserv", fileSink);
+        spdlog::set_default_logger(logger);
+    }
+    catch (const spdlog::spdlog_ex &e)
+    {
+        spdlog::warn("Unable to open error_log at {}: {} - logging to stdout instead", errorLogPath, e.what());
+        return;
+    }
+    spdlog::set_level(spdlog::level::from_str(errorLogLevel));
+    // spdlog buffers by default; an error log sitting unflushed until
+    // process exit (or worse, lost entirely on a signal that skips
+    // spdlog's atexit flush) defeats the point of having one. Flush
+    // every line as it's written, same as nginx's own error_log.
+    spdlog::flush_on(spdlog::level::trace);
+}
+
 int main(int argc, char const *argv[])
 {
     try
@@ -72,8 +107,16 @@ int main(int argc, char const *argv[])
         getline(conf, buff, '\0');
         Webserver server;
         server.brackets(buff);
+        parseGlobalDirectives(buff);
         for (size_t i = 0; i < server._servers.size(); i++)
             server[i].parseServer(buff);
+        // Before setupSocket() below - it already logs ("Listening on
+        // ...") as each socket binds, so error_log has to be wired up
+        // first for that (and everything else) to land in the right
+        // place. configErrors.report() a few lines down uses cerr
+        // directly, not spdlog, so redirecting spdlog's sink this
+        // early doesn't affect config-validation error reporting.
+        setupLogging();
         if (!configErrors.hasErrors())
         {
             for (size_t i = 0; i < server._servers.size(); i++)
@@ -86,7 +129,17 @@ int main(int argc, char const *argv[])
             configErrors.report(cerr);
             return 1;
         }
+        if (!pidPath.empty())
+        {
+            ofstream pidFile(pidPath.c_str());
+            if (pidFile.is_open())
+                pidFile << getpid() << "\n";
+            else
+                spdlog::warn("Unable to write pid file at {}", pidPath);
+        }
         server.start();
+        if (!pidPath.empty())
+            remove(pidPath.c_str());
     }
     catch (const exception &e)
     {
