@@ -17,6 +17,28 @@ nginx, Apache, and every other real HTTP server ship a filesystem layout
 (`/etc/nginx/`, `/var/www/`, `/var/log/nginx/`), an install path, and a
 supervised-daemon story. This plan gets webserv to the same place.
 
+## Status
+
+- **Phase 1 (config resolution order) - done.** Explicit CLI arg still
+  always wins; `/etc/webserv/webserv.conf` preferred over the
+  binary-relative `conf/default.conf` fallback whenever that directory
+  exists; mime.types follows the same tier. Verified live against a
+  throwaway `/etc/webserv/{webserv.conf,mime.types}` (created and
+  removed by hand): all three precedence levels confirmed, zero
+  regression for the no-system-install case (every existing invocation
+  of this project).
+- **Phase 2 (main-context directives: `pid`, `error_log`) - done.**
+  `parseGlobalDirectives()` recognizes both at depth 0 and reports
+  anything else unrecognized - closes the "stray top-level line was
+  silently ignored" gap. Found and fixed two related bugs in
+  `Server::parseServer()` along the way (misreading a leading global
+  directive as an invalid server-level one; double-reporting a
+  genuinely invalid one) and a call-ordering bug in `main.cpp`
+  (`error_log` has to be wired up before `setupSocket()`'s own
+  logging). Full regression suite (28/28) unaffected.
+- **Phase 3 (install.sh, systemd unit) - not started.**
+- **Phase 4 (docs, hardening pass) - not started.**
+
 ## Rule for this effort
 
 Same model as v2: one dedicated branch (`v3`), phases land as their own
