@@ -317,6 +317,97 @@ if [ -n "$uploaded" ]; then
 fi
 
 
+# --- main-context directives: pid, error_log (v3) ---
+# Config resolution order (/etc/webserv/ vs the binary-relative
+# fallback) and scripts/install.sh are deliberately not covered here -
+# both need real system paths and root, and are tested by hand inside
+# a disposable container instead (see V3-PLAN.md).
+
+cat > "$WORK_DIR/bad-directive.conf" <<EOF
+worker_processes 4;
+
+server {
+    host 127.0.0.1
+    listen 8768
+    root $WORK_DIR/WWW
+    index index.html
+}
+EOF
+bad_directive_output=$("$ROOT_DIR/webserv" "$WORK_DIR/bad-directive.conf" 2>&1)
+bad_directive_status=$?
+if [ "$bad_directive_status" -ne 0 ] && echo "$bad_directive_output" | grep -q "Invalid directive at top level: worker_processes"; then
+    pass "unrecognized top-level directive is a config error, not silently ignored"
+else
+    fail "unrecognized top-level directive not rejected (status=$bad_directive_status output='$bad_directive_output')"
+fi
+
+cat > "$WORK_DIR/bad-errorlog.conf" <<EOF
+error_log $WORK_DIR/bad.log notalevel
+
+server {
+    host 127.0.0.1
+    listen 8768
+    root $WORK_DIR/WWW
+    index index.html
+}
+EOF
+bad_level_output=$("$ROOT_DIR/webserv" "$WORK_DIR/bad-errorlog.conf" 2>&1)
+bad_level_status=$?
+if [ "$bad_level_status" -ne 0 ] && echo "$bad_level_output" | grep -q "Invalid error_log level: notalevel"; then
+    pass "invalid error_log level is a config error"
+else
+    fail "invalid error_log level not rejected (status=$bad_level_status output='$bad_level_output')"
+fi
+
+GLOBAL_PORT=8767
+mkdir -p "$WORK_DIR/logdir"
+cat > "$WORK_DIR/global.conf" <<EOF
+pid $WORK_DIR/webserv.pid
+error_log $WORK_DIR/logdir/error.log debug
+
+server {
+    host 127.0.0.1
+    listen $GLOBAL_PORT
+    root $WORK_DIR/WWW
+    index index.html
+}
+EOF
+
+"$ROOT_DIR/webserv" "$WORK_DIR/global.conf" >"$WORK_DIR/global_stdout.log" 2>&1 &
+GLOBAL_PID=$!
+i=0
+until curl -s -o /dev/null "http://127.0.0.1:$GLOBAL_PORT/" 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -gt 50 ]; then
+        fail "pid/error_log test server never came up"
+        break
+    fi
+    sleep 0.1
+done
+
+pidfile_content=$(cat "$WORK_DIR/webserv.pid" 2>/dev/null)
+if [ "$pidfile_content" = "$GLOBAL_PID" ]; then
+    pass "pid directive writes a pidfile matching the actual process"
+else
+    fail "pid directive: pidfile='$pidfile_content' actual pid='$GLOBAL_PID'"
+fi
+
+curl -s -o /dev/null "http://127.0.0.1:$GLOBAL_PORT/"
+if [ ! -s "$WORK_DIR/global_stdout.log" ] && grep -q "Listening on" "$WORK_DIR/logdir/error.log" 2>/dev/null; then
+    pass "error_log redirects diagnostics to the file, stdout stays clean"
+else
+    fail "error_log did not redirect correctly (stdout: $(cat "$WORK_DIR/global_stdout.log" 2>/dev/null))"
+fi
+
+kill -TERM "$GLOBAL_PID" 2>/dev/null
+wait "$GLOBAL_PID" 2>/dev/null
+if [ ! -e "$WORK_DIR/webserv.pid" ]; then
+    pass "pidfile removed on graceful shutdown"
+else
+    fail "pidfile still present after graceful shutdown"
+fi
+
+
 # --- graceful shutdown (own server instance: this test kills it) ---
 
 SHUTDOWN_PORT=8766

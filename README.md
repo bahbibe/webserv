@@ -195,17 +195,21 @@ clean. A malformed `{`/`}` structure is the one thing that still
 aborts immediately, since nothing past that point can be parsed
 reliably.
 
-The config file itself, plus `mime.types`, are found relative to the
-`webserv` binary's own location (via `/proc/self/exe`), so `./webserv
-[config_file]` works from any working directory. Paths *written
-inside* the config - `root`, `upload_path`, `cgi_upload_path`,
-`ssl_certificate` - are not: they resolve relative to whatever
-directory `webserv` was launched from, same as any other program
-reading a relative path. A relative `root` needs to actually resolve
-to something real, which for CGI locations in particular matters:
-the server `chdir()`s into a CGI script's own directory before
-running it, so use an absolute path (or launch from a fixed,
-known directory) if that's a concern.
+When no config path is given on the command line, three tiers are
+checked in order: an explicit `./webserv path/to/conf` always wins if
+given; otherwise `/etc/webserv/webserv.conf`, if that directory
+exists (a real system install - see "Production deployment" below);
+otherwise `conf/default.conf` relative to the `webserv` binary's own
+location (via `/proc/self/exe`), for running straight out of a git
+checkout. `mime.types` and the access log follow whichever of those
+tiers is actually in play. Paths *written inside* the config - `root`,
+`upload_path`, `cgi_upload_path`, `ssl_certificate` - are not
+tier-aware: they resolve relative to whatever directory `webserv` was
+launched from, same as any other program reading a relative path. A
+relative `root` needs to actually resolve to something real, which
+for CGI locations in particular matters: the server `chdir()`s into a
+CGI script's own directory before running it, so use an absolute path
+(or launch from a fixed, known directory) if that's a concern.
 
 Config files use an nginx-like block syntax:
 
@@ -248,6 +252,20 @@ Multiple `server` blocks are supported (virtual hosting by
 different ports - plaintext and TLS listeners can coexist on
 different ports in the same config).
 
+### Main-context directives
+
+Written outside any `server { ... }` block - before, between, or
+after them, anywhere at the top level:
+
+| Directive | Meaning |
+|---|---|
+| `pid <path>` | Write the process PID there on start, remove it on clean shutdown. Optional - not needed under systemd `Type=simple` (see "Production deployment"), useful for anything else that expects a pidfile. |
+| `error_log <path> [level]` | Redirect diagnostics from the default stdout sink to a file, at the given level (`trace`/`debug`/`info`/`warn`/`error`/`critical`/`off`, default `info`). Replaces the default sink rather than adding a second destination, matching nginx's own `error_log` semantics. |
+
+An unrecognized directive at this level (or anywhere else in the
+file) is a config error, same as inside a `server` block - nothing
+here is silently ignored.
+
 ### Server-level directives
 
 | Directive | Meaning |
@@ -279,6 +297,39 @@ directives:
 | `cgi_upload_path` | Where CGI-received request bodies are staged |
 | `cgi_path <ext> <interpreter>` | Override the interpreter for an extension, e.g. `cgi_path py /usr/local/bin/python3.12`. Repeatable, one line per extension. |
 | `return <url>` | Issue a 301 redirect to `<url>` |
+
+## Production deployment
+
+`scripts/install.sh` (needs root) lays out a real system install and
+a systemd service:
+
+```
+sudo ./scripts/install.sh
+sudo systemctl start webserv
+sudo systemctl enable webserv    # start on boot
+sudo systemctl status webserv
+journalctl -u webserv -f
+```
+
+| Path | What |
+|---|---|
+| `/usr/local/sbin/webserv` | The binary |
+| `/etc/webserv/webserv.conf` | Config (see "Config file" above) - a starting-point template, edit it in place |
+| `/etc/webserv/mime.types` | MIME type table |
+| `/var/www/webserv/` | Document root, populated from this repo's `WWW/` example site on first install |
+| `/var/log/webserv/` | `access.log` and (if `error_log` is set, as the installed template does) `error.log` |
+| `/etc/systemd/system/webserv.service` | `Type=simple` - systemd tracks the process directly, no daemonizing needed |
+
+Re-running `install.sh` (an upgrade) never overwrites an
+already-installed config or site - only a first install populates
+those, so edits made after install are safe across upgrades.
+`scripts/uninstall.sh` removes the binary and the systemd unit,
+prompts before touching `/etc/webserv` or `/var/log/webserv`, and
+leaves `/var/www/webserv` untouched entirely.
+
+`ExecReload=` sends `SIGHUP`, which today only reopens `access.log`
+(see "Log rotation" above) - a full config reload without restarting
+is tracked as future work, see below.
 
 ## Supported HTTP behavior
 
@@ -358,6 +409,13 @@ directives:
 - No SNI / multiple TLS certificates on one listener - one certificate
   per `server` block, matched by which listening socket accepted the
   connection, not by the TLS ClientHello's server name.
+- The installed systemd service runs as root - no `user`/`group`
+  directive to bind a privileged port and then drop privileges before
+  serving requests. `listen 80`/`443` needs root either way; this just
+  means the server keeps running as root afterward too. Deliberately
+  deferred rather than rushed: privilege drop is real security-
+  sensitive code (setuid/setgid ordering mistakes are a classic
+  privilege-escalation bug class) that deserves its own careful pass.
 
 ## Out of scope (by design)
 
@@ -378,6 +436,9 @@ to be filled:
 
 ## Possible future work
 
+- Privilege drop (a `user`/`group` directive): bind a privileged port
+  as root, then `setuid()`/`setgid()` to a configured unprivileged
+  user before the event loop starts - see "Known limitations" above.
 - A full config reload on `SIGHUP` (re-parse the file, rebuild live
   servers/locations/sockets without dropping connections) instead of
   requiring a restart - `SIGHUP` currently only reopens the access log
