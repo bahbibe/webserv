@@ -37,7 +37,15 @@ second.
   14/14 test cases, 42/42 assertions. `src/Globals.cpp` split out of
   `main.cpp` to make this possible; full `tests/run_tests.sh` (33/33)
   confirms that split changed nothing about the running server.
-- **Phase 2 (edge-case tests) - not started.**
+- **Phase 2 (edge-case tests) - done.** 31 test cases; 5 real gaps
+  found and pinned down with `doctest::may_fail(true)` (a quoted
+  argument with a space, `listen`'s trailing comment being read as an
+  invalid `ssl` option, a comment after a variadic directive read as
+  a literal value, CRLF line endings breaking structural parsing
+  outright rather than just corrupting a value, and `user` not
+  existing on this branch yet). Phase 4's acceptance bar: every one
+  of these five passes for real, `may_fail` removed. No production
+  code touched. Full `tests/run_tests.sh` (33/33) unaffected.
 - **Phase 3 (the lexer) - not started.**
 - **Phase 4 (the parser) - not started.**
 - **Phase 5 (regression and docs) - not started.**
