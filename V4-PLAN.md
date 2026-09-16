@@ -27,6 +27,21 @@ one that gets called v4. The privilege-drop plan is v5 now, not
 because it was renumbered arbitrarily, but because it releases
 second.
 
+## Status
+
+- **Phase 1 (test harness) - done.** `webserv_tests` target (doctest
+  via `FetchContent`, dev-only), a shared `ParserFixture` resetting
+  the parser's cross-call global state before each test case, and 14
+  characterization tests against real config shapes - including
+  permanent regressions for the two exact v3 bugs found this session.
+  14/14 test cases, 42/42 assertions. `src/Globals.cpp` split out of
+  `main.cpp` to make this possible; full `tests/run_tests.sh` (33/33)
+  confirms that split changed nothing about the running server.
+- **Phase 2 (edge-case tests) - not started.**
+- **Phase 3 (the lexer) - not started.**
+- **Phase 4 (the parser) - not started.**
+- **Phase 5 (regression and docs) - not started.**
+
 ## Context
 
 The config parser is four separate functions (`Webserver::brackets()`,
