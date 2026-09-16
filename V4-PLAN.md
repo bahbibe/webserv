@@ -46,7 +46,17 @@ second.
   existing on this branch yet). Phase 4's acceptance bar: every one
   of these five passes for real, `may_fail` removed. No production
   code touched. Full `tests/run_tests.sh` (33/33) unaffected.
-- **Phase 3 (the lexer) - not started.**
+- **Phase 3 (the lexer) - done.** One flat token stream (`WORD`/
+  `BRACE_OPEN`/`BRACE_CLOSE`/`END`, each with a line number), comments
+  stripped and all whitespace (`\r` included) treated uniformly at
+  tokenization time - closing four of Phase 2's five documented gaps
+  as a side effect of tokenizing once instead of line-scanning four
+  times (quoted strings, `listen`'s trailing comment, a variadic
+  directive's trailing comment, CRLF). Compiled into the real
+  `webserv` binary already (shared `LIB_SOURCES`), not called from
+  production code yet. 15 new lexer-only tests; `webserv_tests`
+  45/45 test cases, 196/201 assertions passing outright. Full
+  `tests/run_tests.sh` (33/33) unaffected.
 - **Phase 4 (the parser) - not started.**
 - **Phase 5 (regression and docs) - not started.**
 
