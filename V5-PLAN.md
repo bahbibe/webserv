@@ -1,5 +1,27 @@
 # webserv v5 - config parser hardening and real test coverage
 
+## Execution order (reorganized after v4 Phase 1 landed)
+
+v4 started first and its Phase 1 (the `user` directive) is already
+committed on the `v4` branch, parsed and validated against the
+*current* parser. This plan supersedes that code, not just tests it:
+v4's remaining phases (the actual privilege drop, and everything
+`install.sh`/testing built on top of a `user`/`group` config value)
+are real, security-sensitive work that shouldn't be built against a
+parser already known to be fragile, and redoing v5's rewrite *after*
+v4 fully lands would mean reconciling a rewrite against
+privilege-drop-adjacent code instead of against plain directive
+parsing. So: v5 lands first (branched from `main`, independent of the
+still-unmerged `v4` branch), absorbing `user`-directive recognition
+into the new parser directly (see Phase 4) rather than treating it as
+already-solved. `v4` resumes after v5 merges, rebased onto the new
+parser - its own Phase 1 commit becomes superseded, not wasted: the
+`getpwnam()`/`getgrnam()` validation logic it wrote carries over
+directly (see Phase 4), only the line-scanning it was sitting in gets
+replaced. Version numbers stay as originally assigned (v4 is still
+"privilege drop," v5 is still "parser hardening") - only the order
+they actually get *built* in changed.
+
 ## Context
 
 The config parser is four separate functions (`Webserver::brackets()`,
@@ -131,10 +153,16 @@ then has to keep true):
   (`error_page`, `cgi_path`), a comment appended after a directive on
   the same line (`listen 8080 # comment`) vs. a comment on its own
   line, tabs vs. spaces, trailing whitespace, `\r\n` line endings.
-  Also v3/v4's own directives: `pid`/`error_log`/`user` appearing
-  before, between, and after `server` blocks (already manually
-  verified once in v3/v4 - now pinned down as permanent, fast tests
-  instead of one-off manual checks).
+  Also every main-context directive: `pid`/`error_log` (shipped in
+  v3) and `user` (parsed and validated on the still-unmerged `v4`
+  branch, ahead of this plan) appearing before, between, and after
+  `server` blocks. `pid`/`error_log` were already manually verified
+  once in v3 - now pinned down as permanent, fast tests instead of
+  one-off manual checks. `user`'s test cases are written against the
+  behavior `v4`'s Phase 1 already established (a real account with
+  and without a group, a nonexistent account, a real account with a
+  nonexistent group), since Phase 4 below is what actually carries
+  that directive's recognition into the new parser.
 - File-level edge cases: an empty file, a file that's only comments/
   whitespace, an extremely long single line, non-ASCII bytes in a
   path value.
@@ -169,6 +197,14 @@ then has to keep true):
   done until all of them pass against the *new* parser, matching
   intended behavior (including the ones that were failing on purpose
   against the old one).
+- Carries all three main-context directives (`pid`, `error_log`,
+  `user`) into the new architecture as one coherent piece of main-
+  context handling, instead of `user` being bolted onto the old
+  parser the way `pid`/`error_log` briefly were in v3. The `user`
+  directive's actual validation (`getpwnam()`/`getgrnam()`) is
+  ported over from `v4`'s Phase 1 essentially unchanged - that logic
+  was already correct and already tested, only the surrounding
+  line-scanning it was sitting in is what's being replaced.
 
 ### Phase 5 - regression and docs
 
