@@ -57,7 +57,25 @@ second.
   production code yet. 15 new lexer-only tests; `webserv_tests`
   45/45 test cases, 196/201 assertions passing outright. Full
   `tests/run_tests.sh` (33/33) unaffected.
-- **Phase 4 (the parser) - not started.**
+- **Phase 4 (the parser) - done.** `ConfigParser` (`inc/ConfigParser.hpp`,
+  `src/Server/ConfigParser.cpp`) replaces `Webserver::brackets()`,
+  `parseGlobalDirectives()`, `Server::parseServer()`,
+  `Server::parseLocation()`, and the static `Server::_pos` cross-call
+  hack outright - one recursive-descent parser over the Phase 3
+  Lexer's token stream, grouping a directive's value tokens by shared
+  source line to preserve the old "one directive per line" semantics.
+  Directive validation itself moved to `Server::applyServerDirective`/
+  `finalizeServerDirectives`/`addLocation` and `Location::
+  applyLocationDirective`/`finalizeLocationDirectives`, called from
+  the parser rather than reimplemented in it. Closed the fifth and
+  last of Phase 2's documented gaps (the `user` directive) by handling
+  it as an ordinary main-context directive; the other four were
+  already closed by the Lexer in Phase 3. All five `may_fail` markers
+  removed, both parser test files rewritten against the new API.
+  `main.cpp` now calls `ConfigParser(buff).parse(server);` - this is
+  what production code actually runs. `webserv_tests` 45/45 test
+  cases, 207/207 assertions, all passing outright. Full
+  `tests/run_tests.sh` (33/33) unaffected.
 - **Phase 5 (regression and docs) - not started.**
 
 ## Context
