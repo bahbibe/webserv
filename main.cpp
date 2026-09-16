@@ -1,26 +1,9 @@
 #include "inc/Server.hpp"
 #include <climits>
 #include <spdlog/sinks/basic_file_sink.h>
-t_events ep;
-map<string, UniqueFd> socketMap;
-string confDir;
-string accessLogPath;
-string pidPath;
-string errorLogPath;
-string errorLogLevel = "info";
-volatile sig_atomic_t g_shutdown = 0;
-volatile sig_atomic_t g_reopenLog = 0;
-ConfigValidator configErrors;
 
-void handleShutdownSignal(int)
-{
-    g_shutdown = 1;
-}
-
-void handleReopenLogSignal(int)
-{
-    g_reopenLog = 1;
-}
+// Global process state (ep, socketMap, confDir, g_shutdown, ...) lives
+// in src/Globals.cpp, not here - see that file for why.
 
 static void resolveConfDir()
 {

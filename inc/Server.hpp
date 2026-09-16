@@ -56,4 +56,13 @@ public:
     map<string, string> getTypes() const;
     bool getSsl() const;
     SSL_CTX *getSslCtx() const;
+    // Test-only scaffolding (see V4-PLAN.md Phase 1): _pos tracks where
+    // the last parseServer() call left off in the file, shared across
+    // every Server instance via the static, so unit tests parsing a
+    // fresh config string need to reset it back to the start first -
+    // production code never needs this, since main.cpp only ever
+    // parses one file per process lifetime. Goes away entirely once
+    // Phase 4 replaces _pos with a real parser that doesn't need
+    // static cross-call position tracking at all.
+    static void resetParsePositionForTests();
 };

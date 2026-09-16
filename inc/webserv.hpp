@@ -106,6 +106,14 @@ class ConfigValidator
 public:
     void add(string const &msg) { _errors.push_back(msg); }
     bool hasErrors() const { return !_errors.empty(); }
+    size_t errorCount() const { return _errors.size(); }
+    vector<string> const &errors() const { return _errors; }
+    // Never called by the running server (one config is validated
+    // once per process lifetime) - exists so unit tests can start each
+    // parser test case from a clean slate against the shared global
+    // configErrors, instead of errors accumulating across every test
+    // that's run before it in the same test binary.
+    void clear() { _errors.clear(); }
     void report(ostream &out) const
     {
         out << RED "Config has " << _errors.size() << " error(s):" RESET "\n";

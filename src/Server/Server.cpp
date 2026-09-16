@@ -7,6 +7,11 @@ Server::Server() : _autoindex(false), _ssl(false)
     memset(&_dir, 0, sizeof(_dir));
 }
 
+void Server::resetParsePositionForTests()
+{
+    _pos = 0;
+}
+
 
 Server::Server(Server const &src)
 {
