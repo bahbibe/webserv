@@ -92,14 +92,6 @@ bool isComment(const string &str)
     return (it != str.end() && *it == '#');
 }
 
-bool isBrackets(const string &str)
-{
-    string::const_iterator it = str.begin();
-    while (it != str.end() && isspace(*it))
-        ++it;
-    return (it != str.end() && (*it == '{' || *it == '}'));
-}
-
 bool isNumber(const string &str)
 {
     for (string::const_iterator it = str.begin(); it != str.end(); ++it)

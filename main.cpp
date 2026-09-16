@@ -1,4 +1,5 @@
 #include "inc/Server.hpp"
+#include "inc/ConfigParser.hpp"
 #include <climits>
 #include <spdlog/sinks/basic_file_sink.h>
 
@@ -98,10 +99,7 @@ int main(int argc, char const *argv[])
         string buff;
         getline(conf, buff, '\0');
         Webserver server;
-        server.brackets(buff);
-        parseGlobalDirectives(buff);
-        for (size_t i = 0; i < server._servers.size(); i++)
-            server[i].parseServer(buff);
+        ConfigParser(buff).parse(server);
         // Before setupSocket() below - it already logs ("Listening on
         // ...") as each socket binds, so error_log has to be wired up
         // first for that (and everything else) to land in the right

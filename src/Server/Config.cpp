@@ -1,239 +1,238 @@
 #include "../../inc/webserv.hpp"
 #include "../../inc/Server.hpp"
 
-// Pre-scans the whole config file for balanced server{}/location{}
-// nesting and records one Server per "server {" block found - the
-// pass that has to run before Server::parseServer()/parseLocation()
-// can fill in any of those blocks' directives.
-void Webserver::brackets(string const &file)
+// Directive application for one server block (see V4-PLAN.md Phase 4:
+// ConfigParser owns tokenizing and block structure, recognizes the
+// directive name via isServerDir(), and hands the name plus every
+// value token sharing its source line here - "location" is handled
+// entirely by ConfigParser itself, since it's structural, not a
+// value-only directive, and never reaches this function). Same
+// per-directive validation this project has always had, just reading
+// from an already-tokenized vector instead of doing its own text
+// scanning to get there.
+void Server::applyServerDirective(string const &name, vector<string> const &values, t_dir &dir)
 {
-    stringstream ss(file);
-    string buff;
-    stack<string> lim;
-    string tmp;
-    while (getline(ss, buff))
+    size_t idx = 0;
+    auto next = [&]() -> string { return idx < values.size() ? values[idx++] : string(); };
+
+    if (name == "host")
     {
-        trim(buff);
-        if (buff.empty() || buff[0] == '#')
-            continue;
-        stringstream line(buff);
-        line >> tmp;
-        if (tmp == "server")
+        dir.host++;
+        _host = next();
+        if (_host == "localhost")
+            _host = "127.0.0.1";
+        else if (resolveHostFamily(_host) == -1)
+            configErrors.add(ERR "Invalid host: " + _host);
+    }
+    else if (name == "listen")
+    {
+        dir.listen++;
+        _port = next();
+        if (_port.empty())
+            _port = DEFAULT_PORT;
+        if (!isNumber(_port))
+            configErrors.add(ERR "Invalid port: " + _port);
+        if (idx < values.size())
         {
-            _servers.push_back(Server());
-            if (!lim.empty())
-                throw WebservException(ERR "Invalid brackets");
-            line >> tmp;
-            if (tmp != "{")
-                throw WebservException(ERR "Invalid brackets");
-            if (line.get() != EOF)
-                throw WebservException(ERR "Invalid brackets");
-            lim.push(tmp);
-        }
-        else if (tmp == "location")
-        {
-            line >> tmp >> tmp;
-            if (tmp != "{")
-                throw WebservException(ERR "Invalid brackets");
-            if (line.get() != EOF)
-                throw WebservException(ERR "Invalid brackets");
-            lim.push(tmp);
-        }
-        else if (tmp == "}")
-        {
-            if (lim.empty())
-                throw WebservException(ERR "Invalid brackets");
-            lim.pop();
+            string opt = next();
+            if (opt == "ssl")
+                _ssl = true;
+            else
+                configErrors.add(ERR "Invalid listen option: " + opt);
         }
     }
-    if (!lim.empty())
-        throw WebservException(ERR "Invalid brackets");
-}
-
-// Directives written outside any server {} block - only "pid" and
-// "error_log" right now (see V3-PLAN.md Phase 2). Run after brackets()
-// has already confirmed the file's {}-structure is balanced, so a
-// plain depth counter (rather than re-validating structure here too)
-// is enough to know whether a given line is actually at the top level.
-// Anything unrecognized at depth 0 is a config error - previously a
-// stray top-level line was silently ignored, not even a warning.
-void parseGlobalDirectives(string const &file)
-{
-    stringstream ss(file);
-    string buff;
-    string tmp;
-    int depth = 0;
-    while (getline(ss, buff))
+    else if (name == "ssl_certificate")
     {
-        trim(buff);
-        if (buff.empty() || isComment(buff))
-            continue;
-        stringstream line(buff);
-        line >> tmp;
-        if (tmp == "server" || tmp == "location")
-        {
-            depth++;
-            continue;
-        }
-        if (tmp == "}")
-        {
-            if (depth > 0)
-                depth--;
-            continue;
-        }
-        if (depth > 0)
-            continue;
-        if (tmp == "pid")
-        {
-            line >> pidPath;
-            if (pidPath.empty())
-                configErrors.add(ERR "Invalid pid directive (needs a path)");
-        }
-        else if (tmp == "error_log")
-        {
-            line >> errorLogPath;
-            string level;
-            if (line >> level)
-            {
-                static const string validLevels[] = {"trace", "debug", "info", "warn", "error", "critical", "off"};
-                bool found = false;
-                for (size_t i = 0; i < sizeof(validLevels) / sizeof(validLevels[0]); i++)
-                    if (level == validLevels[i])
-                        found = true;
-                if (!found)
-                    configErrors.add(ERR "Invalid error_log level: " + level);
-                else
-                    errorLogLevel = level;
-            }
-            if (errorLogPath.empty())
-                configErrors.add(ERR "Invalid error_log directive (needs a path)");
-        }
+        dir.ssl_certificate++;
+        _sslCertPath = next();
+        if (access(_sslCertPath.c_str(), F_OK) == -1)
+            configErrors.add(ERR + _sslCertPath + ": No such file or directory");
+    }
+    else if (name == "ssl_certificate_key")
+    {
+        dir.ssl_certificate_key++;
+        _sslKeyPath = next();
+        if (access(_sslKeyPath.c_str(), F_OK) == -1)
+            configErrors.add(ERR + _sslKeyPath + ": No such file or directory");
+    }
+    else if (name == "server_name")
+    {
+        dir.server_name++;
+        while (idx < values.size())
+            _server_names.push_back(next());
+    }
+    else if (name == "error_page")
+    {
+        string code = next();
+        string path = next();
+        setErrorCodes(code, path);
+    }
+    else if (name == "index")
+    {
+        dir.index++;
+        while (idx < values.size())
+            _indexs.push_back(next());
+    }
+    else if (name == "root")
+    {
+        dir.root++;
+        _server_root = next();
+        if (access(_server_root.c_str(), F_OK) == -1)
+            configErrors.add(ERR + _server_root + ": No such file or directory");
+    }
+    else if (name == "autoindex")
+    {
+        dir.autoindex++;
+        string v = next();
+        if (v == "on")
+            _autoindex = true;
+        else if (v == "off")
+            _autoindex = false;
         else
-            configErrors.add(ERR "Invalid directive at top level: " + tmp);
+            configErrors.add(ERR "Invalid autoindex value: " + v);
+    }
+    else if (name == "client_max_body_size")
+    {
+        dir.client_max_body_size++;
+        _client_max_body_size = next();
+        if (!isNumber(_client_max_body_size))
+            configErrors.add(ERR "Invalid client_max_body_size: " + _client_max_body_size);
     }
 }
 
-unique_ptr<Location> Server::parseLocation(stringstream &ss)
+// Runs once, right after a server block's closing brace - the
+// duplicate-directive check and the "listen ... ssl needs both cert
+// files" check both need the whole block seen first.
+void Server::finalizeServerDirectives(t_dir const &dir)
 {
-    string buff;
-    string tmp;
-    unique_ptr<Location> location = make_unique<Location>();
-    while (getline(ss, buff))
+    if (duplicateDirective(dir))
+        configErrors.add(ERR "Duplicate directive in server " + (_host.empty() ? string("(unknown host)") : _host));
+    if (_ssl && (_sslCertPath.empty() || _sslKeyPath.empty()))
+        configErrors.add(ERR "listen ... ssl needs both ssl_certificate and ssl_certificate_key");
+}
+
+void Server::addLocation(string const &path, unique_ptr<Location> location)
+{
+    _locations[path] = move(location);
+}
+
+// Directive application for one location block - mirrors
+// applyServerDirective() above exactly. An invalid root path is
+// recorded as an error but not immediately replaced with the
+// server's own root here (unlike the pre-Phase-4 code, which did
+// that inline): finalizeLocationDirectives() below already falls
+// back to the server's root whenever this location's own root is
+// still empty, which covers "never given" and "given but invalid"
+// the same way, so there's no need for two separate fallback sites
+// doing the same thing.
+void Location::applyLocationDirective(string const &name, vector<string> const &values)
+{
+    size_t idx = 0;
+    auto next = [&]() -> string { return idx < values.size() ? values[idx++] : string(); };
+
+    if (name == "allow")
     {
-        trim(buff);
-        if (isBrackets(buff) && buff.find("}") != string::npos)
-            break;
-        if (buff.empty() || isWhitespace(buff) || isComment(buff) || isBrackets(buff))
-            continue;
-        stringstream line(buff);
-        line >> tmp;
-        if (isLocationDir(tmp))
-        {
-            if (tmp == "allow")
-            {
-                location->_dir.allow++;
-                while (line >> tmp)
-                    location->setMethods(tmp);
-            }
-            else if (tmp == "index")
-            {
-                location->_dir.index++;
-                while (line >> tmp)
-                    location->setIndexs(tmp);
-            }
-            else if (tmp == "root")
-            {
-                location->_dir.root++;
-                line >> tmp;
-                if (access(tmp.c_str(), F_OK) == -1)
-                {
-                    configErrors.add(ERR + tmp + ": No such file or directory");
-                    location->setRoot(_server_root);
-                }
-                else
-                    location->setRoot(tmp);
-            }
-            else if (tmp == "autoindex")
-            {
-                location->_dir.autoindex++;
-                line >> tmp;
-                if (tmp == "on")
-                    location->setAutoindex(true);
-                else if (tmp != "off")
-                    configErrors.add(ERR "Invalid autoindex value: " + tmp);
-            }
-            else if (tmp == "cgi")
-            {
-                location->_dir.cgi++;
-                line >> tmp;
-                if (tmp == "on")
-                    location->setCgi(true);
-                else if (tmp != "off")
-                    configErrors.add(ERR "Invalid cgi value: " + tmp);
-            }
-            else if (tmp == "upload")
-            {
-                location->_dir.upload++;
-                line >> tmp;
-                if (tmp == "on")
-                    location->setUpload(true);
-                else if (tmp != "off")
-                    configErrors.add(ERR "Invalid upload value: " + tmp);
-            }
-            else if (tmp == "upload_path")
-            {
-                location->_dir.upload_path++;
-                line >> tmp;
-                location->setUploadPath(tmp);
-            }
-            else if (tmp == "cgi_upload_path")
-            {
-                location->_dir.cgi_upload_path++;
-                line >> tmp;
-                location->setCgiUploadPath(tmp);
-            }
-            else if (tmp == "return")
-            {
-                location->_dir.return_code++;
-                line >> tmp;
-                location->setReturn(tmp);
-            }
-            else if (tmp == "cgi_path")
-            {
-                string ext, interpreter;
-                line >> ext >> interpreter;
-                if (ext.empty() || interpreter.empty())
-                    configErrors.add(ERR "Invalid cgi_path directive (needs an extension and an interpreter)");
-                else
-                    location->setCgiPath(ext, interpreter);
-            }
-            else if (tmp == "client_max_body_size")
-            {
-                location->_dir.client_max_body_size++;
-                line >> tmp;
-                if (!isNumber(tmp))
-                    configErrors.add(ERR "Invalid client_max_body_size: " + tmp);
-                else
-                {
-                    size_t size = 0;
-                    stringstream(tmp) >> size;
-                    location->setClientMaxBodySize(size);
-                }
-            }
-        }
-        else
-            configErrors.add(ERR "Invalid directive in location block: " + tmp);
+        _dir.allow++;
+        while (idx < values.size())
+            setMethods(next());
     }
-    if (duplicateDirective(location->_dir))
+    else if (name == "index")
+    {
+        _dir.index++;
+        while (idx < values.size())
+            setIndexs(next());
+    }
+    else if (name == "root")
+    {
+        _dir.root++;
+        string path = next();
+        if (access(path.c_str(), F_OK) == -1)
+            configErrors.add(ERR + path + ": No such file or directory");
+        else
+            setRoot(path);
+    }
+    else if (name == "autoindex")
+    {
+        _dir.autoindex++;
+        string v = next();
+        if (v == "on")
+            setAutoindex(true);
+        else if (v != "off")
+            configErrors.add(ERR "Invalid autoindex value: " + v);
+    }
+    else if (name == "cgi")
+    {
+        _dir.cgi++;
+        string v = next();
+        if (v == "on")
+            setCgi(true);
+        else if (v != "off")
+            configErrors.add(ERR "Invalid cgi value: " + v);
+    }
+    else if (name == "upload")
+    {
+        _dir.upload++;
+        string v = next();
+        if (v == "on")
+            setUpload(true);
+        else if (v != "off")
+            configErrors.add(ERR "Invalid upload value: " + v);
+    }
+    else if (name == "upload_path")
+    {
+        _dir.upload_path++;
+        setUploadPath(next());
+    }
+    else if (name == "cgi_upload_path")
+    {
+        _dir.cgi_upload_path++;
+        setCgiUploadPath(next());
+    }
+    else if (name == "return")
+    {
+        _dir.return_code++;
+        setReturn(next());
+    }
+    else if (name == "cgi_path")
+    {
+        string ext = next();
+        string interpreter = next();
+        if (ext.empty() || interpreter.empty())
+            configErrors.add(ERR "Invalid cgi_path directive (needs an extension and an interpreter)");
+        else
+            setCgiPath(ext, interpreter);
+    }
+    else if (name == "client_max_body_size")
+    {
+        _dir.client_max_body_size++;
+        string v = next();
+        if (!isNumber(v))
+            configErrors.add(ERR "Invalid client_max_body_size: " + v);
+        else
+        {
+            size_t size = 0;
+            stringstream(v) >> size;
+            setClientMaxBodySize(size);
+        }
+    }
+}
+
+// Runs once, right after a location block's closing brace: the
+// duplicate-directive check, and falling back to the owning server's
+// root/autoindex/client_max_body_size for anything this location
+// didn't set (validly) itself.
+void Location::finalizeLocationDirectives(string const &serverRoot, bool serverAutoindex, size_t serverClientMaxBodySize)
+{
+    if (duplicateDirective(_dir))
         configErrors.add(ERR "Duplicate directive in a location block");
-    if (location->getRoot().empty())
-        location->setRoot(_server_root);
-    if (location->_dir.autoindex == 0)
-        location->setAutoindex(_autoindex);
-    if (location->_dir.client_max_body_size == 0)
-        location->setClientMaxBodySize(getClientMaxBodySize());
-    return location;
+    if (getRoot().empty())
+        setRoot(serverRoot);
+    if (_dir.autoindex == 0)
+        setAutoindex(serverAutoindex);
+    if (_dir.client_max_body_size == 0)
+        setClientMaxBodySize(serverClientMaxBodySize);
 }
+
 void Server::mimeTypes()
 {
     static map<string, vector<string> > cachedExtensions;
@@ -269,147 +268,4 @@ void Server::mimeTypes()
     }
     _extensions = cachedExtensions;
     _types = cachedTypes;
-}
-string toStr(int i)
-{
-    stringstream ss;
-    ss << i;
-    return ss.str();
-}
-void Server::parseServer(string const &file)
-{
-    mimeTypes();
-    stringstream ss(file);
-    ss.seekg(_pos);
-    string buff;
-    t_dir dir;
-    memset(&dir, 0, sizeof(t_dir));
-    // Content between _pos and this block's own "server {" line isn't
-    // necessarily ours: it can be blank lines, comments, or (since v3)
-    // main-context directives like "pid"/"error_log" sitting before,
-    // between, or after server {} blocks. None of that is this
-    // function's directive set to validate - parseGlobalDirectives()
-    // already owns it - so everything is skipped unconditionally until
-    // this block's own opening line is actually seen.
-    bool entered = false;
-    while (getline(ss, buff))
-    {
-        trim(buff);
-        if (isBrackets(buff) && buff.find("}") != string::npos)
-            break;
-        if (buff.empty() || isWhitespace(buff) || isComment(buff) )
-            continue;
-        stringstream line(buff);
-        line >> buff;
-        if (buff == "server")
-        {
-            entered = true;
-            continue;
-        }
-        if (!entered)
-            continue;
-        if (buff == "}")
-            continue;
-        if (isServerDir(buff))
-        {
-            if (buff == "host")
-            {
-                dir.host++;
-                line >> _host;
-                if (_host == "localhost")
-                    _host = "127.0.0.1";
-                else if (resolveHostFamily(_host) == -1)
-                    configErrors.add(ERR "Invalid host: " + _host);
-            }
-            else if (buff == "listen")
-            {
-                dir.listen++;
-                line >> _port;
-                if (_port.empty())
-                    _port = DEFAULT_PORT;
-                if (!isNumber(_port))
-                    configErrors.add(ERR "Invalid port: " + _port);
-                string opt;
-                if (line >> opt)
-                {
-                    if (opt == "ssl")
-                        _ssl = true;
-                    else
-                        configErrors.add(ERR "Invalid listen option: " + opt);
-                }
-            }
-            else if (buff == "ssl_certificate")
-            {
-                dir.ssl_certificate++;
-                line >> _sslCertPath;
-                if (access(_sslCertPath.c_str(), F_OK) == -1)
-                    configErrors.add(ERR + _sslCertPath + ": No such file or directory");
-            }
-            else if (buff == "ssl_certificate_key")
-            {
-                dir.ssl_certificate_key++;
-                line >> _sslKeyPath;
-                if (access(_sslKeyPath.c_str(), F_OK) == -1)
-                    configErrors.add(ERR + _sslKeyPath + ": No such file or directory");
-            }
-            else if (buff == "server_name")
-            {
-                dir.server_name++;
-                while (line >> buff)
-                    _server_names.push_back(buff);
-            }
-            else if (buff == "error_page")
-            {
-                string code;
-                line >> code;
-                line >> buff;
-                setErrorCodes(code, buff);
-            }
-            else if (buff == "index")
-            {
-                dir.index++;
-                while (line >> buff)
-                    _indexs.push_back(buff);
-            }
-            else if (buff == "root")
-            {
-                dir.root++;
-                line >> _server_root;
-                if (access(_server_root.c_str(), F_OK) == -1)
-                    configErrors.add(ERR + _server_root + ": No such file or directory");
-            }
-            else if (buff == "autoindex")
-            {
-                dir.autoindex++;
-                line >> buff;
-                if (buff == "on")
-                    _autoindex = true;
-                else if (buff == "off")
-                    _autoindex = false;
-                else
-                    configErrors.add(ERR "Invalid autoindex value: " + buff);
-            }
-            else if (buff == "client_max_body_size")
-            {
-                dir.client_max_body_size++;
-                line >> _client_max_body_size;
-                if (!isNumber(_client_max_body_size))
-                    configErrors.add(ERR "Invalid client_max_body_size: " + _client_max_body_size);
-            }
-            else if (buff == "location")
-            {
-                line >> buff;
-                _locations[buff] = parseLocation(ss);
-            }
-        }
-        else
-        {
-            configErrors.add(ERR "Invalid directive at server level: " + buff);
-        }
-    }
-    if (duplicateDirective(dir))
-        configErrors.add(ERR "Duplicate directive in server " + (_host.empty() ? string("(unknown host)") : _host));
-    if (_ssl && (_sslCertPath.empty() || _sslKeyPath.empty()))
-        configErrors.add(ERR "listen ... ssl needs both ssl_certificate and ssl_certificate_key");
-    Server::_pos = ss.tellg();
 }

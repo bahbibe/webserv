@@ -7,9 +7,9 @@
 // Phase 1). Two jobs:
 //
 // 1. Resets the process-global state parsing touches - configErrors,
-//    Server::_pos, the pid/error_log globals, confDir - so each test
-//    case starts from a clean slate regardless of what ran before it
-//    in the same test binary. Production code never needs this (one
+//    the pid/error_log/user globals, confDir - so each test case
+//    starts from a clean slate regardless of what ran before it in
+//    the same test binary. Production code never needs this (one
 //    config is parsed once per process lifetime); doctest runs every
 //    TEST_CASE in the same process, one after another.
 // 2. Provides real, existing filesystem fixtures - a root directory, a
@@ -27,10 +27,11 @@ struct ParserFixture
     ParserFixture()
     {
         configErrors.clear();
-        Server::resetParsePositionForTests();
         pidPath.clear();
         errorLogPath.clear();
         errorLogLevel = "info";
+        dropUser.clear();
+        dropGroup.clear();
         confDir = "conf/";
         // Webserver's constructor opens accessLogPath and warns if it
         // can't - harmless for parser tests (nothing here ever writes

@@ -11,6 +11,8 @@ string accessLogPath;
 string pidPath;
 string errorLogPath;
 string errorLogLevel = "info";
+string dropUser;
+string dropGroup;
 volatile sig_atomic_t g_shutdown = 0;
 volatile sig_atomic_t g_reopenLog = 0;
 ConfigValidator configErrors;

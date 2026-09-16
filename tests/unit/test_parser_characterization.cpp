@@ -1,20 +1,14 @@
-// Characterization tests for the current (pre-rewrite) config parser
-// (see V4-PLAN.md Phase 1). These pin down what the parser actually
-// does today, using real config snippets shaped like the ones this
-// project already ships (conf/default.conf, conf/webserv.conf.install)
-// or generates in tests/run_tests.sh - a baseline the Phase 3-4
-// lexer/parser rewrite has to reproduce exactly, plus permanent
-// regression coverage for bugs found this session that were
-// previously only checked by hand.
-//
-// Driving the parser directly mirrors exactly what main.cpp does:
+// Characterization tests for the config parser (see V4-PLAN.md).
+// Originally written against the four hand-rolled line-scanners
+// (Phase 1), now driving ConfigParser (Phase 4) - same test intent,
+// same expected outcomes, just calling the parser main.cpp actually
+// uses since this phase landed:
 //   Webserver server;
-//   server.brackets(buff);
-//   parseGlobalDirectives(buff);
-//   for (each server block) server[i].parseServer(buff);
+//   ConfigParser(buff).parse(server);
 
 #include <doctest/doctest.h>
 #include "ParserFixture.hpp"
+#include "../../inc/ConfigParser.hpp"
 
 TEST_CASE_FIXTURE(ParserFixture, "minimal single server block parses with zero errors")
 {
@@ -26,11 +20,9 @@ TEST_CASE_FIXTURE(ParserFixture, "minimal single server block parses with zero e
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    REQUIRE(server._servers.size() == 1);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
+    REQUIRE(server._servers.size() == 1);
     CHECK_FALSE(configErrors.hasErrors());
     CHECK(server[0].getHost() == "127.0.0.1");
     CHECK(server[0].getPort() == "8080");
@@ -58,11 +50,9 @@ TEST_CASE_FIXTURE(ParserFixture, "full server block with a location parses corre
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    REQUIRE(server._servers.size() == 1);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
+    REQUIRE(server._servers.size() == 1);
     CHECK_FALSE(configErrors.hasErrors());
     CHECK(server[0].getClientMaxBodySize() == 1000000);
     CHECK_FALSE(server[0].getAutoindex());
@@ -98,9 +88,7 @@ TEST_CASE_FIXTURE(ParserFixture, "location inherits server client_max_body_size 
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK_FALSE(configErrors.hasErrors());
     auto const &locations = server[0].getLocations();
@@ -123,12 +111,9 @@ TEST_CASE_FIXTURE(ParserFixture, "two server blocks in one file both parse indep
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    REQUIRE(server._servers.size() == 2);
-    server[0].parseServer(conf);
-    server[1].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
+    REQUIRE(server._servers.size() == 2);
     CHECK_FALSE(configErrors.hasErrors());
     CHECK(server[0].getPort() == "8080");
     CHECK(server[1].getPort() == "8081");
@@ -146,9 +131,7 @@ TEST_CASE_FIXTURE(ParserFixture, "pid and error_log before a server block parse 
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK_FALSE(configErrors.hasErrors());
     CHECK(pidPath == "/tmp/webserv-characterization-test.pid");
@@ -158,11 +141,12 @@ TEST_CASE_FIXTURE(ParserFixture, "pid and error_log before a server block parse 
 
 TEST_CASE_FIXTURE(ParserFixture, "pid directive after a server block still parses with zero errors")
 {
-    // Regression test: Server::parseServer() used to have no concept
+    // Regression test: the old Server::parseServer() had no concept
     // of "content that isn't mine to validate," so a main-context
     // directive appearing anywhere near a server block's own text was
-    // liable to be misread. Order independence (before/between/after)
-    // is exactly what that fix guarantees.
+    // liable to be misread. ConfigParser's grammar handles this
+    // structurally - a main-context directive is just another
+    // top-level production, wherever it appears.
     string conf = "server {\n"
                   "    host 127.0.0.1\n"
                   "    listen 8080\n"
@@ -172,9 +156,7 @@ TEST_CASE_FIXTURE(ParserFixture, "pid directive after a server block still parse
                   "pid /tmp/webserv-characterization-test.pid\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK_FALSE(configErrors.hasErrors());
     CHECK(pidPath == "/tmp/webserv-characterization-test.pid");
@@ -185,10 +167,9 @@ TEST_CASE_FIXTURE(ParserFixture, "an unrecognized top-level directive produces e
     // Regression test for the exact v3 bug: a genuinely invalid
     // top-level directive used to be reported twice - once correctly
     // by parseGlobalDirectives(), once confusingly as "invalid at
-    // server level" by parseServer(). Fixed generally in
-    // Server::parseServer() (skip everything until its own "server"
-    // token, rather than trying to validate what comes before it) -
-    // this pins that fix down permanently.
+    // server level" by parseServer(). ConfigParser's single-pass
+    // grammar makes double-reporting structurally impossible: each
+    // token is consumed by exactly one production.
     string conf = "worker_processes 4\n"
                   "\n"
                   "server {\n"
@@ -198,9 +179,7 @@ TEST_CASE_FIXTURE(ParserFixture, "an unrecognized top-level directive produces e
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     REQUIRE(configErrors.hasErrors());
     CHECK(configErrors.errorCount() == 1);
@@ -217,9 +196,7 @@ TEST_CASE_FIXTURE(ParserFixture, "listen ... ssl with both cert files present pa
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK_FALSE(configErrors.hasErrors());
     CHECK(server[0].getSsl());
@@ -234,9 +211,7 @@ TEST_CASE_FIXTURE(ParserFixture, "listen ... ssl without ssl_certificate is exac
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     REQUIRE(configErrors.hasErrors());
     CHECK(configErrors.errorCount() == 1);
@@ -252,9 +227,7 @@ TEST_CASE_FIXTURE(ParserFixture, "a duplicate server-level directive is a config
                   "}\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
-    server[0].parseServer(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK(configErrors.hasErrors());
 }
@@ -266,7 +239,7 @@ TEST_CASE_FIXTURE(ParserFixture, "a server block missing its closing brace throw
                   "    listen 8080\n";
 
     Webserver server;
-    CHECK_THROWS_AS(server.brackets(conf), WebservException);
+    CHECK_THROWS_AS(ConfigParser(conf).parse(server), WebservException);
 }
 
 TEST_CASE_FIXTURE(ParserFixture, "a stray closing brace with nothing open throws")
@@ -277,7 +250,7 @@ TEST_CASE_FIXTURE(ParserFixture, "a stray closing brace with nothing open throws
                   "}\n";
 
     Webserver server;
-    CHECK_THROWS_AS(server.brackets(conf), WebservException);
+    CHECK_THROWS_AS(ConfigParser(conf).parse(server), WebservException);
 }
 
 TEST_CASE_FIXTURE(ParserFixture, "an empty file produces zero servers and zero errors")
@@ -285,8 +258,7 @@ TEST_CASE_FIXTURE(ParserFixture, "an empty file produces zero servers and zero e
     string conf = "";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK(server._servers.size() == 0);
     CHECK_FALSE(configErrors.hasErrors());
@@ -300,8 +272,7 @@ TEST_CASE_FIXTURE(ParserFixture, "a file that's only comments and whitespace pro
                   "# another comment\n";
 
     Webserver server;
-    server.brackets(conf);
-    parseGlobalDirectives(conf);
+    ConfigParser(conf).parse(server);
 
     CHECK(server._servers.size() == 0);
     CHECK_FALSE(configErrors.hasErrors());
