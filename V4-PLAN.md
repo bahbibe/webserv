@@ -1,26 +1,31 @@
-# webserv v5 - config parser hardening and real test coverage
+# webserv v4 - config parser hardening and real test coverage
 
-## Execution order (reorganized after v4 Phase 1 landed)
+## Execution order (reorganized after v5 Phase 1 landed)
 
-v4 started first and its Phase 1 (the `user` directive) is already
-committed on the `v4` branch, parsed and validated against the
+v5 started first and its Phase 1 (the `user` directive) is already
+committed on the `v5` branch, parsed and validated against the
 *current* parser. This plan supersedes that code, not just tests it:
-v4's remaining phases (the actual privilege drop, and everything
+v5's remaining phases (the actual privilege drop, and everything
 `install.sh`/testing built on top of a `user`/`group` config value)
 are real, security-sensitive work that shouldn't be built against a
-parser already known to be fragile, and redoing v5's rewrite *after*
-v4 fully lands would mean reconciling a rewrite against
+parser already known to be fragile, and redoing v4's rewrite *after*
+v5 fully lands would mean reconciling a rewrite against
 privilege-drop-adjacent code instead of against plain directive
-parsing. So: v5 lands first (branched from `main`, independent of the
-still-unmerged `v4` branch), absorbing `user`-directive recognition
+parsing. So: v4 lands first (branched from `main`, independent of the
+still-unmerged `v5` branch), absorbing `user`-directive recognition
 into the new parser directly (see Phase 4) rather than treating it as
-already-solved. `v4` resumes after v5 merges, rebased onto the new
+already-solved. `v5` resumes after v4 merges, rebased onto the new
 parser - its own Phase 1 commit becomes superseded, not wasted: the
 `getpwnam()`/`getgrnam()` validation logic it wrote carries over
 directly (see Phase 4), only the line-scanning it was sitting in gets
-replaced. Version numbers stay as originally assigned (v4 is still
-"privilege drop," v5 is still "parser hardening") - only the order
-they actually get *built* in changed.
+replaced. Version numbers were swapped from how these two plans were
+first drafted, specifically so the numbering matches actual release
+order: whichever plan ships first is v4, full stop - privilege drop
+was drafted and started first chronologically, but parser hardening
+is what actually needs to *release* first (this plan), so it's the
+one that gets called v4. The privilege-drop plan is v5 now, not
+because it was renumbered arbitrarily, but because it releases
+second.
 
 ## Context
 
@@ -58,7 +63,7 @@ place that understands "where am I in this file," not four.
 
 ## Rule for this effort
 
-Same model as v2/v3/v4: one dedicated branch (`v5`), phases land as
+Same model as v2/v3/v5: one dedicated branch (`v4`), phases land as
 their own commits, no merge to `main` until the whole story works end
 to end. This one especially: it touches code every existing config
 (`conf/default.conf`, `conf/webserv.conf.install`, every fixture
@@ -154,12 +159,12 @@ then has to keep true):
   the same line (`listen 8080 # comment`) vs. a comment on its own
   line, tabs vs. spaces, trailing whitespace, `\r\n` line endings.
   Also every main-context directive: `pid`/`error_log` (shipped in
-  v3) and `user` (parsed and validated on the still-unmerged `v4`
+  v3) and `user` (parsed and validated on the still-unmerged `v5`
   branch, ahead of this plan) appearing before, between, and after
   `server` blocks. `pid`/`error_log` were already manually verified
   once in v3 - now pinned down as permanent, fast tests instead of
   one-off manual checks. `user`'s test cases are written against the
-  behavior `v4`'s Phase 1 already established (a real account with
+  behavior `v5`'s Phase 1 already established (a real account with
   and without a group, a nonexistent account, a real account with a
   nonexistent group), since Phase 4 below is what actually carries
   that directive's recognition into the new parser.
@@ -202,7 +207,7 @@ then has to keep true):
   context handling, instead of `user` being bolted onto the old
   parser the way `pid`/`error_log` briefly were in v3. The `user`
   directive's actual validation (`getpwnam()`/`getgrnam()`) is
-  ported over from `v4`'s Phase 1 essentially unchanged - that logic
+  ported over from `v5`'s Phase 1 essentially unchanged - that logic
   was already correct and already tested, only the surrounding
   line-scanning it was sitting in is what's being replaced.
 
