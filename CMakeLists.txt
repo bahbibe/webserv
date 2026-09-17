@@ -44,6 +44,7 @@ set(LIB_SOURCES
     src/Server/Config.cpp
     src/Server/Lexer.cpp
     src/Server/ConfigParser.cpp
+    src/Server/Privileges.cpp
     src/Server/Tls.cpp
     src/Request/Request.cpp
     src/Request/Helpers.cpp

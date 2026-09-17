@@ -24,11 +24,20 @@ CONF_DIR=/etc/webserv
 WWW_DIR=/var/www/webserv
 LOG_DIR=/var/log/webserv
 UNIT_DEST=/etc/systemd/system/webserv.service
+WEBSERV_USER=webserv
+WEBSERV_GROUP=webserv
 
 if [ ! -x "$ROOT_DIR/webserv" ]; then
     echo "No built binary found, building..."
     cmake -S "$ROOT_DIR" -B "$ROOT_DIR/build"
     cmake --build "$ROOT_DIR/build" -j
+fi
+
+if ! id -u "$WEBSERV_USER" >/dev/null 2>&1; then
+    echo "Creating system user/group $WEBSERV_USER (see V5-PLAN.md - the user directive drops root privileges after startup)"
+    useradd --system --no-create-home --shell /usr/sbin/nologin "$WEBSERV_USER"
+else
+    echo "System user $WEBSERV_USER already exists, leaving it alone"
 fi
 
 echo "Installing binary to $BIN_DEST"
@@ -54,6 +63,20 @@ if [ ! -e "$WWW_DIR/index.html" ]; then
     echo "Installed the example site at $WWW_DIR"
 else
     echo "$WWW_DIR already has content, leaving it alone"
+fi
+
+# Scoped ownership, not blanket: only what the dropped-to process
+# actually needs to write at runtime (log reopen on SIGHUP, file
+# uploads) goes to webserv:webserv. The config, the binary, and the
+# served site content itself stay root-owned and read-only to the
+# running process - see V5-PLAN.md's "Directory ownership is scoped,
+# not blanket" decision. Always re-applied, even on a re-run against
+# an already-installed site, since a fresh useradd above or a
+# manually-edited config could otherwise leave these mismatched.
+echo "Setting ownership: $LOG_DIR, $WWW_DIR/uploads -> $WEBSERV_USER:$WEBSERV_GROUP"
+chown -R "$WEBSERV_USER:$WEBSERV_GROUP" "$LOG_DIR"
+if [ -d "$WWW_DIR/uploads" ]; then
+    chown -R "$WEBSERV_USER:$WEBSERV_GROUP" "$WWW_DIR/uploads"
 fi
 
 echo "Installing systemd unit to $UNIT_DEST"

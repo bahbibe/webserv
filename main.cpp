@@ -1,5 +1,6 @@
 #include "inc/Server.hpp"
 #include "inc/ConfigParser.hpp"
+#include "inc/Privileges.hpp"
 #include <climits>
 #include <spdlog/sinks/basic_file_sink.h>
 
@@ -127,6 +128,11 @@ int main(int argc, char const *argv[])
             else
                 spdlog::warn("Unable to write pid file at {}", pidPath);
         }
+        // Strictly after every root-only startup step (sockets bound,
+        // TLS certs loaded, pidfile written, logs open) and strictly
+        // before server.start() - the point past which untrusted
+        // request bytes get parsed. See V5-PLAN.md Phase 1.
+        dropPrivileges();
         server.start();
         if (!pidPath.empty())
             remove(pidPath.c_str());

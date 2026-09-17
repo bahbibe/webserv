@@ -359,6 +359,27 @@ else
     fail "invalid error_log level not rejected (status=$bad_level_status output='$bad_level_output')"
 fi
 
+# The drop itself (V5-PLAN.md Phase 1) needs real root and is
+# container-verified separately - this case only needs the config
+# validation, which runs the same regardless of privilege.
+cat > "$WORK_DIR/bad-user.conf" <<EOF
+user this_account_does_not_exist
+
+server {
+    host 127.0.0.1
+    listen 8768
+    root $WORK_DIR/WWW
+    index index.html
+}
+EOF
+bad_user_output=$("$ROOT_DIR/webserv" "$WORK_DIR/bad-user.conf" 2>&1)
+bad_user_status=$?
+if [ "$bad_user_status" -ne 0 ] && echo "$bad_user_output" | grep -q "no such account: this_account_does_not_exist"; then
+    pass "user pointed at a nonexistent account is a config error"
+else
+    fail "user pointed at a nonexistent account not rejected (status=$bad_user_status output='$bad_user_output')"
+fi
+
 GLOBAL_PORT=8767
 mkdir -p "$WORK_DIR/logdir"
 cat > "$WORK_DIR/global.conf" <<EOF
