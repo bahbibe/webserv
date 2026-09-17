@@ -64,7 +64,18 @@ actually parsing bytes a client sent - ever runs.
   execute the script, so this is shell-syntax-checked only; real
   execution is Phase 3's container-verified job. Whole test suite
   unaffected (`webserv_tests` 45/45, `tests/run_tests.sh` 33/33).
-- **Phase 3 (testing, docs, was Phase 4) - not started.**
+- **Phase 3 (testing, docs, was Phase 4) - done.**
+  Container-verified end to end as real root (Ubuntu 24.04 Docker
+  image, install.sh run for real): 14/14 checks - the account is
+  created, ownership is scoped correctly, real/effective/saved
+  uid/gid all match the unprivileged account (not just effective
+  uid), CGI inherits the drop, upload and SIGHUP log-reopen both
+  still work post-drop, a nonexistent account is a config error
+  before any socket binds. `tests/run_tests.sh` gained the no-root
+  half of that last check (34/34 total). Docs updated: main-context
+  directives table, "Production deployment", "Known limitations",
+  "Possible future work".
+- **All three phases done. Ready to merge to `main`.**
 
 ## Rule for this effort
 
