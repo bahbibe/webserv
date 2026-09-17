@@ -19,7 +19,7 @@ COPY . .
 # FetchContent, dev-only weight with nothing to verify inside a
 # throwaway build-stage container.
 RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWEBSERV_BUILD_TESTS=OFF && \
-    cmake --build build -j
+    cmake --build build -j4
 
 # ---- runtime stage ----
 FROM debian:bookworm-slim
