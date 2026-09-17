@@ -1,26 +1,10 @@
 #include "inc/Server.hpp"
+#include "inc/ConfigParser.hpp"
 #include <climits>
 #include <spdlog/sinks/basic_file_sink.h>
-t_events ep;
-map<string, UniqueFd> socketMap;
-string confDir;
-string accessLogPath;
-string pidPath;
-string errorLogPath;
-string errorLogLevel = "info";
-volatile sig_atomic_t g_shutdown = 0;
-volatile sig_atomic_t g_reopenLog = 0;
-ConfigValidator configErrors;
 
-void handleShutdownSignal(int)
-{
-    g_shutdown = 1;
-}
-
-void handleReopenLogSignal(int)
-{
-    g_reopenLog = 1;
-}
+// Global process state (ep, socketMap, confDir, g_shutdown, ...) lives
+// in src/Globals.cpp, not here - see that file for why.
 
 static void resolveConfDir()
 {
@@ -115,10 +99,7 @@ int main(int argc, char const *argv[])
         string buff;
         getline(conf, buff, '\0');
         Webserver server;
-        server.brackets(buff);
-        parseGlobalDirectives(buff);
-        for (size_t i = 0; i < server._servers.size(); i++)
-            server[i].parseServer(buff);
+        ConfigParser(buff).parse(server);
         // Before setupSocket() below - it already logs ("Listening on
         // ...") as each socket binds, so error_log has to be wired up
         // first for that (and everything else) to land in the right

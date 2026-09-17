@@ -33,6 +33,18 @@ public:
     void setReturn(string const &);
     void setCgiPath(string const &ext, string const &interpreter);
     void setClientMaxBodySize(size_t);
+    // Directive application (see V4-PLAN.md Phase 4's ConfigParser) -
+    // the same per-directive validation Server::parseLocation() used
+    // to do inline, just handed an already-tokenized directive name
+    // and its same-line value tokens instead of scanning raw text
+    // itself. Uses this->_dir directly for duplicate tracking, same
+    // as the code it replaces did.
+    void applyLocationDirective(string const &name, vector<string> const &values);
+    // Runs once, right after a location block's closing brace: the
+    // duplicate-directive check, and falling back to the owning
+    // server's root/autoindex/client_max_body_size for anything this
+    // location didn't set explicitly.
+    void finalizeLocationDirectives(string const &serverRoot, bool serverAutoindex, size_t serverClientMaxBodySize);
 
     string getReturn() const;
     size_t getClientMaxBodySize() const;

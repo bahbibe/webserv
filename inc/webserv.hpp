@@ -18,6 +18,8 @@
 #include <netdb.h>
 #include <csignal>
 #include <utility>
+#include <pwd.h>
+#include <grp.h>
 #include <spdlog/spdlog.h>
 #define RED "\033[0;31m"
 #define YELLOW "\033[0;33m"
@@ -106,6 +108,14 @@ class ConfigValidator
 public:
     void add(string const &msg) { _errors.push_back(msg); }
     bool hasErrors() const { return !_errors.empty(); }
+    size_t errorCount() const { return _errors.size(); }
+    vector<string> const &errors() const { return _errors; }
+    // Never called by the running server (one config is validated
+    // once per process lifetime) - exists so unit tests can start each
+    // parser test case from a clean slate against the shared global
+    // configErrors, instead of errors accumulating across every test
+    // that's run before it in the same test binary.
+    void clear() { _errors.clear(); }
     void report(ostream &out) const
     {
         out << RED "Config has " << _errors.size() << " error(s):" RESET "\n";
@@ -148,19 +158,23 @@ extern t_events ep;
 extern map<string, UniqueFd> socketMap;
 extern string confDir;
 extern string accessLogPath;
-// Main-context directives (see V3-PLAN.md Phase 2): written outside any
-// server {} block, parsed by parseGlobalDirectives(). Empty pidPath/
-// errorLogPath means the directive wasn't given - no pidfile is
-// written, diagnostics stay on the default stdout sink.
+// Main-context directives (see V3-PLAN.md Phase 2, V5-PLAN.md Phase
+// 1, both now applied via ConfigParser - V4-PLAN.md Phase 4): written
+// outside any server {} block. Empty pidPath/errorLogPath/dropUser
+// means the directive wasn't given - no pidfile is written,
+// diagnostics stay on the default stdout sink, no privilege drop
+// happens (that's v5's own remaining work; this branch only parses
+// and validates the directive).
 extern string pidPath;
 extern string errorLogPath;
 extern string errorLogLevel;
+extern string dropUser;
+extern string dropGroup;
 extern volatile sig_atomic_t g_shutdown;
 extern volatile sig_atomic_t g_reopenLog;
 extern ConfigValidator configErrors;
 void handleShutdownSignal(int signum);
 void handleReopenLogSignal(int signum);
-void parseGlobalDirectives(string const &file);
 
 class Webserver
 {
@@ -181,7 +195,6 @@ public:
     vector<Server> _servers;
     Webserver();
     ~Webserver();
-    void brackets(string const &file);
     Server &operator[](size_t index);
     void start();
     void newConnection(map<int, Request> &req, Server &server);
@@ -191,7 +204,6 @@ public:
 
 bool isWhitespace(string const&);
 bool isComment(string const&);
-bool isBrackets(string const&);
 bool isServerDir(string const &);
 bool isLocationDir(string const &);
 int resolveHostFamily(string const &host);

@@ -29,15 +29,24 @@ private:
     // instance actually kept in Webserver::_servers, every accepted
     // connection just needs read access to the same loaded context.
     shared_ptr<SSL_CTX> _sslCtx;
-    static streampos _pos;
 public:
     Server();
     Server(Server const &src);
     Server &operator=(Server const &src);
-    void parseServer(string const &);
     void mimeTypes();
-    unique_ptr<Location> parseLocation(stringstream &ss);
     void setErrorCodes(string const &, string const &);
+    // Directive application (see V4-PLAN.md Phase 4's ConfigParser,
+    // which owns tokenizing/block structure and hands each already-
+    // recognized directive's name and same-line value tokens here -
+    // this is the same validation every directive already had, just
+    // no longer doing its own text scanning to get called).
+    void applyServerDirective(string const &name, vector<string> const &values, t_dir &dir);
+    // Runs once, right after a server block's closing brace: the
+    // duplicate-directive check, and the "listen ... ssl needs both
+    // cert files" check that can only be evaluated once the whole
+    // block is known.
+    void finalizeServerDirectives(t_dir const &dir);
+    void addLocation(string const &path, unique_ptr<Location> location);
     void setupSocket();
     void setupSsl();
     int getSocket() const;
