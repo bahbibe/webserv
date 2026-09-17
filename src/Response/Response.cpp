@@ -302,6 +302,11 @@ bool Response::headerSent() const
     return this->_headerOffset >= this->_header.length();
 }
 
+bool Response::hasPendingOutput() const
+{
+    return this->_headerOffset < this->_header.length() || this->_bodyOffset < this->_body.length();
+}
+
 void Response::findeContentType(Request &req)
 {
     int idex= this->_path.rfind(".");
