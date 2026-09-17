@@ -9,6 +9,7 @@
 
 pid /run/webserv.pid
 error_log /var/log/webserv/error.log info
+user webserv webserv
 
 server {
     host 0.0.0.0
