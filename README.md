@@ -380,6 +380,14 @@ docker build -t webserv .
 docker run -p 8090:8090 webserv
 ```
 
+Published on Docker Hub as
+[`bahbibe/webserv`](https://hub.docker.com/r/bahbibe/webserv) - no
+build step needed:
+
+```
+docker run -p 8090:8090 bahbibe/webserv
+```
+
 Runs as a dedicated unprivileged user inside the container (the
 container itself is the isolation boundary here - this image never
 binds a privileged port, so there's no root-then-drop dance the way

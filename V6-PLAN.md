@@ -87,7 +87,14 @@ it.
   documented override path in Phase 2 actually works, not just the
   baked-in default.
 
-### Phase 4 - docs, then the actual push
+### Phase 4 - docs, then the actual push - done
+
+Pushed as `bahbibe/webserv:2.6.0` and `bahbibe/webserv:latest` on
+[Docker Hub](https://hub.docker.com/r/bahbibe/webserv), after explicit
+confirmation in the moment (both the go-ahead and the repository name)
+and a final sanity check (`docker run` against the exact image about
+to be pushed, GET / and the CGI route both 200) - matching the rule
+below.
 
 - README gets a short "Docker" section: `docker build`/`docker run`
   commands, the port-mapping/volume-mount notes from Phase 2.
