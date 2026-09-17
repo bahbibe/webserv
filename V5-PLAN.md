@@ -43,8 +43,16 @@ actually parsing bytes a client sent - ever runs.
   stays on this branch's history for reference but this plan no
   longer builds on it directly - see "Execution order" above. The
   validation logic itself is carried into `V4-PLAN.md` Phase 4.
-- **Phase 1 (the drop itself, was Phase 2) - not started. Blocked on
-  v4 merging first.**
+- **Phase 1 (the drop itself, was Phase 2) - done.**
+  `dropPrivileges()` (`inc/Privileges.hpp`,
+  `src/Server/Privileges.cpp`), called from `main()` between the
+  pidfile write and `server.start()`. `initgroups()` ->
+  `setgid()` -> `setuid()`, paranoid `setuid(0)` probe afterward.
+  No-op verified (whole test suite unchanged), soft-fail path
+  verified live (non-root run with `user` set warns and keeps
+  running). The actual root-drop path needs a real root process -
+  that's Phase 3's container-verified testing, not this dev machine.
+  `webserv_tests` 45/45, `tests/run_tests.sh` 33/33.
 - **Phase 2 (install.sh, was Phase 3) - not started.**
 - **Phase 3 (testing, docs, was Phase 4) - not started.**
 
