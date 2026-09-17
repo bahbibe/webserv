@@ -76,7 +76,20 @@ second.
   what production code actually runs. `webserv_tests` 45/45 test
   cases, 207/207 assertions, all passing outright. Full
   `tests/run_tests.sh` (33/33) unaffected.
-- **Phase 5 (regression and docs) - not started.**
+- **Phase 5 (regression and docs) - done.** Full
+  `tests/run_tests.sh` (33/33) confirmed against the built binary
+  after Phase 4 landed - unmodified in what it tests, proving
+  identical observable server behavior through the new parser. Both
+  real repo config files re-verified live: `conf/default.conf` served
+  real requests correctly (200/404/200/403 across root, missing path,
+  an upload location, and an autoindex-off CGI location);
+  `conf/webserv.conf.install` parsed cleanly and reported exactly the
+  three expected missing-path errors for its `/var/www/webserv` tree,
+  which only exists on a real install - no parser-related failure.
+  README updated: documents `webserv_tests` alongside
+  `tests/run_tests.sh`, explains which suite a given kind of change
+  belongs in, corrects a stale end-to-end test count.
+- **All five phases done. Ready to merge to `main`.**
 
 ## Context
 
