@@ -53,7 +53,17 @@ actually parsing bytes a client sent - ever runs.
   running). The actual root-drop path needs a real root process -
   that's Phase 3's container-verified testing, not this dev machine.
   `webserv_tests` 45/45, `tests/run_tests.sh` 33/33.
-- **Phase 2 (install.sh, was Phase 3) - not started.**
+- **Phase 2 (install.sh, was Phase 3) - done.** Creates the
+  `webserv` system account (idempotent), scoped `chown` of
+  `/var/log/webserv` and `/var/www/webserv/uploads` only -
+  config/binary/site content stay root-owned.
+  `conf/webserv.conf.install` ships `user webserv webserv` by
+  default. `uninstall.sh` deliberately untouched (the account isn't
+  removed on uninstall, matching its existing survive-unless-asked
+  philosophy). No passwordless root on this dev machine to actually
+  execute the script, so this is shell-syntax-checked only; real
+  execution is Phase 3's container-verified job. Whole test suite
+  unaffected (`webserv_tests` 45/45, `tests/run_tests.sh` 33/33).
 - **Phase 3 (testing, docs, was Phase 4) - not started.**
 
 ## Rule for this effort
