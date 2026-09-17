@@ -28,7 +28,9 @@ automatically by CMake - nothing else to install.
 git clone https://github.com/bahbibe/webserv.git
 cd webserv
 cmake -S . -B build
-cmake --build build -j
+cmake --build build -j4   # raise this if you have RAM/cores to spare - bare -j (no number)
+                          # means unbounded parallel compiles, which can push a modest
+                          # machine into swap
 ./webserv
 ```
 
@@ -46,7 +48,8 @@ To serve your own site: `./webserv path/to/your.conf` - see "Config
 file" below for the full directive reference.
 
 ```
-rm -rf build && cmake -S . -B build && cmake --build build -j   # clean rebuild
+cmake --build build -j4                                          # incremental rebuild
+rm -rf build && cmake -S . -B build && cmake --build build -j4  # clean rebuild (rarely needed)
 bash tests/run_tests.sh                                          # end-to-end test suite
 ./build/webserv_tests                                            # config parser unit tests
 valgrind --leak-check=full ./webserv [config_file]                # manual leak check

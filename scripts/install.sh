@@ -30,7 +30,10 @@ WEBSERV_GROUP=webserv
 if [ ! -x "$ROOT_DIR/webserv" ]; then
     echo "No built binary found, building..."
     cmake -S "$ROOT_DIR" -B "$ROOT_DIR/build"
-    cmake --build "$ROOT_DIR/build" -j
+    # Capped, not bare -j (unbounded parallel compiles) - a system
+    # being freshly installed on is exactly the kind of target that
+    # can least afford an unbounded compile job spike.
+    cmake --build "$ROOT_DIR/build" -j4
 fi
 
 if ! id -u "$WEBSERV_USER" >/dev/null 2>&1; then
