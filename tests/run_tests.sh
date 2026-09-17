@@ -95,9 +95,16 @@ assert_empty_body()
 
 # --- build ---
 
-rm -rf "$ROOT_DIR/build"
+# Incremental on purpose - not a clean rebuild every run. cmake/make
+# already know what's stale; wiping build/ here forced a full
+# FetchContent re-clone of spdlog+doctest and a from-scratch compile
+# on every single invocation of this script, which combined with the
+# unbounded -j below (no number = as many parallel compiles as make
+# feels like, not even capped to core count) was enough to push a
+# 15GB machine into swap. -j capped at 4: fast enough for a local dev
+# loop without trying to run dozens of cc1plus instances at once.
 cmake -S "$ROOT_DIR" -B "$ROOT_DIR/build" >"$WORK_DIR/build.log" 2>&1 \
-    && cmake --build "$ROOT_DIR/build" -j >>"$WORK_DIR/build.log" 2>&1
+    && cmake --build "$ROOT_DIR/build" -j4 >>"$WORK_DIR/build.log" 2>&1
 if [ $? -ne 0 ]; then
     echo "build failed:"
     cat "$WORK_DIR/build.log"
