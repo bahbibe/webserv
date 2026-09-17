@@ -48,8 +48,21 @@ file" below for the full directive reference.
 ```
 rm -rf build && cmake -S . -B build && cmake --build build -j   # clean rebuild
 bash tests/run_tests.sh                                          # end-to-end test suite
+./build/webserv_tests                                            # config parser unit tests
 valgrind --leak-check=full ./webserv [config_file]                # manual leak check
 ```
+
+Two separate test suites, on purpose: `tests/run_tests.sh` drives a
+real running server over HTTP/curl and is authoritative for
+*observable server behavior* - request handling, CGI, uploads,
+keep-alive, shutdown. `webserv_tests` (`tests/unit/`, built via
+CMake's `WEBSERV_BUILD_TESTS` option, on by default) is a `doctest`
+suite scoped narrowly to the config parser (`Lexer` +
+`ConfigParser`) - it exercises structural edge cases and directive
+validation directly, without spinning up a socket. A parsing bug or
+a new config directive gets a unit test here; a change to what the
+server actually does with a request gets an end-to-end case in
+`tests/run_tests.sh`.
 
 ## Architecture
 
@@ -101,8 +114,9 @@ flowchart LR
   in use - the whole file is checked and every problem reported
   together, not just the first one hit.
 
-Some numbers: ~3,900 lines of C++, one thread, 28 end-to-end test
-checks (`tests/run_tests.sh`), zero warnings under
+Some numbers: ~3,900 lines of C++, one thread, 33 end-to-end test
+checks (`tests/run_tests.sh`) plus 45 config-parser unit tests
+(`webserv_tests`), zero warnings under
 `-Wall -Wextra -Werror`, and a
 `valgrind --leak-check=full --track-fds=yes` pass across the CGI/TLS/
 upload/keep-alive matrix shows 0 leaked heap allocations and 0 leaked
