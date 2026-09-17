@@ -76,6 +76,12 @@ class Response
         Response(const Response &other);
         Response &operator=(const Response &other);
         bool getIsFinished() const;
+        // True right after a partial flushHeader()/flushBody() write
+        // (backpressure) leaves bytes still queued. Used by the CGI
+        // in-flight periodic scan (see Webserver::start()) to re-arm
+        // EPOLLOUT only when there's an actual pending write to
+        // resume, not just because a CGI response is still open.
+        bool hasPendingOutput() const;
         bool getKeepAlive() const;
         size_t getBytesSent() const;
         int getStatusCode() const;

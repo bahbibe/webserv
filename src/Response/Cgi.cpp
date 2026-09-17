@@ -132,6 +132,17 @@ void Response::CGI(Request &req, map<int, int> &cgiFdToClient)
             if (inPipe[1] != -1)
                 close(inPipe[1]);
         }
+
+        // Nothing to write to the client yet - no header, no body -
+        // until the CGI stdout pipe actually produces some (relayed
+        // via relayCgiOutput(), driven by the pipe fd's own EPOLLIN,
+        // which re-arms this). Leaving EPOLLOUT armed here would make
+        // the client socket (almost always writable) fire every
+        // epoll_wait tick for no reason - a busy-spin for however long
+        // the script takes to produce its first byte.
+        ep.event.data.fd = this->_fdSocket;
+        ep.event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+        epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, this->_fdSocket, &ep.event);
         return;
     }
 

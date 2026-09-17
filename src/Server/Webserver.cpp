@@ -244,7 +244,22 @@ void Webserver::start()
                         continue;
                     }
                     if (fd == respIt->second.getCgiStdoutFd())
-                        respIt->second.relayCgiOutput(_req[clientFd], _cgiFdToClient);
+                    {
+                        // relayCgiOutput() only queues bytes into the
+                        // Response's own buffer - it never writes to
+                        // the client socket itself (see Cgi.cpp). Its
+                        // EPOLLOUT was stripped while nothing was
+                        // ready (see CGI()'s first-call branch); only
+                        // re-arm it once there's actually something -
+                        // a header, a body chunk, or the final EOF
+                        // terminator - for sendResponse() to flush.
+                        if (respIt->second.relayCgiOutput(_req[clientFd], _cgiFdToClient))
+                        {
+                            ep.event.data.fd = clientFd;
+                            ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                            epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, clientFd, &ep.event);
+                        }
+                    }
                     else if (fd == respIt->second.getCgiStdinFd())
                     {
                         if (ep.events[i].events & (EPOLLHUP | EPOLLERR))
@@ -344,6 +359,34 @@ void Webserver::start()
                         || CLOCKWORK(it->second._startTv.tv_sec) > REQUEST_TIMEOUT))
                 {
                     it->second.abortDraining();
+                }
+                // A CGI response with its client-socket EPOLLOUT
+                // stripped (see CGI()'s first-call branch) only gets
+                // driven again by the client socket once
+                // relayCgiOutput() finds real output to relay. A
+                // script producing no output at all - hung, or just
+                // silent until it exits - would never trigger that,
+                // so CGI()'s own child-reap and CGI_TIMEOUT check
+                // (normally piggybacked on that per-tick call) would
+                // never run either. This keeps both alive at the same
+                // ~1s cadence epoll_wait's own timeout already gives
+                // every other periodic check in this loop, instead of
+                // depending on a busy-spinning socket to provide it.
+                map<int, Response>::iterator cgiRespIt = _resp.find(it->first);
+                if (cgiRespIt != _resp.end() && cgiRespIt->second._isCGI && !cgiRespIt->second.getIsFinished())
+                {
+                    cgiRespIt->second.sendResponse(it->second, it->first, _cgiFdToClient);
+                    // Rare: the call above hit real backpressure (e.g.
+                    // the CGI_TIMEOUT finalizer's small write didn't
+                    // fully land). Re-arm EPOLLOUT so the socket's own
+                    // writability resumes it promptly instead of
+                    // waiting up to another ~1s for this same scan.
+                    if (cgiRespIt->second.hasPendingOutput())
+                    {
+                        ep.event.data.fd = it->first;
+                        ep.event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR;
+                        epoll_ctl(ep.epollFd, EPOLL_CTL_MOD, it->first, &ep.event);
+                    }
                 }
             }
             catch (const exception &e)
