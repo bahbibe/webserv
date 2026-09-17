@@ -1,0 +1,7 @@
+.git
+build/
+webserv
+*.o
+access.log
+en.subject.pdf
+TODO.md

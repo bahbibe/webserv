@@ -1,0 +1,58 @@
+# Baked into the Docker image at /app/conf/webserv.conf.docker (see
+# V6-PLAN.md Phase 2) and used as the default CMD argument. Differs
+# from conf/default.conf in exactly one directive: host 0.0.0.0
+# instead of 127.0.0.1 - a container's own loopback interface isn't
+# reachable through Docker's port mapping (-p 8090:8090), so the
+# server has to bind every interface inside the container instead.
+#
+# To use your own site content or config instead of what's baked in,
+# bind-mount over these paths (paths are relative to WORKDIR /app in
+# the image):
+#   docker run -p 8090:8090 -v ./mysite:/app/WWW bahbibe/webserv
+#   docker run -p 8090:8090 -v ./myconf.conf:/app/conf/webserv.conf.docker bahbibe/webserv
+#
+# A mounted ./mysite replaces the whole WWW/ tree, not just
+# index.html - the location blocks below still expect ./WWW/uploads,
+# ./WWW/cgi-bin, and ./WWW/err/*.html to exist, so an incomplete
+# custom site (e.g. just an index.html) fails config validation at
+# startup. Either include those directories (empty is fine) in the
+# mounted site, or mount your own config over conf/webserv.conf.docker
+# with only the locations you actually need.
+
+server {
+    host 0.0.0.0
+    listen 8090
+    server_name example.com
+
+    root ./WWW
+    index index.html
+    error_page 400 ./WWW/err/400.html
+    error_page 403 ./WWW/err/403.html
+    error_page 404 ./WWW/err/404.html
+    error_page 405 ./WWW/err/405.html
+    error_page 500 ./WWW/err/500.html
+    error_page 501 ./WWW/err/501.html
+    client_max_body_size 10000000
+    autoindex off
+
+    location /uploads {
+        root ./WWW/uploads
+        allow GET POST DELETE
+        upload on
+        upload_path ./WWW/uploads
+        autoindex on
+    }
+
+    location /cgi-bin {
+        root ./WWW/cgi-bin
+        allow GET POST
+        cgi on
+        cgi_upload_path ./WWW/uploads/cgi
+    }
+
+    location / {
+        root ./WWW
+        index index.html
+        allow GET POST DELETE
+    }
+}

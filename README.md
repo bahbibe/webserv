@@ -365,6 +365,41 @@ no-login, no-home system account is inert, not a cleanup obligation.
 (see "Log rotation" above) - a full config reload without restarting
 is tracked as future work, see below.
 
+## Docker
+
+A multi-stage `Dockerfile` builds the binary in a `debian-slim` image
+with the full toolchain, then ships only what's needed to run it - no
+compiler, no build tools - in a second `debian-slim` runtime stage
+(~154MB). The image bakes in the example site (`WWW/`) and a
+container-aware config (`conf/webserv.conf.docker` - binds `0.0.0.0`
+instead of `127.0.0.1`, since a container's own loopback isn't what
+Docker's port mapping reaches), so it runs with zero required flags:
+
+```
+docker build -t webserv .
+docker run -p 8090:8090 webserv
+```
+
+Runs as a dedicated unprivileged user inside the container (the
+container itself is the isolation boundary here - this image never
+binds a privileged port, so there's no root-then-drop dance the way
+`install.sh`'s systemd deployment has).
+
+To serve your own site or use your own config instead of what's
+baked in:
+
+```
+docker run -p 8090:8090 -v ./mysite:/app/WWW webserv
+docker run -p 8090:8090 -v ./myconf.conf:/app/conf/webserv.conf.docker webserv
+```
+
+A mounted site replaces the whole `WWW/` tree, not just
+`index.html` - the baked-in config's `location` blocks expect
+`WWW/uploads`, `WWW/cgi-bin`, and `WWW/err/*.html` to exist, so an
+incomplete custom site fails config validation at startup unless it
+includes those directories or comes with its own config that only
+declares the locations it actually needs.
+
 ## Supported HTTP behavior
 
 - Methods: `GET`, `HEAD`, `POST`, `DELETE`. `HEAD` behaves exactly like
