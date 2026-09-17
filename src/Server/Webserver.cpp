@@ -301,7 +301,7 @@ void Webserver::start()
                         _resp[fd].sendResponse(_req[fd], fd, _cgiFdToClient);
                     if (_resp[fd].getIsFinished() == true && !_req[fd].isDraining())
                     {
-                        if (_resp[fd].getKeepAlive() && !_req[fd].isDrainTimedOut())
+                        if (_resp[fd].getKeepAlive() && !_req[fd].isDrainTimedOut() && !_req[fd].chunkedBodyFailedToDrain())
                         {
                             logAccess(_req[fd], &_resp[fd]);
                             Server *srv = _req[fd].getServer();
