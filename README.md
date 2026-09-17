@@ -275,6 +275,7 @@ after them, anywhere at the top level:
 |---|---|
 | `pid <path>` | Write the process PID there on start, remove it on clean shutdown. Optional - not needed under systemd `Type=simple` (see "Production deployment"), useful for anything else that expects a pidfile. |
 | `error_log <path> [level]` | Redirect diagnostics from the default stdout sink to a file, at the given level (`trace`/`debug`/`info`/`warn`/`error`/`critical`/`off`, default `info`). Replaces the default sink rather than adding a second destination, matching nginx's own `error_log` semantics. |
+| `user <name> [group]` | Drop root privileges to this account (and group, if given - otherwise the account's primary group) right after every privileged startup step (socket binds, TLS cert loads, pidfile write, log open) and before any request bytes are parsed. No-op if the process isn't already root when this is set. See "Production deployment" below. |
 
 An unrecognized directive at this level (or anywhere else in the
 file) is a config error, same as inside a `server` block - nothing
@@ -340,6 +341,22 @@ those, so edits made after install are safe across upgrades.
 `scripts/uninstall.sh` removes the binary and the systemd unit,
 prompts before touching `/etc/webserv` or `/var/log/webserv`, and
 leaves `/var/www/webserv` untouched entirely.
+
+**Runs as an unprivileged user.** `install.sh` creates a dedicated
+`webserv` system account (`useradd --system --no-create-home
+--shell /usr/sbin/nologin`) and the installed config ships `user
+webserv webserv` by default - the process binds `listen 80`/`443` as
+root, then drops to `webserv:webserv` (real, effective, *and* saved
+uid/gid, verified via a container test that reads the running
+process's own `/proc/<pid>/status`) before parsing a single byte of
+request data. CGI scripts inherit the drop for free, since `fork()`
+only ever happens after it. Ownership on disk is scoped, not blanket:
+only `/var/log/webserv/` and `/var/www/webserv/uploads/` are chowned
+to `webserv:webserv` (what the running process actually needs to
+write at runtime); the config, the binary, and the served site
+content stay root-owned and read-only to it. `uninstall.sh`
+intentionally leaves the `webserv` account in place - a leftover
+no-login, no-home system account is inert, not a cleanup obligation.
 
 `ExecReload=` sends `SIGHUP`, which today only reopens `access.log`
 (see "Log rotation" above) - a full config reload without restarting
@@ -423,13 +440,6 @@ is tracked as future work, see below.
 - No SNI / multiple TLS certificates on one listener - one certificate
   per `server` block, matched by which listening socket accepted the
   connection, not by the TLS ClientHello's server name.
-- The installed systemd service runs as root - no `user`/`group`
-  directive to bind a privileged port and then drop privileges before
-  serving requests. `listen 80`/`443` needs root either way; this just
-  means the server keeps running as root afterward too. Deliberately
-  deferred rather than rushed: privilege drop is real security-
-  sensitive code (setuid/setgid ordering mistakes are a classic
-  privilege-escalation bug class) that deserves its own careful pass.
 
 ## Out of scope (by design)
 
@@ -450,9 +460,6 @@ to be filled:
 
 ## Possible future work
 
-- Privilege drop (a `user`/`group` directive): bind a privileged port
-  as root, then `setuid()`/`setgid()` to a configured unprivileged
-  user before the event loop starts - see "Known limitations" above.
 - A full config reload on `SIGHUP` (re-parse the file, rebuild live
   servers/locations/sockets without dropping connections) instead of
   requiring a restart - `SIGHUP` currently only reopens the access log
