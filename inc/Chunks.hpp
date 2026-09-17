@@ -7,6 +7,7 @@
 #define CH_START "ch_start"
 #define CH_SIZE "ch_size"
 #define CH_CONTENT "ch_content"
+#define CH_TRAILER "ch_trailer"
 
 class Chunks {
     private:
@@ -31,5 +32,13 @@ class Chunks {
         void setFirstSize();
         void setSize();
         void writeContent();
+        void parseTrailer();
         void throwException(int code);
+        // Stop writing chunk content to the destination file (an
+        // upload or CGI-staged body being abandoned after an error)
+        // without losing parse position - _buffer/_state/_chunkSize
+        // stay exactly where they were, so the very next byte fed in
+        // continues the same chunk-framing walk, just discarding
+        // instead of writing.
+        void discardFromNowOn();
 };

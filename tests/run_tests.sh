@@ -239,12 +239,17 @@ else
     fail "successful POST did not reuse the connection"
 fi
 
+# A chunked body's length isn't known up front, but the chunk framing
+# itself marks its own end (the zero-size last-chunk, then the
+# trailer part's terminating CRLF - see Chunks::parseTrailer()) just
+# as unambiguously as a declared Content-Length does, so a
+# successfully-parsed chunked POST is keep-alive eligible too.
 chunked_ka_trace=$(curl -s -v -o /dev/null -H "Transfer-Encoding: chunked" --data-binary "@$WORK_DIR/upload_source.txt" "$BASE_URL/" \
     --next -H "Transfer-Encoding: chunked" --data-binary "@$WORK_DIR/upload_source.txt" "$BASE_URL/" 2>&1)
 if echo "$chunked_ka_trace" | grep -qi "Re-using existing connection"; then
-    fail "chunked POST connection was reused (body length isn't known up front, so it can't be safely drained on an early error - should always close)"
+    pass "successful chunked POST reuses the connection (keep-alive)"
 else
-    pass "chunked POST still always closes the connection"
+    fail "successful chunked POST did not reuse the connection"
 fi
 
 # A POST rejected early (413, body too large) still has to have its
@@ -298,6 +303,70 @@ if [ "$drain_status1" = "HTTP/1.1 413 Content Too Large" ] && [ "$drain_status2"
     pass "oversized POST body is drained so the reused connection's next request parses cleanly"
 else
     fail "drain-then-reuse produced status1='$drain_status1' status2='$drain_status2'"
+fi
+
+# Same idea, chunked: an oversized chunk still has to be drained -
+# correctly walking chunk framing, not just counting bytes, since
+# there's no declared total length to count against - before the
+# connection can be reused.
+chunked_drain_result=$(python3 - "$PORT" <<'PYEOF'
+import socket, sys, time
+
+def recv_one_response(s, timeout=15):
+    s.settimeout(timeout)
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        chunk = s.recv(4096)
+        if not chunk:
+            return buf
+        buf += chunk
+    head, rest = buf.split(b"\r\n\r\n", 1)
+    if b"chunked" not in head.lower():
+        return buf
+    body = rest
+    while b"\r\n0\r\n\r\n" not in body:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        body += chunk
+    return head + b"\r\n\r\n" + body
+
+port = int(sys.argv[1])
+s = socket.create_connection(("127.0.0.1", port), timeout=5)
+
+# The client_max_body_size check only runs once there's actually some
+# content buffered for the oversized chunk (Chunks::writeContent()
+# bails out immediately on an empty buffer, before reaching the size
+# check) - so the chunk's size line alone isn't enough to trigger it
+# in the same read the way a declared Content-Length is; head_chunk
+# has to carry real content bytes along with it, same reason the
+# Content-Length version above sends real bytes up front too.
+second_chunk_len = 1100000
+head_chunk = b"b" * 50000
+req_head = (b"POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n"
+    + format(second_chunk_len, "x").encode() + b"\r\n" + head_chunk)
+s.sendall(req_head)
+resp1 = recv_one_response(s)
+
+# The server already rejected this with a 413 - but it still needs
+# the rest of what the client declared to correctly find where this
+# chunked body actually ends on the wire, same as the Content-Length
+# case above.
+s.sendall(b"b" * (second_chunk_len - len(head_chunk)) + b"\r\n0\r\n\r\n")
+time.sleep(1)
+s.sendall(b"GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+resp2 = recv_one_response(s)
+s.close()
+print(resp1.split(b"\r\n")[0].decode(errors="replace"))
+print(resp2.split(b"\r\n")[0].decode(errors="replace"))
+PYEOF
+)
+chunked_drain_status1=$(echo "$chunked_drain_result" | sed -n '1p')
+chunked_drain_status2=$(echo "$chunked_drain_result" | sed -n '2p')
+if [ "$chunked_drain_status1" = "HTTP/1.1 413 Content Too Large" ] && [ "$chunked_drain_status2" = "HTTP/1.1 200 OK" ]; then
+    pass "oversized chunked POST body is drained so the reused connection's next request parses cleanly"
+else
+    fail "chunked drain-then-reuse produced status1='$chunked_drain_status1' status2='$chunked_drain_status2'"
 fi
 
 assert_status "multipart upload -> 201" 201 -F "file=@$WORK_DIR/upload_source.txt" "$BASE_URL/"

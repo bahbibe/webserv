@@ -99,15 +99,22 @@ flowchart LR
   first. A crash before any output gets a clean 500; a crash after
   streaming has already started just truncates the response cleanly,
   matching how a real reverse proxy behaves.
-- **POST keep-alive with byte-exact body draining.** The easy,
-  common shortcut is to just close every POST connection so an
-  unread request body can never corrupt the next request. This
-  tracks raw bytes consumed against the declared `Content-Length`
-  instead, and if an error fires before the client finishes sending,
-  drains exactly the declared remainder off the wire before reusing
-  the connection. Verified over a real socket: an oversized POST gets
-  a `413` with the connection kept alive, and the next request on
-  that same TCP connection still parses cleanly.
+- **POST keep-alive with exact body draining, `Content-Length` or
+  chunked.** The easy, common shortcut is to just close every POST
+  connection so an unread request body can never corrupt the next
+  request. This tracks raw bytes consumed against a declared
+  `Content-Length` instead, and if an error fires before the client
+  finishes sending, drains exactly the declared remainder off the
+  wire before reusing the connection. A `Transfer-Encoding: chunked`
+  body has no declared length to count against, but its own framing
+  marks the end just as unambiguously - the same chunk parser that
+  handles a normal chunked upload switches into a discard mode and
+  keeps walking chunk boundaries (including the terminating zero-size
+  chunk and trailer part) to find where the client's body actually
+  ends. Verified over a real socket, both ways: an oversized POST -
+  `Content-Length` or chunked - gets a `413` with the connection kept
+  alive, and the next request on that same TCP connection still
+  parses cleanly.
 - **TLS runs inside the same non-blocking reactor.**
   `SSL_accept()`/`SSL_read()`/`SSL_write()` advance one `epoll` tick
   at a time - no blocking handshake, no separate thread. TLS 1.2
@@ -422,14 +429,15 @@ declares the locations it actually needs.
 - Keep-alive: responses reuse the connection for the next request
   unless the client sends `Connection: close` (no pipelining - the
   client must read each response before sending the next request).
-  `POST` is keep-alive eligible too, but only when its body length
-  was declared up front (`Content-Length` or `multipart/form-data`):
-  if an error fires before the client finishes sending, the rest of
-  the declared body is read and discarded before the connection is
-  reused, so no leftover bytes get parsed as the start of the next
-  request. A `POST` using `Transfer-Encoding: chunked` always closes
-  instead - its body length isn't known up front, so there's nothing
-  reliable to drain on an early error.
+  `POST` is keep-alive eligible whether its body length was declared
+  up front (`Content-Length`/`multipart/form-data`) or framed as
+  `Transfer-Encoding: chunked` - both mark their own end unambiguously
+  (a byte count for the former, the terminating zero-size chunk plus
+  trailer part for the latter), so if an error fires before the
+  client finishes sending, the rest of the body is read and discarded
+  - by byte count or by walking the remaining chunk framing,
+  whichever applies - before the connection is reused, so no leftover
+  bytes get parsed as the start of the next request.
 - Request bodies via `Content-Length`, `Transfer-Encoding: chunked`,
   or `multipart/form-data`.
 - Every response carries a `Date` header (RFC 9110 6.6.1).
@@ -479,10 +487,6 @@ declares the locations it actually needs.
   larger change.
 - No HTTP pipelining: a client must read each response before sending
   the next request on the same connection (see "Keep-alive" above).
-- A `POST` with `Transfer-Encoding: chunked` always closes the
-  connection instead of being keep-alive eligible - its declared body
-  length isn't known up front, so there's nothing reliable to drain
-  if an error happens partway through (see "Keep-alive" above).
 - No SNI / multiple TLS certificates on one listener - one certificate
   per `server` block, matched by which listening socket accepted the
   connection, not by the TLS ClientHello's server name.

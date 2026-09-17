@@ -44,6 +44,8 @@ Request &Request::operator=(const Request &other)
         this->_isDraining = other._isDraining;
         this->_drainRemaining = other._drainRemaining;
         this->_drainTimedOut = other._drainTimedOut;
+        this->_isChunkedDraining = other._isChunkedDraining;
+        this->_chunkedBodyConsumed = other._chunkedBodyConsumed;
 
         this->_headersBuffer = other._headersBuffer;
         this->_requestBuffer = other._requestBuffer;
@@ -69,6 +71,7 @@ Request::Request() : _socketFd(0), _lineCount(0), _statusCode(200), _isRequestFi
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false),
     _hasContentLength(false), _declaredContentLength(0), _bodyBytesConsumed(0),
     _isDraining(false), _drainRemaining(0), _drainTimedOut(false),
+    _isChunkedDraining(false), _chunkedBodyConsumed(false),
     _isCgi(false), isErrorCode(false) , _ready(false)
 {
     this->_readBytes = 0;
@@ -84,6 +87,7 @@ Request::Request(Server* server, int socketFd, vector<Server> servers) : _socket
     _isReadingBody(false), _contentLength(0), _isBodyBoundary(false), _wantsClose(false),
     _hasContentLength(false), _declaredContentLength(0), _bodyBytesConsumed(0),
     _isDraining(false), _drainRemaining(0), _drainTimedOut(false),
+    _isChunkedDraining(false), _chunkedBodyConsumed(false),
     _isCgi(false), isErrorCode(false), _ready(false)
 {
     this->servers = servers;
@@ -100,6 +104,11 @@ void Request::readRequest()
 {
     try {
         _start = time(NULL);
+        if (this->_isChunkedDraining)
+        {
+            drainChunkedBody();
+            return;
+        }
         if (this->_isDraining)
         {
             char drainBuf[BUFFER_SIZE];
@@ -481,7 +490,39 @@ void Request::parseBodyWithChunked()
        bufferSize = _chunks.parse(_requestBuffer, _readBytes);
     } catch (int statusCode)
     {
+        // 201 out of the chunks parser now only ever means it walked
+        // all the way to the real terminator (the trailer part's
+        // closing CRLF - see Chunks::parseTrailer()), not just "saw
+        // the zero-size chunk announcement" - this is the single
+        // place that fact gets recorded for the keep-alive decision.
+        if (statusCode == 201)
+            this->_chunkedBodyConsumed = true;
         setStatusCode(statusCode, "Chunks Status Code");
+    }
+}
+
+// Driven by _isChunkedDraining, set from setStatusCode() below when
+// an error fires before the client's declared chunked body has been
+// fully read. Reuses this same request's _chunks parser (already
+// mid-parse, or untouched and ready from its default-constructed
+// state if the error fired before any body byte arrived at all) in
+// discard mode - it already knows how to walk chunk framing
+// correctly, so this just keeps feeding it bytes without writing any
+// of them anywhere, until it reaches the real terminator or a
+// framing error of its own.
+void Request::drainChunkedBody()
+{
+    char drainBuf[BUFFER_SIZE];
+    ssize_t n = tlsAwareRead(_socketFd, drainBuf, sizeof(drainBuf));
+    if (n <= 0)
+        return;
+    try {
+        _chunks.parse(string(drainBuf, (size_t)n), (int)n);
+    } catch (int statusCode)
+    {
+        if (statusCode == 201)
+            this->_chunkedBodyConsumed = true;
+        this->_isChunkedDraining = false;
     }
 }
 
@@ -492,17 +533,33 @@ void Request::setStatusCode(int statusCode, string statusMessage)
     if (statusCode >= 400)
         this->isErrorCode = true;
     // Every POST finishes here, success or error. If the client
-    // declared a body length up front (Content-Length or multipart -
-    // never chunked, see captureDeclaredBodyLength()) and hasn't
-    // actually sent all of it yet, the rest is still coming on the
-    // wire and has to be read and discarded before this connection
-    // can be handed to a new Request - otherwise those leftover bytes
-    // get misparsed as the start of the next request.
+    // declared a body length up front (Content-Length or multipart)
+    // and hasn't actually sent all of it yet, the rest is still
+    // coming on the wire and has to be read and discarded before this
+    // connection can be handed to a new Request - otherwise those
+    // leftover bytes get misparsed as the start of the next request.
     if (this->_method == "POST" && this->_hasContentLength && !this->_wantsClose
         && statusCode != 408 && this->_declaredContentLength > this->_bodyBytesConsumed)
     {
         this->_isDraining = true;
         this->_drainRemaining = this->_declaredContentLength - this->_bodyBytesConsumed;
+    }
+    // Same reasoning, chunked case: _chunkedBodyConsumed is only ever
+    // true once the chunks parser has genuinely reached the real
+    // terminator (see parseBodyWithChunked() above and
+    // drainChunkedBody() below) - a false here means either the body
+    // hasn't been read at all yet, or it errored out partway through,
+    // either way there could be more of the client's declared body
+    // still on the wire.
+    else if (this->_method == "POST" && !this->_chunkedBodyConsumed && !this->_wantsClose
+        && statusCode != 408)
+    {
+        map<string, string>::iterator it = _headers.find("transfer-encoding");
+        if (it != _headers.end() && it->second == "chunked")
+        {
+            this->_chunks.discardFromNowOn();
+            this->_isChunkedDraining = true;
+        }
     }
     spdlog::debug("{} {} -> {} ({})", _method, _tmpRequestTarget, statusCode, statusMessage);
     throw  statusCode;
@@ -510,7 +567,7 @@ void Request::setStatusCode(int statusCode, string statusMessage)
 
 bool Request::isDraining() const
 {
-    return this->_isDraining;
+    return this->_isDraining || this->_isChunkedDraining;
 }
 
 bool Request::isDrainTimedOut() const
@@ -520,12 +577,27 @@ bool Request::isDrainTimedOut() const
 
 bool Request::hasKnownBodyLength() const
 {
-    return this->_hasContentLength;
+    if (this->_hasContentLength)
+        return true;
+    map<string, string>::const_iterator it = _headers.find("transfer-encoding");
+    return it != _headers.end() && it->second == "chunked";
+}
+
+// Only meaningful once any chunked draining this connection needed
+// has already finished - isDraining() is false by then, which is the
+// only point either caller (Webserver::start()'s reuse decision, and
+// its periodic drain-timeout-abort scan) actually consults this.
+bool Request::chunkedBodyFailedToDrain() const
+{
+    map<string, string>::const_iterator it = _headers.find("transfer-encoding");
+    bool wasChunked = it != _headers.end() && it->second == "chunked";
+    return wasChunked && !this->_chunkedBodyConsumed;
 }
 
 void Request::abortDraining()
 {
     this->_isDraining = false;
+    this->_isChunkedDraining = false;
     this->_drainTimedOut = true;
 }
 

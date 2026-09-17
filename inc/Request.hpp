@@ -83,6 +83,23 @@ private:
     size_t _drainRemaining;
     bool _drainTimedOut;
 
+    // Chunked POST keep-alive support: a chunked body's length isn't
+    // known up front, so it can't use the byte-counter drain above.
+    // Instead, an error mid-body switches the same Chunks parser this
+    // request already uses into discard mode (see
+    // Chunks::discardFromNowOn()) and keeps feeding it bytes - it
+    // already knows how to walk chunk framing correctly, including
+    // the terminating "0" chunk and trailer part, so reusing it here
+    // finds the true end of the client's declared body on the wire
+    // the same way a normal successful parse would.
+    // _chunkedBodyConsumed is the single source of truth for "the
+    // chunks parser genuinely reached its real terminator" - set from
+    // the same place (a caught 201 out of Chunks::parse()) whether
+    // that happened during normal parsing or during a later drain.
+    bool _isChunkedDraining;
+    bool _chunkedBodyConsumed;
+    void drainChunkedBody();
+
     Boundaries _boundaries;
     Chunks _chunks;
     
@@ -149,5 +166,12 @@ public:
     bool isDraining() const;
     bool isDrainTimedOut() const;
     bool hasKnownBodyLength() const;
+    // True once any chunked-body draining this connection needed has
+    // concluded (isDraining() is false by construction whenever this
+    // is meaningfully checked) without ever reaching a real
+    // terminator - a malformed chunk mid-drain, not just "no chunked
+    // body was involved at all". Checked at the same reuse-decision
+    // site as isDrainTimedOut(), alongside it.
+    bool chunkedBodyFailedToDrain() const;
     void abortDraining();
 };
