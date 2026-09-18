@@ -2,6 +2,7 @@
 
 *A from-scratch HTTP/1.1 and HTTPS server in C++20 - no framework, no external HTTP library, just epoll and POSIX sockets.*
 
+![CI](https://github.com/bahbibe/webserv/actions/workflows/ci.yml/badge.svg)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue)
 ![CMake](https://img.shields.io/badge/CMake-3.16%2B-informational)
 ![OpenSSL](https://img.shields.io/badge/TLS-OpenSSL%203.0-informational)
@@ -66,6 +67,19 @@ validation directly, without spinning up a socket. A parsing bug or
 a new config directive gets a unit test here; a change to what the
 server actually does with a request gets an end-to-end case in
 `tests/run_tests.sh`.
+
+For AddressSanitizer + UndefinedBehaviorSanitizer:
+
+```
+cmake -S . -B build-asan -DWEBSERV_SANITIZE=ON -DWEBSERV_BUILD_TESTS=OFF
+cmake --build build-asan -j4
+ASAN_OPTIONS=detect_leaks=1 build-asan/webserv [config_file]
+```
+
+CI (`.github/workflows/ci.yml`) runs the unit suite, the end-to-end
+suite, the same suite again under ASan/UBSan, and `cppcheck` on every
+push and PR. See [SECURITY.md](SECURITY.md) for the vulnerability
+reporting policy.
 
 ## Architecture
 

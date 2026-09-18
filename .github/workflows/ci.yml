@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: build + unit + e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libssl-dev curl python3
+
+      - name: Configure
+        run: cmake -S . -B build
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Unit tests (doctest via ctest)
+        run: ctest --test-dir build --output-on-failure
+
+      - name: End-to-end tests
+        run: tests/run_tests.sh
+
+  sanitize:
+    name: ASan + UBSan build + e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libssl-dev curl python3
+
+      - name: Configure with sanitizers
+        run: cmake -S . -B build -DWEBSERV_SANITIZE=ON -DWEBSERV_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: End-to-end tests under ASan/UBSan
+        env:
+          ASAN_OPTIONS: halt_on_error=1:detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: tests/run_tests.sh
+
+  static-analysis:
+    name: cppcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=warning,performance,portability --error-exitcode=1 \
+            --inline-suppr --suppress=missingIncludeSystem \
+            -I inc src main.cpp
