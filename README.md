@@ -359,6 +359,14 @@ journalctl -u webserv -f
 | `/var/log/webserv/` | `access.log` and (if `error_log` is set, as the installed template does) `error.log` |
 | `/etc/systemd/system/webserv.service` | `Type=simple` - systemd tracks the process directly, no daemonizing needed |
 
+The unit also sandboxes the process at the systemd level -
+`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, a trimmed
+`CapabilityBoundingSet` (just `CAP_NET_BIND_SERVICE` +
+`CAP_SETUID`/`CAP_SETGID`/`CAP_DAC_OVERRIDE` for the root window
+before the privilege drop below), and `ReadWritePaths` scoped to the
+pidfile, logs, and uploads dir - on top of, not instead of, the
+in-process privilege drop.
+
 Re-running `install.sh` (an upgrade) never overwrites an
 already-installed config or site - only a first install populates
 those, so edits made after install are safe across upgrades.
