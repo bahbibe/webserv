@@ -105,3 +105,29 @@ if(WEBSERV_BUILD_TESTS)
     include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
     doctest_discover_tests(webserv_tests)
 endif()
+
+# --- fuzzing (libFuzzer, Clang only - libFuzzer ships in compiler-rt,
+# GCC has no equivalent driver) ---
+#
+# Chunks.cpp is a hand-written byte-level state machine parsing
+# untrusted client input directly - the highest-risk parsing surface
+# in the request path, and the one least exercised by hand-written
+# e2e cases. Off by default: needs Clang and isn't part of a normal
+# build or the doctest/e2e suites.
+option(WEBSERV_FUZZ "Build libFuzzer harnesses (requires Clang)" OFF)
+if(WEBSERV_FUZZ)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(FATAL_ERROR "WEBSERV_FUZZ requires Clang: cmake -DCMAKE_CXX_COMPILER=clang++ -DWEBSERV_FUZZ=ON")
+    endif()
+    add_executable(fuzz_chunks tests/fuzz/fuzz_chunks.cpp src/Request/Chunks.cpp)
+    target_include_directories(fuzz_chunks PRIVATE inc)
+    # webserv.hpp (pulled in via Chunks.hpp) includes spdlog/spdlog.h
+    # unconditionally - header-only, so linking it just adds the
+    # include path, no extra library code pulled into the fuzz binary.
+    target_link_libraries(fuzz_chunks PRIVATE spdlog::spdlog_header_only)
+    target_compile_options(fuzz_chunks PRIVATE -fsanitize=fuzzer,address,undefined -g -O1)
+    target_link_options(fuzz_chunks PRIVATE -fsanitize=fuzzer,address,undefined)
+    set_target_properties(fuzz_chunks PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build
+    )
+endif()
