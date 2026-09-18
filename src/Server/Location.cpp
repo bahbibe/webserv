@@ -8,6 +8,13 @@ Location::Location(Location const &src)
     *this = src;
 }
 
+// cppcheck-suppress operatorEqVarError
+// _dir is a set of parse-time counters (see Config.cpp's
+// applyServerDirective()) used only to catch a duplicate directive
+// within a single location block, while that block is still being
+// parsed - meaningless once parsing finishes, so not part of a
+// fully-parsed Location's real state and deliberately not copied
+// here.
 Location &Location::operator=(Location const &src)
 {
     if (this != &src)

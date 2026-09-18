@@ -1,7 +1,7 @@
 #include "../../inc/Server.hpp"
 #include "../../inc/Response.hpp"
 
-Server::Server() : _autoindex(false), _ssl(false)
+Server::Server() : _autoindex(false), _socket(-1), _ssl(false)
 {
     memset(&_dir, 0, sizeof(_dir));
 }
@@ -11,13 +11,19 @@ Server::Server(Server const &src)
     *this = src;
 }
 
+// cppcheck-suppress operatorEqVarError
+// _dir is a set of parse-time counters (see applyServerDirective())
+// used only to catch a duplicate directive within a single server
+// block, while that block is still being parsed - meaningless once
+// parsing finishes, so not part of a fully-parsed Server's real
+// state and deliberately not copied here.
 Server &Server::operator=(Server const &src)
 {
     if (this != &src)
     {
         _locations.clear();
         map<string, unique_ptr<Location> >::const_iterator it = src._locations.begin();
-        for (; it != src._locations.end(); it++)
+        for (; it != src._locations.end(); ++it)
         {
             _locations[it->first] = make_unique<Location>(*it->second);
         }
