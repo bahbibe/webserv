@@ -130,4 +130,17 @@ if(WEBSERV_FUZZ)
     set_target_properties(fuzz_chunks PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build
     )
+
+    # Same class of parser as Chunks (hand-written state machine over
+    # untrusted input), for multipart/form-data instead of chunked
+    # transfer-encoding. No discard mode here - it writes real (small)
+    # scratch files, see the harness's own header comment.
+    add_executable(fuzz_boundaries tests/fuzz/fuzz_boundaries.cpp src/Request/Boundaries.cpp)
+    target_include_directories(fuzz_boundaries PRIVATE inc)
+    target_link_libraries(fuzz_boundaries PRIVATE spdlog::spdlog_header_only)
+    target_compile_options(fuzz_boundaries PRIVATE -fsanitize=fuzzer,address,undefined -g -O1)
+    target_link_options(fuzz_boundaries PRIVATE -fsanitize=fuzzer,address,undefined)
+    set_target_properties(fuzz_boundaries PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build
+    )
 endif()
