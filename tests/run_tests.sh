@@ -224,6 +224,15 @@ assert_status "sibling directory sharing root's name as a string prefix is still
 assert_status "GET /readonly/ -> 200" 200 "$BASE_URL/readonly/"
 assert_status "DELETE on GET-only location -> 405" 405 -X DELETE "$BASE_URL/readonly/index.html"
 
+# Real gap: findLocation() used to match on a raw string prefix, so a
+# target like /readonlyExtra (not actually under /readonly at all)
+# would incorrectly match the /readonly location instead of falling
+# through to / - observably different here, since /readonly only
+# allows GET (405 on DELETE) while / allows DELETE too. Confirms the
+# fix respects a real path boundary, not just a shared prefix.
+assert_status "DELETE /readonlyExtra falls through to / (path boundary), not /readonly's 405" 404 \
+    -X DELETE "$BASE_URL/readonlyExtra"
+
 assert_status "return directive -> 301" 301 "$BASE_URL/old"
 assert_header_contains "301 Location header" "Location" "example.com/new" "$BASE_URL/old"
 

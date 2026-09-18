@@ -245,9 +245,23 @@ Location* Request::findLocation()
     map<string, unique_ptr<Location> >::const_iterator ite = locations.end();
     while (locations.size() > 0 && ite-- != itb)
     {
-        if (!this->_requestTarget.compare(0, ite->first.length(), ite->first))
+        size_t len = ite->first.length();
+        // A raw prefix compare would match "/admin" against a target
+        // of "/administrator" - same class of bug as validatePath()'s
+        // sibling-directory bypass, just at the location-matching
+        // layer instead of the filesystem layer. Require either an
+        // exact match, or a '/' boundary right where the location
+        // path ends (already true for "/" itself, since it ends in
+        // '/') - "/admin" matches "/admin" and "/admin/x", not
+        // "/administrator".
+        bool exact = this->_requestTarget.length() == len
+            && !this->_requestTarget.compare(0, len, ite->first);
+        bool prefixWithBoundary = this->_requestTarget.length() > len
+            && !this->_requestTarget.compare(0, len, ite->first)
+            && (ite->first[len - 1] == '/' || this->_requestTarget[len] == '/');
+        if (exact || prefixWithBoundary)
         {
-            this->_requestTarget.erase(0, ite->first.length());
+            this->_requestTarget.erase(0, len);
             return ite->second.get();
         }
     }
