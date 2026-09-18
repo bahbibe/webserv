@@ -73,13 +73,52 @@ void Response::CGI(Request &req, map<int, int> &cgiFdToClient)
         cout.flush();
 
         bool needsStdin = (this->_method != "GET" && this->_method != "HEAD");
-        int outPipe[2];
+        int outPipe[2] = {-1, -1};
         int inPipe[2] = {-1, -1};
-        pipe(outPipe);
-        if (needsStdin)
-            pipe(inPipe);
+        // pipe()/fork() failure is a real possibility under load (fd
+        // or process-table exhaustion, not just a theoretical error
+        // path) - left unchecked, outPipe/inPipe would hold garbage
+        // fds that later close()/dup2() calls would operate on, and
+        // an unchecked fork() == -1 would fall through to the parent
+        // branch below treating -1 as a real child pid, which is
+        // genuinely dangerous: kill(-1, ...) signals every process
+        // the caller has permission to signal, and waitpid(-1, ...)
+        // waits on any child, not the one actually intended. No
+        // response header has been sent yet at this point, so this
+        // can still cleanly become a 500 instead.
+        if (pipe(outPipe) == -1 || (needsStdin && pipe(inPipe) == -1))
+        {
+            if (outPipe[0] != -1) close(outPipe[0]);
+            if (outPipe[1] != -1) close(outPipe[1]);
+            if (inPipe[0] != -1) close(inPipe[0]);
+            if (inPipe[1] != -1) close(inPipe[1]);
+            this->_isCGI = false;
+            this->_isErrorCode = true;
+            this->_statusCode = 500;
+            checkErrors(req);
+            if (!this->_defaultError && headerSent())
+                GET();
+            return;
+        }
 
         this->pid = fork();
+        if (this->pid == -1)
+        {
+            close(outPipe[0]);
+            close(outPipe[1]);
+            if (needsStdin)
+            {
+                close(inPipe[0]);
+                close(inPipe[1]);
+            }
+            this->_isCGI = false;
+            this->_isErrorCode = true;
+            this->_statusCode = 500;
+            checkErrors(req);
+            if (!this->_defaultError && headerSent())
+                GET();
+            return;
+        }
         if (this->pid == 0)
         {
             close(outPipe[0]);
