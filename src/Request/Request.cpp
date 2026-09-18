@@ -356,7 +356,19 @@ void Request::validatePath()
     {
         string realPathStr = realPath;
         string realRootStr = realRoot;
-        if (realPathStr.compare(0, realRootStr.length(), realRootStr) != 0)
+        // A raw prefix compare here would treat a sibling directory
+        // that merely shares root's name as a prefix - "/var/www/
+        // site-secret" against a root of "/var/www/site" - as being
+        // inside root, since the string "/var/www/site-secret"
+        // starts with the string "/var/www/site". Requiring either an
+        // exact match or a '/' right after root's length closes that:
+        // realPathStr has to actually be root, or a real path
+        // beneath it, not just share a character prefix with it.
+        bool isInsideRoot = (realPathStr == realRootStr)
+            || (realPathStr.length() > realRootStr.length()
+                && realPathStr.compare(0, realRootStr.length(), realRootStr) == 0
+                && realPathStr[realRootStr.length()] == '/');
+        if (!isInsideRoot)
             setStatusCode(403, "Forbidden");
     }
 }
