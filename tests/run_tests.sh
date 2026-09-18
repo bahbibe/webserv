@@ -402,6 +402,51 @@ else
     fail "multipart upload content mismatch (uploaded: ${uploaded:-none})"
 fi
 
+# Regression case: a multipart upload abandoned mid-transfer (client
+# disconnects after Boundaries::createFile() already opened the
+# output file, before the closing boundary ever arrives) used to leak
+# the file descriptor forever - Boundaries had no destructor, and
+# nothing else in the abrupt-disconnect path closed it. Found via
+# fuzzing Boundaries::parseBoundary() (tests/fuzz/fuzz_boundaries.cpp)
+# turning up an ASan leak report, then reproduced live against the
+# real server via /proc/<pid>/fd (5 abandoned uploads -> 5 leaked
+# fds before the fix).
+fd_count() { ls "/proc/$SERVER_PID/fd" 2>/dev/null | wc -l; }
+fds_before_abandon=$(fd_count)
+python3 - "$PORT" <<'PYEOF'
+import socket, sys, time
+port = int(sys.argv[1])
+boundary = "----WebKitFormBoundaryLEAK"
+body = (
+    f"--{boundary}\r\n"
+    f"Content-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\n"
+    f"Content-Type: text/plain\r\n\r\n"
+    f"partial file content, never terminated"
+).encode()
+for _ in range(5):
+    s = socket.create_connection(("127.0.0.1", port), timeout=5)
+    req = (
+        f"POST /uploads HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+        f"Content-Type: multipart/form-data; boundary={boundary}\r\n"
+        f"Content-Length: {len(body) + 100}\r\nConnection: keep-alive\r\n\r\n"
+    ).encode() + body
+    s.sendall(req)
+    time.sleep(0.2)
+    s.close()
+PYEOF
+sleep 1
+fds_after_abandon=$(fd_count)
+if [ "$fds_after_abandon" -le "$fds_before_abandon" ]; then
+    pass "abandoned multipart uploads don't leak file descriptors ($fds_before_abandon -> $fds_after_abandon)"
+else
+    fail "file descriptor leak: $fds_before_abandon -> $fds_after_abandon after 5 abandoned uploads"
+fi
+# Leftover partial files from the abandoned uploads above are harmless
+# (WORK_DIR is wiped by the cleanup trap on exit) - not removed here
+# on purpose, since a broad glob would also catch the real upload
+# file "multipart upload -> 201" already left behind, which the
+# DELETE test below still needs.
+
 assert_status "chunked upload -> 201" 201 \
     -H "Transfer-Encoding: chunked" --data-binary "@$WORK_DIR/upload_source.txt" "$BASE_URL/"
 chunked=$(ls -t "$WORK_DIR/WWW/uploads"/*.bin 2>/dev/null | head -1)
