@@ -394,6 +394,64 @@ else
     fail "chunked drain-then-reuse produced status1='$chunked_drain_status1' status2='$chunked_drain_status2'"
 fi
 
+# Regression case: a request declaring both Content-Length and
+# Transfer-Encoding: chunked is correctly rejected (400, RFC 9112
+# 6.1), but chunked-drain setup used to only ever consume *new*
+# socket reads - the chunked body bytes that arrived in the very same
+# read as the headers (the common case for a small request) were
+# never fed to the drain, so the connection just sat there until the
+# unrelated idle-timeout scan force-closed it ~10s later. Assert the
+# connection reuses in well under that, not that it merely eventually
+# recovers.
+cl_te_result=$(python3 - "$PORT" <<'PYEOF'
+import socket, sys, time
+
+def recv_one_response(s, timeout=15):
+    s.settimeout(timeout)
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        chunk = s.recv(4096)
+        if not chunk:
+            return buf
+        buf += chunk
+    head, rest = buf.split(b"\r\n\r\n", 1)
+    if b"chunked" not in head.lower():
+        return buf
+    body = rest
+    while b"\r\n0\r\n\r\n" not in body:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        body += chunk
+    return head + b"\r\n\r\n" + body
+
+port = int(sys.argv[1])
+s = socket.create_connection(("127.0.0.1", port), timeout=5)
+chunked_body = b"1a\r\n" + b"A" * 26 + b"\r\n0\r\n\r\n"
+req = (b"POST /uploads HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n"
+    b"Transfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n") + chunked_body
+t0 = time.time()
+s.sendall(req)
+resp1 = recv_one_response(s)
+s.sendall(b"GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+resp2 = recv_one_response(s)
+elapsed = time.time() - t0
+s.close()
+print(resp1.split(b"\r\n")[0].decode(errors="replace"))
+print(resp2.split(b"\r\n")[0].decode(errors="replace"))
+print(f"{elapsed:.2f}")
+PYEOF
+)
+cl_te_status1=$(echo "$cl_te_result" | sed -n '1p')
+cl_te_status2=$(echo "$cl_te_result" | sed -n '2p')
+cl_te_elapsed=$(echo "$cl_te_result" | sed -n '3p')
+cl_te_fast=$(awk -v e="$cl_te_elapsed" 'BEGIN { print (e < 5) ? 1 : 0 }')
+if [ "$cl_te_status1" = "HTTP/1.1 400 Bad Request" ] && [ "$cl_te_status2" = "HTTP/1.1 200 OK" ] && [ "$cl_te_fast" = "1" ]; then
+    pass "Content-Length + Transfer-Encoding conflict reuses the connection immediately, not after a timeout (${cl_te_elapsed}s)"
+else
+    fail "CL/TE conflict drain produced status1='$cl_te_status1' status2='$cl_te_status2' elapsed=${cl_te_elapsed}s"
+fi
+
 assert_status "multipart upload -> 201" 201 -F "file=@$WORK_DIR/upload_source.txt" "$BASE_URL/"
 uploaded=$(ls -t "$WORK_DIR/WWW/uploads"/*.txt 2>/dev/null | head -1)
 if [ -n "$uploaded" ] && diff -q "$WORK_DIR/upload_source.txt" "$uploaded" >/dev/null 2>&1; then
