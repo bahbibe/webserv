@@ -2,7 +2,22 @@
 
 Boundaries::Boundaries() : _isFileCreated(false), _outfile(NULL), _state(BD_START), _filesCounter(0), _contentLength(0), _writedContent(0) { };
 
-Boundaries::~Boundaries() { };
+// A part's file is normally closed by closeOutFile() (on a boundary
+// found) or throwException() (on a parse error) before this ever
+// runs. Neither of those fires for a connection that times out or
+// disconnects mid-upload - Webserver::closeConnection() just erases
+// the Request (and this Boundaries member with it), so without this,
+// the fd and heap buffer behind _outfile leak for good: one per
+// abandoned upload, confirmed via a live repro (5 abandoned uploads
+// -> 5 leaked fds, checked against /proc/<pid>/fd).
+Boundaries::~Boundaries()
+{
+    if (_outfile)
+    {
+        _outfile->close();
+        delete _outfile;
+    }
+}
 
 
 void Boundaries::setBoundaries(const string& boundary, const string& uploadPath, size_t contentLength)
