@@ -119,6 +119,12 @@ echo "test index" > "$WORK_DIR/WWW/index.html"
 echo "readonly content" > "$WORK_DIR/WWW/readonly/index.html"
 python3 -c "print('X' * 3000)" > "$WORK_DIR/upload_source.txt"
 
+# A sibling directory sharing WWW's name as a raw string prefix - not
+# nested under it at all - for the sibling-directory traversal
+# regression test below.
+mkdir -p "$WORK_DIR/WWW-secret"
+echo "TOP SECRET - outside the server root entirely" > "$WORK_DIR/WWW-secret/secret.txt"
+
 echo "this file is never actually run - cgi_path below points at the fake interpreter" \
     > "$WORK_DIR/WWW/hello.py"
 chmod +x "$WORK_DIR/WWW/hello.py"
@@ -204,6 +210,16 @@ fi
 
 assert_status "path traversal outside root -> 403" 403 \
     --path-as-is "$BASE_URL/../../../../../../../../etc/passwd"
+
+# A real, previously-exploitable gap: validatePath() used to compare
+# the canonicalized request path against root with a raw string
+# prefix match, which treats any sibling whose name happens to start
+# with root's own name - WWW-secret next to WWW - as being "inside"
+# root, since the string "WWW-secret" starts with the string "WWW".
+# Confirmed live before the fix: this returned 200 with the sibling
+# file's real content instead of 403.
+assert_status "sibling directory sharing root's name as a string prefix is still outside root -> 403" 403 \
+    --path-as-is "$BASE_URL/../WWW-secret/secret.txt"
 
 assert_status "GET /readonly/ -> 200" 200 "$BASE_URL/readonly/"
 assert_status "DELETE on GET-only location -> 405" 405 -X DELETE "$BASE_URL/readonly/index.html"
@@ -385,6 +401,19 @@ if [ -n "$chunked" ] && diff -q "$WORK_DIR/upload_source.txt" "$chunked" >/dev/n
 else
     fail "chunked upload content mismatch (uploaded: ${chunked:-none})"
 fi
+
+# Regression case: the automatic "directory without a trailing slash"
+# redirect used to fire for every method, not just GET/HEAD - a POST
+# to a directory-shaped target (like the README's own quick-start
+# example, `curl -F ... http://.../uploads`, no trailing slash) still
+# wrote the file to disk (that happens during request parsing,
+# independent of the response) but told the client 301 instead of
+# 201, with no reliable way for the client to know the upload had
+# already happened. /uploads here is a real on-disk directory under
+# the / location's own root (upload on applies to it too), so this
+# exercises the exact same is_adir()-without-trailing-slash path.
+assert_status "POST to a directory path with no trailing slash still uploads (not a 301)" 201 \
+    -F "file=@$WORK_DIR/upload_source.txt" "$BASE_URL/uploads"
 
 if [ -n "$uploaded" ]; then
     rel=${uploaded#"$WORK_DIR/WWW"}
