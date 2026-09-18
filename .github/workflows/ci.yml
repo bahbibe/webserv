@@ -72,6 +72,33 @@ jobs:
             --inline-suppr --suppress=missingIncludeSystem \
             -I inc src main.cpp
 
+  format-check:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format
+
+      # Advisory, not a hard gate: the existing tree predates this
+      # workflow and isn't fully reformatted to .clang-format yet
+      # (a repo-wide reformat is its own, separately-reviewed change,
+      # not something to fold silently into an unrelated CI PR).
+      # --dry-run alone always exits 0 (only -Werror would fail the
+      # step) - check its output instead of its exit code.
+      - name: Check formatting
+        run: |
+          clang-format --dry-run -style=file \
+            $(find src inc tests/fuzz -name '*.cpp' -o -name '*.hpp') main.cpp \
+            2>/tmp/format-diff.log
+          cat /tmp/format-diff.log
+          if [ -s /tmp/format-diff.log ]; then
+            echo "::warning::formatting drift found - see job log"
+          fi
+
   fuzz-smoke:
     name: fuzz smoke test (chunked body parser)
     runs-on: ubuntu-latest
@@ -95,3 +122,19 @@ jobs:
       # thing (tests/fuzz/fuzz_chunks.cpp's header comment).
       - name: Run fuzzer for 60s
         run: ./build/fuzz_chunks -max_total_time=60 -print_final_stats=1
+
+  docker-scan:
+    name: Docker image vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t webserv:ci .
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: webserv:ci
+          severity: HIGH,CRITICAL
+          exit-code: '1'

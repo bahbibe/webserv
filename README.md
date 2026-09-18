@@ -87,10 +87,16 @@ cmake --build build-fuzz --target fuzz_chunks -j4
 ./build-fuzz/fuzz_chunks -max_total_time=300 corpus/
 ```
 
-CI (`.github/workflows/ci.yml`) runs the unit suite, the end-to-end
-suite, the same suite again under ASan/UBSan, a 60-second fuzzing
-smoke test, and `cppcheck` on every push and PR. See
-[SECURITY.md](SECURITY.md) for the vulnerability reporting policy.
+CI (`.github/workflows/ci.yml`) runs, on every push and PR: the unit
+suite, the end-to-end suite, the same suite again under ASan/UBSan, a
+60-second fuzzing smoke test, `cppcheck`, a `clang-format` check
+(advisory - the pre-existing tree isn't fully reformatted to
+`.clang-format` yet), and a Trivy scan of the built Docker image for
+HIGH/CRITICAL CVEs. `dependabot.yml` keeps GitHub Actions and the
+Docker base image current (spdlog/doctest are pinned via CMake
+`FetchContent`, which Dependabot doesn't cover - those stay a manual
+bump). See [SECURITY.md](SECURITY.md) for the vulnerability reporting
+policy.
 
 ## Architecture
 
