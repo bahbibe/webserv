@@ -585,6 +585,35 @@ void Request::setStatusCode(int statusCode, string statusMessage)
         {
             this->_chunks.discardFromNowOn();
             this->_isChunkedDraining = true;
+            // !_isReadingBody means this error fired before
+            // parseBodyWithChunked() ever ran for this request (e.g.
+            // a header-validation error, or the Content-Length +
+            // Transfer-Encoding conflict below) - _chunks is still
+            // untouched, and _requestBuffer holds body bytes from
+            // this same read that nothing has looked at yet. Walk
+            // them right now: otherwise this only advances on a new
+            // socket read, which may never come if the client
+            // considers its request already fully sent (the common
+            // case for a small request that fits in one packet) -
+            // the connection would then just sit open, undrained,
+            // until the idle-timeout scan eventually force-closes it.
+            // (If _isReadingBody is already true, _chunks.parse() was
+            // just called on this same _requestBuffer by
+            // parseBodyWithChunked() itself - re-feeding it here
+            // would double-process already-consumed bytes.)
+            if (!this->_isReadingBody && !this->_requestBuffer.empty())
+            {
+                try
+                {
+                    this->_chunks.parse(this->_requestBuffer, (int)this->_requestBuffer.length());
+                }
+                catch (int drainStatus)
+                {
+                    if (drainStatus == 201)
+                        this->_chunkedBodyConsumed = true;
+                    this->_isChunkedDraining = false;
+                }
+            }
         }
     }
     spdlog::debug("{} {} -> {} ({})", _method, _tmpRequestTarget, statusCode, statusMessage);
