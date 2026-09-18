@@ -76,10 +76,21 @@ cmake --build build-asan -j4
 ASAN_OPTIONS=detect_leaks=1 build-asan/webserv [config_file]
 ```
 
+For fuzzing the chunked-transfer-encoding body parser
+(`src/Request/Chunks.cpp` - a hand-written byte-level state machine
+parsing untrusted client input, the highest-risk parsing surface in
+the request path) with libFuzzer, which needs Clang:
+
+```
+cmake -S . -B build-fuzz -DCMAKE_CXX_COMPILER=clang++ -DWEBSERV_FUZZ=ON -DWEBSERV_BUILD_TESTS=OFF
+cmake --build build-fuzz --target fuzz_chunks -j4
+./build-fuzz/fuzz_chunks -max_total_time=300 corpus/
+```
+
 CI (`.github/workflows/ci.yml`) runs the unit suite, the end-to-end
-suite, the same suite again under ASan/UBSan, and `cppcheck` on every
-push and PR. See [SECURITY.md](SECURITY.md) for the vulnerability
-reporting policy.
+suite, the same suite again under ASan/UBSan, a 60-second fuzzing
+smoke test, and `cppcheck` on every push and PR. See
+[SECURITY.md](SECURITY.md) for the vulnerability reporting policy.
 
 ## Architecture
 
