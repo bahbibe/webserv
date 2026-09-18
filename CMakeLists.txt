@@ -7,6 +7,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options(-Wall -Wextra -Werror)
 
+# Off by default - doubles memory use and slows every syscall, not
+# something a normal dev loop or the Docker image wants. CI turns it
+# on in a dedicated job; locally: cmake -S . -B build-asan
+# -DWEBSERV_SANITIZE=ON.
+option(WEBSERV_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if(WEBSERV_SANITIZE)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
 # Pin explicitly to Debug (-g, no -O flag) before fetching any
 # dependency below. Leaving CMAKE_BUILD_TYPE unset was the Phase 0
 # choice so nothing added -O2 - but spdlog's own CMakeLists.txt
