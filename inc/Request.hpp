@@ -45,7 +45,15 @@ private:
     bool _isRequestFinished;
     bool _isFoundCRLF;
     
-    char _buffer[BUFFER_SIZE];
+    // +1: readRequest() null-terminates at _buffer[_readBytes], and a
+    // full BUFFER_SIZE-byte read (bufferSize is capped at BUFFER_SIZE,
+    // see Chunks::writeContent()) makes _readBytes == BUFFER_SIZE - a
+    // plain char[BUFFER_SIZE] here means that write lands one byte
+    // past the end (caught by UBSan's array-bounds check, silent
+    // stack corruption otherwise - never crashed in a non-sanitized
+    // build, which is why 40+ manual e2e runs this session never
+    // caught it against a plain build).
+    char _buffer[BUFFER_SIZE + 1];
     string _requestBuffer;
     string _headersBuffer;
     string _rest;
