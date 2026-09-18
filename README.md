@@ -76,23 +76,32 @@ cmake --build build-asan -j4
 ASAN_OPTIONS=detect_leaks=1 build-asan/webserv [config_file]
 ```
 
-For fuzzing the chunked-transfer-encoding body parser
-(`src/Request/Chunks.cpp` - a hand-written byte-level state machine
-parsing untrusted client input, the highest-risk parsing surface in
-the request path) with libFuzzer, which needs Clang:
+For fuzzing the two hand-written, byte-level body-parsing state
+machines that handle untrusted client input directly - the
+highest-risk parsing surface in the request path - with libFuzzer,
+which needs Clang: `fuzz_chunks` targets `src/Request/Chunks.cpp`
+(chunked transfer-encoding), `fuzz_boundaries` targets
+`src/Request/Boundaries.cpp` (multipart/form-data uploads).
+Fuzzing `fuzz_boundaries` found a real bug this way: an upload
+abandoned mid-transfer (client disconnects before the closing
+boundary) leaked the output file's descriptor forever, since
+`Boundaries` had no destructor - fixed, with a regression test
+(`tests/run_tests.sh`) that reproduces it against a live server via
+`/proc/<pid>/fd`.
 
 ```
 cmake -S . -B build-fuzz -DCMAKE_CXX_COMPILER=clang++ -DWEBSERV_FUZZ=ON -DWEBSERV_BUILD_TESTS=OFF
-cmake --build build-fuzz --target fuzz_chunks -j4
+cmake --build build-fuzz --target fuzz_chunks fuzz_boundaries -j4
 ./build-fuzz/fuzz_chunks -max_total_time=300 corpus/
+./build-fuzz/fuzz_boundaries -max_total_time=300 corpus/
 ```
 
 CI (`.github/workflows/ci.yml`) runs, on every push and PR: the unit
 suite, the end-to-end suite, the same suite again under ASan/UBSan, a
-60-second fuzzing smoke test, `cppcheck`, a `clang-format` check
-(advisory - the pre-existing tree isn't fully reformatted to
-`.clang-format` yet), and a Trivy scan of the built Docker image for
-HIGH/CRITICAL CVEs. `dependabot.yml` keeps GitHub Actions and the
+60-second fuzzing smoke test against both harnesses, `cppcheck`, a
+`clang-format` check (advisory - the pre-existing tree isn't fully
+reformatted to `.clang-format` yet), and a Trivy scan of the built
+Docker image for HIGH/CRITICAL CVEs. `dependabot.yml` keeps GitHub Actions and the
 Docker base image current (spdlog/doctest are pinned via CMake
 `FetchContent`, which Dependabot doesn't cover - those stay a manual
 bump). See [SECURITY.md](SECURITY.md) for the vulnerability reporting

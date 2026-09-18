@@ -100,7 +100,7 @@ jobs:
           fi
 
   fuzz-smoke:
-    name: fuzz smoke test (chunked body parser)
+    name: fuzz smoke test (chunked + multipart body parsers)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -113,15 +113,18 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DWEBSERV_FUZZ=ON -DWEBSERV_BUILD_TESTS=OFF
 
-      - name: Build fuzz target
-        run: cmake --build build --target fuzz_chunks -j4
+      - name: Build fuzz targets
+        run: cmake --build build --target fuzz_chunks fuzz_boundaries -j4
 
       # A short timed run on every push/PR, not a continuous fuzzing
       # campaign - catches an obvious new crash close to the change
       # that caused it. Longer, ongoing fuzzing is a manual/local
-      # thing (tests/fuzz/fuzz_chunks.cpp's header comment).
-      - name: Run fuzzer for 60s
+      # thing (each harness's own header comment).
+      - name: Run fuzz_chunks for 60s
         run: ./build/fuzz_chunks -max_total_time=60 -print_final_stats=1
+
+      - name: Run fuzz_boundaries for 60s
+        run: ./build/fuzz_boundaries -max_total_time=60 -print_final_stats=1
 
   docker-scan:
     name: Docker image vulnerability scan
