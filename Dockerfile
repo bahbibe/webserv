@@ -1,4 +1,4 @@
-# See V6-PLAN.md. Multi-stage on purpose: the build stage's toolchain
+# Multi-stage on purpose: the build stage's toolchain
 # (cmake, g++, libssl-dev, spdlog's FetchContent source tree) never
 # ships - only the runtime stage's much smaller footprint does.
 
@@ -40,11 +40,11 @@ COPY --from=build /src/WWW /app/WWW
 # same scoped-ownership posture as v5's install.sh.
 RUN chown webserv:webserv /app && chown -R webserv:webserv /app/WWW/uploads
 
-# 8090 matches conf/webserv.conf.docker's listen port (see
-# V6-PLAN.md Phase 2) - EXPOSE is documentation, docker run still
-# needs its own -p to actually publish the port. TLS/443 isn't
-# exposed by default: it's config-driven (needs a real certificate
-# mounted in), not something a baked-in image should default to.
+# 8090 matches conf/webserv.conf.docker's listen port - EXPOSE is
+# documentation, docker run still needs its own -p to actually
+# publish the port. TLS/443 isn't exposed by default: it's
+# config-driven (needs a real certificate mounted in), not something
+# a baked-in image should default to.
 EXPOSE 8090
 
 # No `user` directive in webserv.conf.docker: the container itself is

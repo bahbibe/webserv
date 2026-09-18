@@ -37,7 +37,7 @@ if [ ! -x "$ROOT_DIR/webserv" ]; then
 fi
 
 if ! id -u "$WEBSERV_USER" >/dev/null 2>&1; then
-    echo "Creating system user/group $WEBSERV_USER (see V5-PLAN.md - the user directive drops root privileges after startup)"
+    echo "Creating system user/group $WEBSERV_USER (the user directive drops root privileges after startup)"
     useradd --system --no-create-home --shell /usr/sbin/nologin "$WEBSERV_USER"
 else
     echo "System user $WEBSERV_USER already exists, leaving it alone"
