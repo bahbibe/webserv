@@ -35,11 +35,11 @@ public:
     Server &operator=(Server const &src);
     void mimeTypes();
     void setErrorCodes(string const &, string const &);
-    // Directive application (see V4-PLAN.md Phase 4's ConfigParser,
-    // which owns tokenizing/block structure and hands each already-
-    // recognized directive's name and same-line value tokens here -
-    // this is the same validation every directive already had, just
-    // no longer doing its own text scanning to get called).
+    // Directive application, called from ConfigParser - it owns
+    // tokenizing/block structure and hands each already-recognized
+    // directive's name and same-line value tokens here. This is the
+    // same validation every directive already had, just no longer
+    // doing its own text scanning to get called.
     void applyServerDirective(string const &name, vector<string> const &values, t_dir &dir);
     // Runs once, right after a server block's closing brace: the
     // duplicate-directive check, and the "listen ... ssl needs both

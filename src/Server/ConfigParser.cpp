@@ -130,11 +130,10 @@ void ConfigParser::parseLocationBlock(Server &server)
     server.addLocation(path, move(location));
 }
 
-// user <name> [group]; - ported from v5's Phase 1 essentially
-// unchanged (see V4-PLAN.md Phase 4): validated here via
-// getpwnam()/getgrnam() at config-parse time, same as every other
-// directive that needs a real OS lookup to validate
-// (resolveHostFamily() for host, access() for root/ssl paths).
+// user <name> [group]; validated here via getpwnam()/getgrnam() at
+// config-parse time, same as every other directive that needs a real
+// OS lookup to validate (resolveHostFamily() for host, access() for
+// root/ssl paths).
 void ConfigParser::parseMainDirective(string const &name, vector<string> const &values)
 {
     size_t idx = 0;

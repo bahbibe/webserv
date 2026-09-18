@@ -131,7 +131,7 @@ int main(int argc, char const *argv[])
         // Strictly after every root-only startup step (sockets bound,
         // TLS certs loaded, pidfile written, logs open) and strictly
         // before server.start() - the point past which untrusted
-        // request bytes get parsed. See V5-PLAN.md Phase 1.
+        // request bytes get parsed.
         dropPrivileges();
         server.start();
         if (!pidPath.empty())

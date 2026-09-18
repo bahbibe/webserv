@@ -1,15 +1,15 @@
 #include "../../inc/webserv.hpp"
 #include "../../inc/Server.hpp"
 
-// Directive application for one server block (see V4-PLAN.md Phase 4:
-// ConfigParser owns tokenizing and block structure, recognizes the
-// directive name via isServerDir(), and hands the name plus every
-// value token sharing its source line here - "location" is handled
-// entirely by ConfigParser itself, since it's structural, not a
-// value-only directive, and never reaches this function). Same
-// per-directive validation this project has always had, just reading
-// from an already-tokenized vector instead of doing its own text
-// scanning to get there.
+// Directive application for one server block. ConfigParser owns
+// tokenizing and block structure, recognizes the directive name via
+// isServerDir(), and hands the name plus every value token sharing
+// its source line here - "location" is handled entirely by
+// ConfigParser itself, since it's structural, not a value-only
+// directive, and never reaches this function. Same per-directive
+// validation this project has always had, just reading from an
+// already-tokenized vector instead of doing its own text scanning to
+// get there.
 void Server::applyServerDirective(string const &name, vector<string> const &values, t_dir &dir)
 {
     size_t idx = 0;

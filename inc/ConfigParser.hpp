@@ -5,14 +5,14 @@
 class Webserver;
 class Server;
 
-// Builds on the Lexer's token stream (Phase 3) to replace the four
-// hand-rolled line-scanners this project used to have - Webserver::
-// brackets(), the old free function parseGlobalDirectives(),
-// Server::parseServer(), Server::parseLocation() - with one real
+// Builds on the Lexer's token stream to replace the four hand-rolled
+// line-scanners this project used to have - Webserver::brackets(),
+// the old free function parseGlobalDirectives(), Server::
+// parseServer(), Server::parseLocation() - with one real
 // recursive-descent parser: one place that always knows exactly what
 // nesting level it's at, instead of four independently-reconstructed
 // notions of the same thing, coordinated only by a static cross-call
-// position hack (see V4-PLAN.md Phase 4).
+// position hack.
 //
 // Owns grammar and block structure only. The actual per-directive
 // validation stays exactly where it always lived - on Server

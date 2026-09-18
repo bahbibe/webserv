@@ -1,8 +1,7 @@
-// Characterization tests for the config parser (see V4-PLAN.md).
-// Originally written against the four hand-rolled line-scanners
-// (Phase 1), now driving ConfigParser (Phase 4) - same test intent,
-// same expected outcomes, just calling the parser main.cpp actually
-// uses since this phase landed:
+// Characterization tests for the config parser. Originally written
+// against the four hand-rolled line-scanners, now driving
+// ConfigParser - same test intent, same expected outcomes, just
+// calling the parser main.cpp actually uses:
 //   Webserver server;
 //   ConfigParser(buff).parse(server);
 

@@ -18,13 +18,13 @@ struct Token
 
 // Turns raw config file text into one flat token stream - comments
 // stripped, every whitespace character (including '\r', unlike the
-// old line-by-line parser - see V4-PLAN.md Phase 2's CRLF finding)
-// treated uniformly as a separator, a quoted string read as one token
-// regardless of any spaces inside it. One place decides what a token
-// is, instead of four line-scanners each doing their own ad hoc
-// splitting (see V4-PLAN.md Phase 3). Purely lexical - has no idea
-// what a "server" or "location" is; that's ConfigParser's job
-// (Phase 4), built on top of the token stream this produces.
+// old line-by-line parser) treated uniformly as a separator, a
+// quoted string read as one token regardless of any spaces inside
+// it. One place decides what a token is, instead of four
+// line-scanners each doing their own ad hoc splitting. Purely
+// lexical - has no idea what a "server" or "location" is; that's
+// ConfigParser's job, built on top of the token stream this
+// produces.
 class Lexer
 {
 public:

@@ -3,8 +3,7 @@
 #include <filesystem>
 #include <fstream>
 
-// Shared setup/teardown for every parser unit test (see V4-PLAN.md
-// Phase 1). Two jobs:
+// Shared setup/teardown for every parser unit test. Two jobs:
 //
 // 1. Resets the process-global state parsing touches - configErrors,
 //    the pid/error_log/user globals, confDir - so each test case

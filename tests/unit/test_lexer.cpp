@@ -1,8 +1,8 @@
-// Lexer unit tests (see V4-PLAN.md Phase 3). Tested directly against
-// the token stream it produces, independent of anything about
-// server/location semantics - a token stream for a given input is
-// either exactly right or it isn't. No fixture needed: Lexer is
-// self-contained per instance, no shared/global state to reset.
+// Lexer unit tests. Tested directly against the token stream it
+// produces, independent of anything about server/location semantics
+// - a token stream for a given input is either exactly right or it
+// isn't. No fixture needed: Lexer is self-contained per instance, no
+// shared/global state to reset.
 
 #include <doctest/doctest.h>
 #include "../../inc/Lexer.hpp"
@@ -58,8 +58,7 @@ TEST_CASE("braces are their own tokens regardless of surrounding whitespace")
 {
     // "server{" and "server {" and "server\n{" all have to lex
     // identically - that's what makes brace placement stop mattering
-    // to the parser built on top of this (see V4-PLAN.md Phase 2's
-    // "brace on its own line" finding).
+    // to the parser built on top of this.
     Lexer sameLine("server {");
     Lexer noSpace("server{");
     Lexer nextLine("server\n{");
@@ -105,9 +104,9 @@ TEST_CASE("a comment-only line produces no tokens for that line")
 
 TEST_CASE("a comment appended after real content is stripped, not tokenized")
 {
-    // Fixes both Phase 2 comment gaps at once: listen's trailing
-    // comment no longer looks like a second directive argument, and
-    // a variadic directive's trailing comment no longer looks like an
+    // Fixes two real comment gaps at once: listen's trailing comment
+    // no longer looks like a second directive argument, and a
+    // variadic directive's trailing comment no longer looks like an
     // extra value - the lexer strips it before either directive ever
     // sees a token for it.
     Lexer lexer("listen 8080 # the main port\nserver_name example.com # prod");
@@ -151,11 +150,11 @@ TEST_CASE("an unterminated quoted string throws")
 
 TEST_CASE("CRLF line endings do not corrupt adjacent tokens")
 {
-    // The direct regression test for the exact Phase 2 finding: '\r'
-    // is just whitespace here, stripped the same as a space or '\n' -
-    // it can never end up glued onto the end of a word or make a
-    // brace-placement check fail the way it did in the old
-    // line-by-line parser.
+    // The direct regression test for a real gap found in the old
+    // line-by-line parser: '\r' is just whitespace here, stripped
+    // the same as a space or '\n' - it can never end up glued onto
+    // the end of a word or make a brace-placement check fail the way
+    // it did before.
     Lexer lexer("server {\r\n    host 127.0.0.1\r\n    listen 8080\r\n}\r\n");
     vector<Token> tokens = lexer.tokenize();
 

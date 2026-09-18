@@ -1,13 +1,13 @@
 #pragma once
 #include "webserv.hpp"
 
-// See V5-PLAN.md Phase 1. Drops from root to the account named by the
-// `user <name> [group];` directive (dropUser/dropGroup, already
-// config-validated by ConfigParser::parseMainDirective - see
-// inc/webserv.hpp), called once from main() after every root-only
-// startup step (socket binds, TLS cert loads, pidfile write, log
-// open) and strictly before server.start() - the point past which
-// untrusted request bytes get parsed.
+// Drops from root to the account named by the `user <name> [group];`
+// directive (dropUser/dropGroup, already config-validated by
+// ConfigParser::parseMainDirective - see inc/webserv.hpp), called
+// once from main() after every root-only startup step (socket binds,
+// TLS cert loads, pidfile write, log open) and strictly before
+// server.start() - the point past which untrusted request bytes get
+// parsed.
 //
 // No-op if `user` wasn't set. Soft-fails (logs a warning, keeps
 // running as the launching account) if the process isn't root to

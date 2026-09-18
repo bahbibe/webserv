@@ -1,21 +1,20 @@
-// Edge-case tests for the config parser (see V4-PLAN.md Phase 2).
-// Originally written against the old line-tokenizer, several
-// deliberately locking in real gaps via doctest::may_fail(true).
-// Phase 4 replaced the four hand-rolled scanners with a real
-// Lexer + recursive-descent ConfigParser; its explicit acceptance bar
-// is every one of those gaps closing for real, so all five may_fail
-// markers are gone below - each of those cases now asserts the
-// correct (not the old broken) behavior and genuinely passes.
+// Edge-case tests for the config parser. Originally written against
+// the old line-tokenizer, several deliberately locking in real gaps
+// via doctest::may_fail(true). The Lexer + recursive-descent
+// ConfigParser that replaced the four hand-rolled scanners closed
+// every one of those gaps for real, so all five may_fail markers are
+// gone below - each of those cases now asserts the correct (not the
+// old broken) behavior and genuinely passes.
 //
 // Two structural tests also changed in a way worth flagging: "brace
 // on the line after the keyword" used to throw, because the old
 // per-line scanner required "server {" and "location <path> {" to be
-// on one physical line. The new Lexer emits braces as their own
-// tokens independent of line breaks (see V4-PLAN.md Phase 3 and the
-// "same source line" strategy note in ConfigParser), so this is no
-// longer a structural error - it's just valid config now, same as
-// nginx itself allows. Both tests were flipped to assert successful
-// parsing instead of a throw.
+// on one physical line. The Lexer emits braces as their own tokens
+// independent of line breaks (see the "same source line" strategy
+// note in ConfigParser), so this is no longer a structural error -
+// it's just valid config now, same as nginx itself allows. Both
+// tests were flipped to assert successful parsing instead of a
+// throw.
 
 #include <doctest/doctest.h>
 #include "ParserFixture.hpp"
@@ -109,9 +108,9 @@ TEST_CASE_FIXTURE(ParserFixture, "root with no argument is a config error")
 
 TEST_CASE_FIXTURE(ParserFixture, "a quoted argument with a space is supported")
 {
-    // The Lexer (Phase 3) reads a quoted string as one token, so
-    // "/a path/" no longer splits into two tokens at the space -
-    // this closed what used to be a real, locked-in gap.
+    // The Lexer reads a quoted string as one token, so "/a path/"
+    // no longer splits into two tokens at the space - this closed
+    // what used to be a real, locked-in gap.
     std::filesystem::path spaced = tmpDir / "a path";
     std::filesystem::create_directories(spaced);
     string conf = "server {\n"
@@ -315,10 +314,8 @@ TEST_CASE_FIXTURE(ParserFixture, "error_log between two server blocks parses wit
 
 TEST_CASE_FIXTURE(ParserFixture, "the user directive is recognized and validated")
 {
-    // Ported in as part of Phase 4's main-context directive handling
-    // (see V4-PLAN.md); the actual privilege-drop mechanism itself is
-    // v5's remaining work, but the directive is parsed and validated
-    // here already.
+    // The directive is parsed and validated here; the actual
+    // privilege-drop mechanism itself lives in Privileges.hpp/.cpp.
     string conf = "user root\n"
                   "\n"
                   "server {\n"
