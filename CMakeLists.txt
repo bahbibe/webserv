@@ -76,7 +76,7 @@ set_target_properties(webserv PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-# --- unit tests (v4: config parser hardening, see V4-PLAN.md) ---
+# --- unit tests (v4: config parser hardening) ---
 #
 # Scoped narrowly to parser-level logic, not HTTP behavior - the
 # existing curl-driven tests/run_tests.sh stays authoritative for
