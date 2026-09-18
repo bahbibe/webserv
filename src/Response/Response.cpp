@@ -118,7 +118,19 @@ void Response::sendResponse(Request &request, int fdSocket, map<int, int> &cgiFd
         if (!this->_defaultError && headerSent())
             GET();
     }
-    else if (this->_statusCode == 301 || (is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
+    // The automatic "directory without a trailing slash" redirect
+    // (as opposed to an explicit `return` directive, which sets
+    // _statusCode to 301 itself and applies to every method by
+    // design) only makes sense for GET/HEAD. A POST or DELETE to a
+    // directory-shaped target already did its real work - a file
+    // upload writes to disk during request parsing, independent of
+    // this response entirely - by the time this runs; redirecting it
+    // told the client to retry a request whose side effect had
+    // already happened, with no reliable way for the client to know
+    // that (most clients drop the body and convert to GET on a 301
+    // follow, silently discarding what looks like a failed upload).
+    else if (this->_statusCode == 301 || ((this->_method == "GET" || this->_method == "HEAD")
+        && is_adir(this->_path) && this->_target[this->_target.length() - 1] != '/'))
     {
         if (this->_statusCode == 301)
             this->_path = request.directives.returnRedirect;
