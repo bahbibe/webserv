@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Only ecosystem Dependabot actually understands here - spdlog and
+  # doctest are pinned via CMake FetchContent(GIT_TAG ...), which
+  # Dependabot has no support for, so those stay a manual bump.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
