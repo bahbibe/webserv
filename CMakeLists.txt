@@ -103,7 +103,13 @@ if(WEBSERV_BUILD_TESTS)
 
     include(CTest)
     include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
-    doctest_discover_tests(webserv_tests)
+    # WORKING_DIRECTORY: the parser tests load a real conf/mime.types
+    # by a path relative to the repo root - ctest otherwise runs each
+    # test with the build directory as cwd (whether invoked as
+    # `ctest --test-dir build` or `cd build && ctest`), which breaks
+    # that lookup even though running the webserv_tests binary
+    # directly from the repo root works fine.
+    doctest_discover_tests(webserv_tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 
 # --- fuzzing (libFuzzer, Clang only - libFuzzer ships in compiler-rt,
